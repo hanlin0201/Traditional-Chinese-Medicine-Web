@@ -47,7 +47,13 @@ npm run build
 npm run preview
 ```
 
-开发服默认：**http://localhost:5173**。**请务必用开发服务访问，不要直接双击 index.html 打开。**
+开发服默认：**http://localhost:5173**。**请务必用开发服务访问，不要直接双击 index.html 打开。**（正确运行方式（必做）
+在项目根目录 c:\Users\16539\Desktop\web 打开终端（PowerShell 或 CMD），依次执行：
+npm installnpm run dev
+等终端出现类似：
+  ➜  Local:   http://localhost:5173/
+再用浏览器打开：http://localhost:5173
+（不要直接双击 index.html，也不要开 file:///... 的地址。））
 
 若页面空白：按 F12 打开开发者工具，在 Console 查看是否有报错；并确认已执行 `npm install` 且 `npm run dev` 成功。
 
