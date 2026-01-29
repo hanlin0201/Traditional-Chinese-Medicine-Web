@@ -1,333 +1,212 @@
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { ArrowLeft } from 'lucide-vue-next'
-import { useAuth } from '@/composables/useAuth'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { supabase } from '@/supabaseClient'
+import { useAuth } from '@/composables/useAuth'
 import HealthTagManager from '@/components/HealthTagManager.vue'
+import { Trash2, ChevronDown, FileText, ChefHat, User, Edit2, Check, Camera } from 'lucide-vue-next'
 
-const router = useRouter()
-const { user, fetchProfile } = useAuth()
-
-const username = ref('')
-const location = ref('')
-const bio = ref('')
-const avatarUrl = ref('')
+const { user } = useAuth()
 const loading = ref(true)
-const saving = ref(false)
-const saveError = ref('')
-const saveSuccess = ref(false)
+const activeTab = ref('plans')
 
-const DEFAULT_AVATAR = '/placeholder-herb.svg'
-const AVATAR_BUCKET = 'avatars'
-const avatarInput = ref(null)
-const avatarUploading = ref(false)
+// 数据
+const username = ref('')
+const avatar_url = ref('')
+const isEditingName = ref(false)
+const fileInput = ref(null) // 引用隐藏的文件输入框
 
-function triggerAvatarInput() {
-  avatarInput.value?.click()
+const carePlans = ref([])
+const savedRecipes = ref([])
+const foldedStates = ref({})
+
+// 1. 获取数据
+async function getProfile() {
+  try {
+    if (!user.value) return
+    const { data } = await supabase.from('profiles').select('*').eq('id', user.value.id).single()
+    if (data) {
+      username.value = data.username || ''
+      avatar_url.value = data.avatar_url || ''
+      carePlans.value = data.care_plans || []
+      savedRecipes.value = data.saved_recipes || []
+    }
+  } catch (error) { console.error(error) } 
+  finally { loading.value = false }
 }
 
-async function onAvatarFileChange(e) {
-  const file = e.target.files?.[0]
-  if (!file || !user.value?.id) return
-  if (!file.type.startsWith('image/')) {
-    saveError.value = '请选择图片文件'
-    return
-  }
-  saveError.value = ''
-  avatarUploading.value = true
-  const ext = file.name.split('.').pop() || 'jpg'
-  const path = `${user.value.id}/avatar.${ext}`
-  const { error: uploadError } = await supabase.storage
-    .from(AVATAR_BUCKET)
-    .upload(path, file, { upsert: true })
-  avatarUploading.value = false
-  e.target.value = ''
-  if (uploadError) {
-    saveError.value = uploadError.message || '头像上传失败'
-    return
-  }
-  const { data: urlData } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path)
-  const publicUrl = urlData?.publicUrl
-  if (!publicUrl) return
-  const { error: updateError } = await supabase
-    .from('profiles')
-    .update({ avatar_url: publicUrl })
-    .eq('id', user.value.id)
-  if (updateError) {
-    saveError.value = updateError.message || '头像保存失败'
-    return
-  }
-  avatarUrl.value = publicUrl
-  await fetchProfile()
+// 2. 触发文件选择 (点击头像时调用)
+function triggerFileInput() {
+  fileInput.value.click()
 }
 
-onMounted(async () => {
-  if (!user.value?.id) {
-    router.replace('/')
+// 3. 处理文件上传 (转 Base64 存入 DB)
+async function handleFileChange(event) {
+  const file = event.target.files[0]
+  if (!file) return
+
+  // 限制图片大小 (例如 1MB)，防止 Base64 太长数据库存不下
+  if (file.size > 1024 * 1024) {
+    alert('图片太大，请选择小于 1MB 的图片')
     return
   }
-  loading.value = true
-  const { data } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.value.id)
-    .maybeSingle()
-  if (data) {
-    username.value = data.username ?? ''
-    location.value = data.location ?? ''
-    bio.value = data.bio ?? ''
-    avatarUrl.value = data.avatar_url ?? ''
-  } else {
-    await fetchProfile()
-    username.value = ''
-    location.value = ''
-    bio.value = ''
-    avatarUrl.value = ''
+
+  const reader = new FileReader()
+  reader.onload = async (e) => {
+    const base64String = e.target.result
+    avatar_url.value = base64String // 立即预览
+    
+    // 保存到数据库
+    await saveProfileField({ avatar_url: base64String })
   }
-  loading.value = false
+  reader.readAsDataURL(file)
+}
+
+// 4. 保存单个字段通用函数
+async function saveProfileField(updates) {
+  try {
+    const { error } = await supabase.from('profiles').update({ 
+      ...updates, 
+      updated_at: new Date() 
+    }).eq('id', user.value.id)
+    if (error) throw error
+  } catch (error) {
+    alert('保存失败: ' + error.message)
+  }
+}
+
+// 5. 保存昵称
+async function saveName() {
+  isEditingName.value = false
+  if (!username.value.trim()) username.value = '未命名'
+  await saveProfileField({ username: username.value })
+}
+
+// 6. 删除逻辑
+async function deletePlan(planId) {
+  if(!confirm('确定删除?')) return
+  const newPlans = carePlans.value.filter(p => p.id !== planId)
+  await supabase.from('profiles').update({ care_plans: newPlans }).eq('id', user.value.id)
+  carePlans.value = newPlans
+}
+
+async function deleteRecipe(recipeId) {
+  if(!confirm('确定删除?')) return
+  const newRecipes = savedRecipes.value.filter(r => String(r.id) !== String(recipeId)) // 强转String对比
+  await supabase.from('profiles').update({ saved_recipes: newRecipes }).eq('id', user.value.id)
+  savedRecipes.value = newRecipes
+}
+
+// 监听刷新
+onMounted(() => {
+  getProfile()
+  window.addEventListener('profile-updated', getProfile)
 })
 
-async function save() {
-  if (!user.value?.id) return
-  saveError.value = ''
-  saveSuccess.value = false
-  saving.value = true
-  const { error } = await supabase
-    .from('profiles')
-    .update({
-      username: username.value.trim(),
-      location: location.value.trim(),
-      bio: bio.value.trim(),
-    })
-    .eq('id', user.value.id)
-  saving.value = false
-  if (error) {
-    saveError.value = error.message || '保存失败'
-    return
-  }
-  await fetchProfile()
-  saveSuccess.value = true
-  setTimeout(() => { saveSuccess.value = false }, 2000)
-}
-
-function goBack() {
-  router.push('/')
-}
+onUnmounted(() => {
+  window.removeEventListener('profile-updated', getProfile)
+})
 </script>
 
 <template>
-  <div class="min-h-screen pb-24 flex flex-col bg-[#FDFBF7]">
-    <header class="sticky top-0 z-10 glass-search wood-overlay px-4 py-2 flex items-center gap-3 border-b border-sandalwood/10">
-      <button
-        type="button"
-        class="p-1.5 rounded-lg text-sandalwood hover:bg-sandalwood/10 transition-colors"
-        aria-label="返回"
-        @click="goBack"
-      >
-        <ArrowLeft class="w-5 h-5" />
-      </button>
-      <h1 class="font-serif font-semibold text-sandalwood text-lg">个人中心</h1>
-    </header>
+  <div class="min-h-screen bg-[#FDFBF7] pb-24 p-4">
+    <div class="max-w-xl mx-auto space-y-6">
+      
+      <section class="bg-white p-6 rounded-xl shadow-sm border border-sandalwood/10 flex flex-col items-center justify-center text-center">
+        
+        <input 
+          type="file" 
+          ref="fileInput" 
+          accept="image/*" 
+          class="hidden" 
+          @change="handleFileChange"
+        />
 
-    <template v-if="loading">
-      <div class="flex-1 flex items-center justify-center text-sandalwood/60 gap-3">
-        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-sandalwood" />
-        <span class="text-sm font-serif">加载中...</span>
-      </div>
-    </template>
+        <div 
+          @click="triggerFileInput"
+          class="w-20 h-20 rounded-full bg-sandalwood/10 flex items-center justify-center overflow-hidden border-2 border-sandalwood/20 mb-3 cursor-pointer group relative hover:border-sandalwood transition-colors"
+        >
+           <img v-if="avatar_url" :src="avatar_url" class="w-full h-full object-cover" />
+           <User v-else class="w-8 h-8 text-sandalwood/50" />
+           
+           <div class="absolute inset-0 bg-black/30 hidden group-hover:flex items-center justify-center text-white">
+             <Camera class="w-6 h-6" />
+           </div>
+        </div>
 
-    <template v-else>
-      <div class="flex-1 px-4 py-6 max-w-xl mx-auto w-full">
-        <!-- 头像：点击选择图片 -->
-        <div class="flex justify-center mb-6">
-          <input
-            ref="avatarInput"
-            type="file"
-            accept="image/*"
-            class="hidden"
-            aria-hidden="true"
-            @change="onAvatarFileChange"
-          />
-          <button
-            type="button"
-            class="profile-avatar-wrap"
-            :disabled="avatarUploading"
-            @click="triggerAvatarInput"
-          >
-            <img
-              :src="avatarUrl || DEFAULT_AVATAR"
-              :alt="username || '头像'"
-              class="profile-avatar-img"
-              @error="(e) => (e.target.src = DEFAULT_AVATAR)"
+        <div class="flex items-center justify-center gap-2 h-8 w-full">
+          <div v-if="!isEditingName" @click="isEditingName = true" class="flex items-center gap-2 cursor-pointer hover:bg-gray-50 px-2 py-1 rounded group">
+            <h2 class="text-xl font-serif font-bold text-sandalwood">{{ username || '点击设置昵称' }}</h2>
+            <Edit2 class="w-3 h-3 text-gray-300 group-hover:text-sandalwood/50" />
+          </div>
+          <div v-else class="flex items-center gap-2">
+            <input 
+              v-model="username" 
+              @blur="saveName"
+              @keyup.enter="saveName"
+              autoFocus
+              class="text-xl font-serif font-bold text-sandalwood text-center bg-[#FDFBF7] border-b border-sandalwood/50 outline-none w-40"
             />
-            <span v-if="avatarUploading" class="profile-avatar-loading">上传中…</span>
-            <span v-else class="profile-avatar-hint">点击更换</span>
+            <button @click="saveName" class="text-green-600 hover:bg-green-50 p-1 rounded"><Check class="w-4 h-4" /></button>
+          </div>
+        </div>
+        
+        <p class="text-xs text-gray-400 mt-1">{{ user?.email }}</p>
+      </section>
+
+      <HealthTagManager />
+
+      <section>
+        <div class="flex gap-6 border-b border-sandalwood/10 mb-4">
+          <button @click="activeTab='plans'" :class="activeTab==='plans'?'text-sandalwood font-bold border-b-2 border-sandalwood':'text-gray-400'" class="pb-2 px-1 text-sm flex gap-2 items-center transition-all">
+            <FileText class="w-4 h-4"/> 调理计划
+          </button>
+          <button @click="activeTab='recipes'" :class="activeTab==='recipes'?'text-sandalwood font-bold border-b-2 border-sandalwood':'text-gray-400'" class="pb-2 px-1 text-sm flex gap-2 items-center transition-all">
+             <ChefHat class="w-4 h-4"/> 收藏食谱
           </button>
         </div>
 
-        <!-- 表单 -->
-        <form class="space-y-4" @submit.prevent="save">
-          <div>
-            <label class="profile-label">昵称 (Username)</label>
-            <input
-              v-model="username"
-              type="text"
-              class="profile-input"
-              placeholder="请输入昵称"
-            />
+        <div v-if="activeTab === 'plans'" class="space-y-4">
+          <div v-if="carePlans.length === 0" class="text-center text-gray-400 text-sm py-10 bg-white rounded-xl border border-dashed border-sandalwood/10">
+            暂无计划，请点击右下角卷轴问问 AI 导师
           </div>
-          <div>
-            <label class="profile-label">所在地 (Location)</label>
-            <input
-              v-model="location"
-              type="text"
-              class="profile-input"
-              placeholder="请输入所在地"
-            />
+          <div v-for="plan in carePlans" :key="plan.id" class="bg-white border border-sandalwood/10 rounded-xl overflow-hidden shadow-sm">
+             <div class="bg-[#FAF6ED] p-3 flex justify-between items-center border-b border-sandalwood/5">
+                <span class="font-bold text-sandalwood flex items-center gap-2">💡 {{ plan.diagnosis_result }}</span>
+                <button @click="deletePlan(plan.id)" class="p-1 text-gray-300 hover:text-red-500 transition">
+                  <Trash2 class="w-4 h-4" />
+                </button>
+             </div>
+             <div class="p-4 space-y-4">
+               <p class="text-sm text-gray-700 leading-relaxed">{{ plan.summary }}</p>
+               <div v-if="plan.acupoints" class="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                 <div class="text-xs font-bold text-sandalwood mb-2 flex items-center gap-1"><span class="w-1.5 h-1.5 bg-sandalwood rounded-full"></span> 穴位按揉</div>
+                 <div v-for="(a, idx) in plan.acupoints" :key="idx" class="text-xs mb-2 last:mb-0">
+                   <span class="font-bold text-gray-800">{{ a.name }}</span> | <span class="text-gray-600">{{ a.location }}</span>
+                   <div class="mt-1 text-sandalwood/80 bg-white p-1.5 rounded border border-sandalwood/5">👉 {{ a.method }}</div>
+                 </div>
+               </div>
+               <div v-if="plan.lifestyle" class="text-xs text-gray-500"><span class="font-bold text-sandalwood">🚫 禁忌：</span> {{ plan.lifestyle.join('；') }}</div>
+             </div>
           </div>
-          <div>
-            <label class="profile-label">个人简介 (Bio)</label>
-            <textarea
-              v-model="bio"
-              class="profile-textarea"
-              placeholder="请输入个人简介"
-              rows="4"
-            />
-          </div>
+        </div>
 
-          <p v-if="saveError" class="profile-error">{{ saveError }}</p>
-          <p v-if="saveSuccess" class="profile-success">保存成功</p>
+        <div v-else class="grid grid-cols-1 gap-3">
+           <div v-if="savedRecipes.length === 0" class="text-center text-gray-400 text-sm py-10 bg-white rounded-xl border border-dashed border-sandalwood/10">暂无收藏食谱</div>
+           <div v-for="r in savedRecipes" :key="r.id" class="bg-white border border-sandalwood/10 rounded-xl p-4 shadow-sm relative group">
+              <button @click="deleteRecipe(r.id)" class="absolute top-3 right-3 text-gray-300 hover:text-red-500 transition"><Trash2 class="w-4 h-4" /></button>
+              <h4 class="font-bold text-gray-800 mb-1">{{ r.name }}</h4>
+              <div class="flex flex-wrap gap-1 mb-3">
+                 <span v-for="t in r.tags" :key="t" class="text-[10px] bg-[#EEF2E6] text-[#5A7C65] px-1.5 py-0.5 rounded border border-[#5A7C65]/20">{{ t }}</span>
+              </div>
+              <p class="text-xs text-gray-600 mb-3 bg-gray-50 p-2 rounded"><strong>食材：</strong>{{ r.ingredients.join('、') }}</p>
+              <button @click="foldedStates[r.id] = !foldedStates[r.id]" class="w-full text-xs text-center text-sandalwood/70 hover:text-sandalwood border-t pt-2 flex items-center justify-center gap-1">{{ foldedStates[r.id] ? '收起做法' : '查看做法' }}<ChevronDown class="w-3 h-3 transition-transform" :class="{'rotate-180': foldedStates[r.id]}" /></button>
+              <div v-show="foldedStates[r.id]" class="mt-2 text-xs text-gray-600 space-y-1 pl-2 border-l-2 border-sandalwood/10">
+                 <p v-for="(s, i) in r.steps" :key="i">{{ s }}</p>
+              </div>
+           </div>
+        </div>
+      </section>
 
-          <button
-            type="submit"
-            class="profile-btn"
-            :disabled="saving"
-          >
-            {{ saving ? '保存中…' : 'Save Changes' }}
-          </button>
-        </form>
-
-        <!-- 健康体质标签管理 -->
-        <HealthTagManager />
-      </div>
-    </template>
+    </div>
   </div>
 </template>
-
-<style scoped>
-.glass-search {
-  background: rgba(253, 251, 247, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(139, 90, 43, 0.12);
-}
-.wood-overlay {
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
-}
-.profile-label {
-  display: block;
-  margin-bottom: 0.375rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #8B5A2B;
-}
-.profile-input,
-.profile-textarea {
-  width: 100%;
-  padding: 0.625rem 0.75rem;
-  font-family: inherit;
-  font-size: 0.9375rem;
-  color: #5c3317;
-  background: #fff;
-  border: 1px solid rgba(139, 90, 43, 0.2);
-  border-radius: 0.5rem;
-  outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-.profile-textarea {
-  resize: vertical;
-  min-height: 5rem;
-}
-.profile-input:focus,
-.profile-textarea:focus {
-  border-color: #8B5A2B;
-  box-shadow: 0 0 0 3px rgba(139, 90, 43, 0.12);
-}
-.profile-error {
-  margin: 0;
-  font-size: 0.8125rem;
-  color: #C44E46;
-}
-.profile-success {
-  margin: 0;
-  font-size: 0.875rem;
-  color: #5D7A47;
-}
-.profile-btn {
-  width: 100%;
-  padding: 0.75rem 1rem;
-  font-family: inherit;
-  font-size: 0.9375rem;
-  font-weight: 500;
-  color: #fff;
-  background: #8B5A2B;
-  border: none;
-  border-radius: 0.5rem;
-  cursor: pointer;
-  transition: background 0.2s, opacity 0.2s;
-}
-.profile-btn:hover:not(:disabled) {
-  background: #7a4f26;
-}
-.profile-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.profile-avatar-wrap {
-  position: relative;
-  display: block;
-  width: 6rem;
-  height: 6rem;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-  overflow: hidden;
-  border: 2px solid rgba(139, 90, 43, 0.2);
-  background: rgba(139, 90, 43, 0.05);
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-.profile-avatar-wrap:hover:not(:disabled) {
-  border-color: rgba(139, 90, 43, 0.4);
-  box-shadow: 0 0 0 3px rgba(139, 90, 43, 0.15);
-}
-.profile-avatar-wrap:disabled {
-  cursor: not-allowed;
-  opacity: 0.8;
-}
-.profile-avatar-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.profile-avatar-hint,
-.profile-avatar-loading {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.75rem;
-  color: #fff;
-  background: rgba(0, 0, 0, 0.4);
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-.profile-avatar-wrap:hover .profile-avatar-hint,
-.profile-avatar-wrap:hover .profile-avatar-loading,
-.profile-avatar-loading {
-  opacity: 1;
-}
-</style>

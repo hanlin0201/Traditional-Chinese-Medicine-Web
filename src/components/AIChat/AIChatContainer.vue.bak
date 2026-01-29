@@ -1,0 +1,122 @@
+<script setup>
+import { ref, computed } from 'vue'
+import { Send } from 'lucide-vue-next'
+import { useAuth } from '@/composables/useAuth'
+import MessageRenderer from './MessageRenderer.vue'
+
+const { logUserHistory } = useAuth()
+
+const MOCK_INQUIRY = {
+  type: 'inquiry',
+  text: '收到，失眠在中医里分多种情况。为了给您更精准的建议，请告诉我您是否有以下伴随症状？',
+  options: [
+    { label: '口苦、急躁易怒', value: '肝火旺' },
+    { label: '心慌、健忘多梦', value: '心脾两虚' },
+    { label: '手脚心热、盗汗', value: '阴虚火旺' },
+    { label: '没有其他明显症状', value: '一般失眠' },
+  ],
+}
+
+const MOCK_PRESCRIPTION = {
+  type: 'prescription',
+  diagnosis_result: '肝火扰心型失眠',
+  summary: '根据您的描述，您属于肝火旺导致的心神不宁。建议清肝泻火，安神定志。',
+  recipes: [
+    {
+      name: '夏枯草黑豆茶',
+      tags: ['清肝', '去火'],
+      ingredients: ['夏枯草 10g', '黑豆 30g', '冰糖适量'],
+      steps: ['1. 黑豆炒香...', '2. 放入夏枯草煮水...'],
+      is_folded: true,
+    },
+    {
+      name: '芹菜红枣汤',
+      tags: ['平肝', '降压'],
+      ingredients: ['鲜芹菜 200g', '红枣 5枚'],
+      steps: ['...'],
+      is_folded: true,
+    },
+  ],
+  acupoints: [
+    {
+      name: '太冲穴',
+      location: '足背侧，第一、二跖骨结合部之前凹陷处',
+      method: '睡前按揉 5 分钟，有酸胀感为宜',
+    },
+  ],
+  lifestyle: ['忌食辛辣、饮酒', '每晚 23:00 前必须卧床'],
+}
+
+const input = ref('')
+const messages = ref([
+  {
+    role: 'assistant',
+    content: '您好，我是 AI 养生导师。请告诉我您近来的身体不适或想调理的方向，我会从中医角度为您问诊并给出调理建议。',
+  },
+])
+
+function sendText() {
+  const text = input.value.trim()
+  if (!text) return
+  messages.value.push({ role: 'user', content: text })
+  input.value = ''
+  logUserHistory(text)
+  // 模拟：出问诊卡片
+  messages.value.push({ ...MOCK_INQUIRY })
+}
+
+function onInquiryOptionClick(option) {
+  messages.value.push({ role: 'user', content: option.label })
+  const pendingTag = option.value
+  // 模拟：1 秒后出处方卡片
+  setTimeout(() => {
+    messages.value.push({
+      ...MOCK_PRESCRIPTION,
+      pendingTag,
+    })
+  }, 1000)
+}
+
+function onSavePlan(pendingTag) {
+  console.log('Saving Plan & Tag:', pendingTag ?? '')
+}
+
+function handleKeydown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault()
+    sendText()
+  }
+}
+</script>
+
+<template>
+  <div class="flex flex-col h-full">
+    <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-[#FAF6ED]">
+      <MessageRenderer
+        v-for="(m, i) in messages"
+        :key="i"
+        :message="m"
+        @inquiry-option="onInquiryOptionClick"
+        @save-plan="onSavePlan"
+      />
+    </div>
+    <div class="p-3 border-t border-sandalwood/15 bg-[#FDFBF7]">
+      <div class="flex gap-2">
+        <input
+          v-model="input"
+          type="text"
+          placeholder="输入您的不适或养生问题…"
+          class="flex-1 px-4 py-2 rounded-lg border border-sandalwood/20 bg-white text-sandalwood placeholder-sandalwood/50 focus:outline-none focus:ring-2 focus:ring-sandalwood/30"
+          @keydown="handleKeydown"
+        />
+        <button
+          type="button"
+          class="p-2 rounded-lg bg-sandalwood text-white hover:bg-sandalwood/90"
+          @click="sendText"
+        >
+          <Send class="w-5 h-5" />
+        </button>
+      </div>
+    </div>
+  </div>
+</template>
