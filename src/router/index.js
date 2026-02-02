@@ -3,9 +3,15 @@ import { createRouter, createWebHistory } from 'vue-router'
 const routes = [
   {
     path: '/',
-    name: 'Home',
+    name: 'MenuIndex',
+    component: () => import('@/views/MenuIndexView.vue'),
+    meta: { title: '中医药百科' },
+  },
+  {
+    path: '/herbs',
+    name: 'HerbIntro',
     component: () => import('@/views/HomeView.vue'),
-    meta: { title: '药材百科' },
+    meta: { title: '药材介绍' },
   },
   {
     path: '/herb/:id',
