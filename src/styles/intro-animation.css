@@ -1,0 +1,40 @@
+/* 入场动画：泡泡汇聚 + 白屏转场 */
+#intro-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #000;
+  z-index: 9999;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: opacity 1.2s ease-out;
+}
+
+#intro-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.intro-bubble-img {
+  position: absolute;
+  border-radius: 50%;
+  object-fit: cover;
+  opacity: 0;
+  transition: all 2s cubic-bezier(0.5, 0, 0.5, 1);
+}
+
+#intro-white-flash {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: white;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 10001;
+}
