@@ -15,10 +15,14 @@ function goDetail() {
   router.push({ name: 'HerbDetail', params: { id: props.herb.id } })
 }
 
-// 优先 Supabase image_url（完整 URL），否则 CDN + image
+// 优先 Supabase image_url（完整 URL），否则使用占位图
 function imgSrc() {
-  if (props.herb.image_url) return props.herb.image_url
-  return `${CDN_URL}${props.herb.image || ''}`
+  const url = props.herb.image_url
+  if (url && url.trim() !== '') {
+    return url
+  }
+  // 没有图片时返回占位图
+  return '/placeholder-herb.svg'
 }
 </script>
 
@@ -32,6 +36,7 @@ function imgSrc() {
         :src="imgSrc()"
         :alt="herb.name"
         loading="lazy"
+        referrerpolicy="no-referrer"
         class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
         @error="($e) => { $e.target.src = '/placeholder-herb.svg'; $e.target.onerror = null }"
       />

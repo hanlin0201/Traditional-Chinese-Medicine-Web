@@ -61,7 +61,7 @@ onMounted(doLoad)
 watch(id, doLoad)
 
 function goBack() {
-  router.push('/') // 确保返回首页
+  router.push('/herbs') // 返回药材列表
 }
 </script>
 

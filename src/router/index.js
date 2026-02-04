@@ -3,7 +3,17 @@ import { createRouter, createWebHistory } from 'vue-router'
 const routes = [
   {
     path: '/',
-    name: 'Home',
+    redirect: '/portal',
+  },
+  {
+    path: '/portal',
+    name: 'Portal',
+    component: () => import('@/views/PortalView.vue'),
+    meta: { title: '首页' },
+  },
+  {
+    path: '/herbs',
+    name: 'Herbs',
     component: () => import('@/views/HomeView.vue'),
     meta: { title: '药材百科' },
   },
@@ -18,6 +28,12 @@ const routes = [
     name: 'Profile',
     component: () => import('@/views/ProfileView.vue'),
     meta: { title: '个人中心', requiresAuth: true },
+  },
+  {
+    path: '/acupoints',
+    name: 'Acupoints',
+    component: () => import('@/views/PortalView.vue'), // 暂时使用门户页面占位
+    meta: { title: '穴位网站' },
   },
 ]
 
