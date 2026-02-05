@@ -32,12 +32,14 @@ const filteredHerbs = computed(() => {
 })
 
 // 3. 核心修复：点击卡片跳转详情
+// src/views/HomeView.vue
+
 const goToDetail = (herb) => {
-  // 这里的 name: 'HerbDetail' 必须和你 router/index.js 里的 name 一致
-  // params: { name: ... } 对应路径 /herb/:name
   router.push({ 
     name: 'HerbDetail', 
-    params: { name: herb.name } 
+    params: { name: herb.name },
+    // 核心修改：把整个 herb 对象存到 history.state 里带过去
+    state: { preloadHerb: JSON.parse(JSON.stringify(herb)) } 
   })
 }
 
