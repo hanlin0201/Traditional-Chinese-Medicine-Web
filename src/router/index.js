@@ -3,17 +3,6 @@ import { createRouter, createWebHistory } from 'vue-router'
 const routes = [
   {
     path: '/',
-    redirect: '/portal',
-  },
-  {
-    path: '/portal',
-    name: 'Portal',
-    component: () => import('@/views/PortalView.vue'),
-    meta: { title: '首页' },
-  },
-  {
-    path: '/herbs',
-    name: 'Herbs',
     name: 'MenuIndex',
     component: () => import('@/views/MenuIndexView.vue'),
     meta: { title: '中医药百科' },
@@ -37,10 +26,6 @@ const routes = [
     meta: { title: '个人中心', requiresAuth: true },
   },
   {
-    path: '/acupoints',
-    name: 'Acupoints',
-    component: () => import('@/views/PortalView.vue'), // 暂时使用门户页面占位
-    meta: { title: '穴位网站' },
     path: '/recipes', 
     name: 'RecipeMarket',
     component: () => import('@/views/RecipeMarket.vue') // 使用 @ 符号更稳妥

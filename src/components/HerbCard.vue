@@ -15,14 +15,10 @@ function goDetail() {
   router.push({ name: 'HerbDetail', params: { id: props.herb.id } })
 }
 
-// 优先 Supabase image_url（完整 URL），否则使用占位图
+// 优先 Supabase image_url（完整 URL），否则 CDN + image
 function imgSrc() {
-  const url = props.herb.image_url
-  if (url && url.trim() !== '') {
-    return url
-  }
-  // 没有图片时返回占位图
-  return '/placeholder-herb.svg'
+  if (props.herb.image_url) return props.herb.image_url
+  return `${CDN_URL}${props.herb.image || ''}`
 }
 </script>
 
@@ -36,7 +32,6 @@ function imgSrc() {
         :src="imgSrc()"
         :alt="herb.name"
         loading="lazy"
-        referrerpolicy="no-referrer"
         class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
         @error="($e) => { $e.target.src = '/placeholder-herb.svg'; $e.target.onerror = null }"
       />
@@ -45,18 +40,10 @@ function imgSrc() {
     <div class="p-4">
       <h3 class="font-serif font-semibold text-sandalwood text-lg mb-2">{{ herb.name }}</h3>
       <div class="flex flex-wrap gap-1.5">
-        <!-- 显示药材类别 -->
         <span
-          v-if="herb.classification"
-          class="px-2.5 py-0.5 rounded-full text-xs bg-bamboo/15 text-bamboo"
-        >
-          {{ herb.classification }}
-        </span>
-        <!-- 兼容旧的 tags 字段 -->
-        <span
-          v-for="tag in (herb.tags || [])"
+          v-for="tag in herb.tags"
           :key="tag"
-          class="px-2.5 py-0.5 rounded-full text-xs bg-sandalwood/10 text-sandalwood"
+          class="px-2.5 py-0.5 rounded-full text-xs bg-bamboo/15 text-bamboo"
         >
           {{ tag }}
         </span>

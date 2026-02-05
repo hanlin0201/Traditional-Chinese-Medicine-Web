@@ -57,28 +57,36 @@ export function useHerbList() {
   let nextOffset = PAGE_SIZE
 
   async function load() {
-    // 清除旧缓存，确保获取最新数据
-    localStorage.removeItem(CACHE_KEY_PAGE1)
-    
-    loading.value = true
-    error.value = null
-    try {
-      // 加载药材，按ID降序（新数据在前）
+    const cached = getCache(CACHE_KEY_PAGE1)
+    if (cached && Array.isArray(cached)) {
+      herbs.value = normalizeHerbs(cached)
+      loading.value = false
+      nextOffset = PAGE_SIZE
+      hasMore.value = cached.length >= PAGE_SIZE
+      // 后台静默 revalidate
       const { data, error: e } = await supabase
         .from('herbs')
         .select('*')
-        .order('id', { ascending: false })
+        .order('id', { ascending: true })
+        .range(0, PAGE_SIZE - 1)
+      if (!e && data) {
+        const norm = normalizeHerbs(data)
+        herbs.value = norm
+        setCache(CACHE_KEY_PAGE1, norm)
+        hasMore.value = norm.length >= PAGE_SIZE
+      }
+      return
+    }
+    loading.value = true
+    error.value = null
+    try {
+      const { data, error: e } = await supabase
+        .from('herbs')
+        .select('*')
+        .order('id', { ascending: true })
         .range(0, PAGE_SIZE - 1)
       if (e) throw e
-      
       const norm = normalizeHerbs(data || [])
-      
-      // 调试：打印前3条数据的image_url
-      console.log('=== 调试：加载的药材数据 ===')
-      norm.slice(0, 3).forEach(h => {
-        console.log(`${h.name} (ID:${h.id}): image_url = ${h.image_url}`)
-      })
-      
       herbs.value = norm
       setCache(CACHE_KEY_PAGE1, norm)
       nextOffset = PAGE_SIZE
@@ -98,7 +106,7 @@ export function useHerbList() {
       const { data, error: e } = await supabase
         .from('herbs')
         .select('*')
-        .order('id', { ascending: false })
+        .order('id', { ascending: true })
         .range(nextOffset, nextOffset + PAGE_SIZE - 1)
       if (e) return
       const norm = normalizeHerbs(data || [])

@@ -1,17 +1,13 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 // 引入你需要用到的图标
 import { User, Home, BookOpen, UtensilsCrossed, Activity } from 'lucide-vue-next'
 import AiCompanion from '@/components/AiCompanion.vue'
 import LoginOverlay from '@/components/LoginOverlay.vue'
-import NavBar from '@/components/NavBar.vue'
 import { useAuth } from '@/composables/useAuth'
 
 const router = useRouter()
-const route = useRoute()
 // 保持你原有的登录逻辑不变
 const { user, gatePassed } = useAuth()
 
@@ -19,13 +15,6 @@ const forceShowLogin = ref(false)
 // 计算属性：决定是否显示全屏登录/门禁遮罩
 const showLoginOverlay = computed(() => !gatePassed.value || forceShowLogin.value)
 
-// 是否显示导航栏（门户页面不显示，让门户页面自己全屏展示）
-const showNavBar = computed(() => {
-  return gatePassed.value && route.path !== '/portal'
-})
-
-function handleRequestLogin() {
-  forceShowLogin.value = true
 // 打开登录面板或跳转个人中心的逻辑
 function openAuthPanel() {
   if (user.value) {
@@ -34,22 +23,9 @@ function openAuthPanel() {
     forceShowLogin.value = true
   }
 }
-
-onMounted(() => {
-  window.addEventListener('request-login', handleRequestLogin)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('request-login', handleRequestLogin)
-})
 </script>
 
 <template>
-  <div class="min-h-screen bg-paper">
-    <!-- 顶部导航栏 -->
-    <NavBar v-if="showNavBar" />
-    
-    <RouterView />
   <div class="min-h-screen bg-paper font-sans text-stone-800">
     
     <nav v-if="gatePassed" class="sticky top-0 z-40 bg-[#f4f1ea]/90 backdrop-blur-md border-b border-stone-200 shadow-sm transition-all duration-500">

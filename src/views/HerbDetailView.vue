@@ -18,42 +18,6 @@ const herb = ref(null)
 const loading = ref(true)
 const error = ref(null)
 
-/**
- * 格式化带序号的文本，在序号前换行
- * 支持的序号格式：
- * - 圆圈数字：①②③④⑤⑥⑦⑧⑨⑩
- * - 括号数字：⑴⑵⑶⑷⑸⑹⑺⑻⑼⑽ 或 (1)(2)(3)
- * - 书名号引用：《xxx》：
- * - 数字序号：1、2、3 或 1. 2. 3
- */
-function formatNumberedText(text) {
-  if (!text) return '暂无'
-  
-  // 对文本进行 HTML 转义，防止 XSS
-  let formatted = text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-  
-  // 在圆圈数字序号前换行（①②③...）
-  formatted = formatted.replace(/([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])/g, '<br/><span class="text-cinnabar font-medium">$1</span>')
-  
-  // 在括号数字序号前换行（⑴⑵⑶...）
-  formatted = formatted.replace(/([⑴⑵⑶⑷⑸⑹⑺⑻⑼⑽])/g, '<br/><span class="text-cinnabar font-medium">$1</span>')
-  
-  // 在书名号引用前换行（《本草纲目》：）
-  formatted = formatted.replace(/(《[^》]+》[：:]\s*)/g, '<br/><span class="text-bamboo">$1</span>')
-  
-  // 移除开头可能产生的多余换行
-  formatted = formatted.replace(/^(<br\/>)+/, '')
-  
-  return formatted
-}
-
-function doLoad() {
-  // 确保 ID 存在且有效才加载
-  if (id.value && id.value !== '') {
-    load(id.value)
 // 核心功能：根据名字去数据库查药材
 const fetchHerbByName = async () => {
   const herbName = route.params.name
@@ -117,7 +81,6 @@ watch(() => route.params.name, (newName) => {
 })
 
 function goBack() {
-  router.push('/herbs') // 返回药材列表
   // 智能返回：如果有上一页记录就返回上一页(比如从食谱页来的)，否则回首页
   if (window.history.length > 1) {
     router.back()
@@ -175,75 +138,36 @@ function goBack() {
 
       <main class="flex-1 px-4 py-6 max-w-2xl mx-auto w-full space-y-5 animate-fade-in-up">
         
-        <!-- 基本信息卡片：药材类别和别名 -->
-        <div class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
-          <h2 class="text-cinnabar font-serif font-semibold text-base mb-3 flex items-center gap-2">
-            <span class="w-1 h-4 bg-cinnabar rounded" /> 基本信息
-          </h2>
-          <div class="space-y-2 text-sm">
-            <div class="flex" v-if="herb.classification">
-              <span class="text-sandalwood/60 w-20 shrink-0">药材类别</span>
-              <span class="text-sandalwood/90">{{ herb.classification }}</span>
-            </div>
-            <div class="flex" v-if="herb.alias">
-              <span class="text-sandalwood/60 w-20 shrink-0">别名</span>
-              <span class="text-sandalwood/90">{{ herb.alias }}</span>
-            </div>
-          </div>
-        </div>
-
         <div class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
           <h2 class="text-cinnabar font-serif font-semibold text-base mb-2 flex items-center gap-2">
             <span class="w-1 h-4 bg-cinnabar rounded" /> 性味归经
           </h2>
           <p class="text-sandalwood/90 text-sm leading-relaxed text-justify">
-            {{ herb.taste || '暂无' }}{{ herb.channel ? '；' + herb.channel : '' }}
+            {{ herb.nature }}；{{ herb.channel }}
           </p>
         </div>
 
         <div class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
           <h2 class="text-cinnabar font-serif font-semibold text-base mb-2 flex items-center gap-2">
-            <span class="w-1 h-4 bg-cinnabar rounded" /> 功效与作用
+            <span class="w-1 h-4 bg-cinnabar rounded" /> 功效
           </h2>
-          <div 
-            class="text-sandalwood/90 text-sm leading-relaxed text-justify formatted-content"
-            v-html="formatNumberedText(herb.effect)"
-          ></div>
+          <p class="text-sandalwood/90 text-sm leading-relaxed text-justify">{{ herb.efficacy }}</p>
         </div>
 
         <div class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
           <h2 class="text-bamboo font-serif font-semibold text-base mb-2 flex items-center gap-2">
             <span class="w-1 h-4 bg-bamboo rounded" /> 用法用量
           </h2>
-          <div 
-            class="text-sandalwood/90 text-sm leading-relaxed text-justify formatted-content"
-            v-html="formatNumberedText(herb.usage)"
-          ></div>
+          <p class="text-sandalwood/90 text-sm leading-relaxed text-justify">{{ herb.usage }}</p>
         </div>
 
         <div class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
           <h2 class="text-cinnabar font-serif font-semibold text-base mb-2 flex items-center gap-2">
-            <span class="w-1 h-4 bg-cinnabar rounded" /> 注意事项
+            <span class="w-1 h-4 bg-cinnabar rounded" /> 使用禁忌
           </h2>
-          <div 
-            class="text-sandalwood/90 text-sm leading-relaxed text-justify formatted-content"
-            v-html="formatNumberedText(herb.tips)"
-          ></div>
+          <p class="text-sandalwood/90 text-sm leading-relaxed text-justify">{{ herb.taboo }}</p>
         </div>
       </main>
     </template>
   </div>
 </template>
-
-<style scoped>
-/* 格式化内容样式 */
-.formatted-content :deep(br) {
-  content: '';
-  display: block;
-  margin-top: 0.75rem;
-}
-
-.formatted-content :deep(br:first-child) {
-  display: none;
-}
-</style>
