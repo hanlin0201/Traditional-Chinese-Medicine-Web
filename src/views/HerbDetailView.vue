@@ -7,7 +7,7 @@ import { TresCanvas } from '@tresjs/core'
 import { OrbitControls } from '@tresjs/cientos'
 // 引入你的 3D 模型子组件
 import Herb3DScene from '@/components/Herb3DScene.vue'
-// 引入 Supabase 客户端 (确保路径正确)
+// 引入 Supabase 客户端
 import { supabase } from '@/supabaseClient' 
 
 const route = useRoute()
@@ -18,21 +18,51 @@ const herb = ref(null)
 const loading = ref(true)
 const error = ref(null)
 
-// 核心功能：根据名字去数据库查药材
+/**
+ * 核心功能 1：文本美化
+ * 将枯燥的文本段落转化为带高亮序号的列表
+ */
+function formatNumberedText(text) {
+  if (!text) return '暂无'
+  
+  // HTML 转义防 XSS
+  let formatted = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+  
+  // 1. 圆圈数字换行 (①②...)
+  formatted = formatted.replace(/([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])/g, '<br/><span class="text-cinnabar font-medium">$1</span>')
+  
+  // 2. 括号数字换行 (⑴⑵...)
+  formatted = formatted.replace(/([⑴⑵⑶⑷⑸⑹⑺⑻⑼⑽])/g, '<br/><span class="text-cinnabar font-medium">$1</span>')
+  
+  // 3. 书名号引用换行 (《本草纲目》：)
+  formatted = formatted.replace(/(《[^》]+》[：:]\s*)/g, '<br/><span class="text-bamboo">$1</span>')
+  
+  // 移除首行多余的换行
+  formatted = formatted.replace(/^(<br\/>)+/, '')
+  
+  return formatted
+}
+
+/**
+ * 核心功能 2：高性能数据获取
+ * 包含：预加载(秒开) + 静默更新 + 错误处理
+ */
 const fetchHerbByName = async () => {
   const herbName = route.params.name
   if (!herbName) return
 
-  // 1. 【秒开逻辑】先检查是不是从列表页带了数据过来
+  // A. 【秒开逻辑】检查路由是否携带了预加载数据
   const preloadData = history.state.preloadHerb
 
   if (preloadData && preloadData.name === herbName) {
-    // 如果有数据，直接显示！不用 loading
+    // 命中缓存：直接渲染，无需等待
     herb.value = preloadData
-    loading.value = false // 立即取消加载状态
+    loading.value = false 
     
-    // 2. 【静默更新】后台悄悄再去查一次最新数据，补全可能缺少的字段
-    // 用户看不见这个过程，体验非常丝滑
+    // B. 【静默更新】后台悄悄核对最新数据
     try {
       const { data } = await supabase
         .from('herbs')
@@ -41,15 +71,15 @@ const fetchHerbByName = async () => {
         .single()
       
       if (data) {
-        herb.value = data // 查到了就静默替换成最全的数据
+        herb.value = data // 更新为最新全量数据
       }
     } catch (e) {
-      console.error('后台更新数据失败，但不影响展示', e)
+      console.warn('后台更新数据失败，但不影响展示', e)
     }
-    return // 结束函数
+    return 
   }
 
-  // 3. 【常规逻辑】如果是直接刷新网页（没有来源数据），才显示 Loading
+  // C. 【常规逻辑】无预加载数据时，显示 Loading 并请求
   try {
     loading.value = true
     error.value = null
@@ -70,22 +100,21 @@ const fetchHerbByName = async () => {
   }
 }
 
-// 首次挂载时加载
+// 首次挂载
 onMounted(() => {
   fetchHerbByName()
 })
 
-// 监听路由变化 (防止在当前页切换药材时不刷新)
+// 监听路由变化 (解决同页面切换药材不刷新的问题)
 watch(() => route.params.name, (newName) => {
   if (newName) fetchHerbByName()
 })
 
 function goBack() {
-  // 智能返回：如果有上一页记录就返回上一页(比如从食谱页来的)，否则回首页
   if (window.history.length > 1) {
     router.back()
   } else {
-    router.push('/')
+    router.push('/herbs') // 默认回列表页
   }
 }
 </script>
@@ -139,35 +168,80 @@ function goBack() {
       <main class="flex-1 px-4 py-6 max-w-2xl mx-auto w-full space-y-5 animate-fade-in-up">
         
         <div class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
+          <h2 class="text-cinnabar font-serif font-semibold text-base mb-3 flex items-center gap-2">
+            <span class="w-1 h-4 bg-cinnabar rounded" /> 基本信息
+          </h2>
+          <div class="space-y-2 text-sm">
+            <div class="flex" v-if="herb.classification">
+              <span class="text-sandalwood/60 w-20 shrink-0">药材类别</span>
+              <span class="text-sandalwood/90">{{ herb.classification }}</span>
+            </div>
+            <div class="flex" v-if="herb.alias">
+              <span class="text-sandalwood/60 w-20 shrink-0">别名</span>
+              <span class="text-sandalwood/90">{{ herb.alias }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
           <h2 class="text-cinnabar font-serif font-semibold text-base mb-2 flex items-center gap-2">
             <span class="w-1 h-4 bg-cinnabar rounded" /> 性味归经
           </h2>
           <p class="text-sandalwood/90 text-sm leading-relaxed text-justify">
             {{ herb.nature }}；{{ herb.channel }}
+            {{ herb.taste ? '；' + herb.taste : '' }}
           </p>
         </div>
 
         <div class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
           <h2 class="text-cinnabar font-serif font-semibold text-base mb-2 flex items-center gap-2">
-            <span class="w-1 h-4 bg-cinnabar rounded" /> 功效
+            <span class="w-1 h-4 bg-cinnabar rounded" /> 功效与作用
           </h2>
-          <p class="text-sandalwood/90 text-sm leading-relaxed text-justify">{{ herb.efficacy }}</p>
+          <p v-if="herb.efficacy" class="text-sandalwood/90 text-sm leading-relaxed text-justify mb-2 font-medium">
+            {{ herb.efficacy }}
+          </p>
+          <div 
+            v-if="herb.effect"
+            class="text-sandalwood/90 text-sm leading-relaxed text-justify formatted-content"
+            v-html="formatNumberedText(herb.effect)"
+          ></div>
         </div>
 
         <div class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
           <h2 class="text-bamboo font-serif font-semibold text-base mb-2 flex items-center gap-2">
             <span class="w-1 h-4 bg-bamboo rounded" /> 用法用量
           </h2>
-          <p class="text-sandalwood/90 text-sm leading-relaxed text-justify">{{ herb.usage }}</p>
+          <div 
+            class="text-sandalwood/90 text-sm leading-relaxed text-justify formatted-content"
+            v-html="formatNumberedText(herb.usage)"
+          ></div>
         </div>
 
         <div class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
           <h2 class="text-cinnabar font-serif font-semibold text-base mb-2 flex items-center gap-2">
             <span class="w-1 h-4 bg-cinnabar rounded" /> 使用禁忌
           </h2>
-          <p class="text-sandalwood/90 text-sm leading-relaxed text-justify">{{ herb.taboo }}</p>
+           <div 
+            class="text-sandalwood/90 text-sm leading-relaxed text-justify formatted-content"
+            v-html="formatNumberedText(herb.taboo || herb.tips)"
+          ></div>
         </div>
+
       </main>
     </template>
   </div>
 </template>
+
+<style scoped>
+/* 核心样式：让 v-html 渲染出的换行生效 */
+.formatted-content :deep(br) {
+  content: '';
+  display: block;
+  margin-top: 0.5rem; /* 控制列表项之间的间距 */
+}
+
+/* 隐藏第一个多余的换行（如果有） */
+.formatted-content :deep(br:first-child) {
+  display: none;
+}
+</style>

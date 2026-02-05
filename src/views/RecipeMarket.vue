@@ -187,7 +187,7 @@ onActivated(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-stone-50 text-stone-800 p-6 pt-20 pb-24">
+  <div class="min-h-screen bg-stone-50 text-stone-800 p-6 pt-15 pb-24">
     <header class="mb-8">
       <h1 class="text-3xl font-bold text-stone-900 mb-2">🌿 养生膳食广场</h1>
       <p class="text-stone-500">根据您的体质推荐的精准食疗方案</p>
