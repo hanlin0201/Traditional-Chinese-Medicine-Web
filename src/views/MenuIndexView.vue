@@ -1,5 +1,6 @@
 <script setup>
 import { useRouter } from 'vue-router'
+import TcmHistorySection from '@/components/TcmHistorySection.vue'
 
 // 使用 Vue Router 进行页面跳转
 const router = useRouter()
@@ -8,7 +9,7 @@ const router = useRouter()
 function handleMainPanelClick() {
   console.log('正在连接3D人体交互模型模块...')
   // 如果未来你想让点击整个面板直接跳转到穴位或某个页面，可以在这里写：
-  // router.push('/acupoints') 
+  // router.push('/acupoints')
 }
 
 // 专门处理“进入药材”按钮点击
@@ -20,11 +21,16 @@ function goToHerbs() {
 function goToRecipes() {
   router.push('/recipes')
 }
+
+// 滚动到中医历史模块
+function goToHistory() {
+  document.getElementById('tcm-history')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 </script>
 
 <template>
   <div class="menu-index min-h-screen bg-menu">
-    
+
     <main class="menu-container">
       <section class="menu-portal-hero">
         <div class="menu-hero-content">
@@ -36,23 +42,30 @@ function goToRecipes() {
               <div class="menu-placeholder-text">
                 <span class="menu-pulse-icon">📍</span>
                 <p class="mb-6">[ 3D 交互 / 核心功能区 ]</p>
-                
+
                 <div class="flex gap-4 justify-center">
-                  
-                  <button 
-                    @click.stop="goToHerbs" 
+
+                  <button
+                    @click.stop="goToHerbs"
                     class="menu-enter-btn"
                   >
                     📖 药材百科
                   </button>
 
-                  <button 
-                    @click.stop="goToRecipes" 
+                  <button
+                    @click.stop="goToRecipes"
                     class="menu-enter-btn menu-recipe-btn"
                   >
                     🍲 食疗方案
                   </button>
-                  
+
+                  <button
+                    @click.stop="goToHistory"
+                    class="menu-enter-btn menu-history-btn"
+                  >
+                    📜 中医历史
+                  </button>
+
                 </div>
 
               </div>
@@ -60,6 +73,9 @@ function goToRecipes() {
           </div>
         </div>
       </section>
+
+      <!-- 中医药历史模块：全屏，滚动至此撑满视口 -->
+      <TcmHistorySection />
     </main>
   </div>
 </template>
@@ -70,7 +86,8 @@ function goToRecipes() {
   --menu-bg: #F8F3ED;
   --menu-primary: #8B5E3C;
   --menu-accent: #A67C52;
-  --menu-recipe: #4d7c5b; /* 新增一个代表食疗的绿色变量 */
+  --menu-recipe: #4d7c5b;
+  --menu-history: #6b5b4f; /* 中医历史按钮 */
   --menu-text: #5D4037;
 }
 
@@ -88,9 +105,10 @@ function goToRecipes() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* 调整上边距，因为现在上面有 App.vue 的导航栏了 */
-  padding: 40px 5%; 
-  min-height: 80vh;
+  justify-content: center;
+  padding: 40px 5%;
+  min-height: 100vh; /* 上方模块全屏 */
+  box-sizing: border-box;
 }
 
 .menu-hero-content {
@@ -187,6 +205,14 @@ function goToRecipes() {
 }
 .menu-recipe-btn:hover {
   background-color: #3a6345;
+}
+
+.menu-history-btn {
+  background-color: var(--menu-history);
+}
+.menu-history-btn:hover {
+  background-color: #5a4a3f;
+  transform: translateY(-2px);
 }
 
 /* 这里的 navbar 样式已经被删除，因为移到了 App.vue */
