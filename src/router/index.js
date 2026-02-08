@@ -20,6 +20,12 @@ const routes = [
     meta: { title: '药材详情' },
   },
   {
+    path: '/acupoints',
+    name: 'Acupoints',
+    component: () => import('@/views/AcupointView.vue'),
+    meta: { title: '经络穴位导航' },
+  },
+  {
     path: '/profile',
     name: 'Profile',
     component: () => import('@/views/ProfileView.vue'),
