@@ -1,7 +1,8 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft } from 'lucide-vue-next'
+// 1. 引入 Heart 图标
+import { ArrowLeft, Heart } from 'lucide-vue-next'
 // 3D 核心组件与控制器
 import { TresCanvas } from '@tresjs/core'
 import { OrbitControls } from '@tresjs/cientos'
@@ -18,51 +19,40 @@ const herb = ref(null)
 const loading = ref(true)
 const error = ref(null)
 
+// --- 新增：收藏相关状态 ---
+const isFavorite = ref(false) // 是否已收藏
+const isToggling = ref(false) // 是否正在交互中(防止连点)
+const currentUser = ref(null) // 当前登录用户
+
 /**
  * 核心功能 1：文本美化
- * 将枯燥的文本段落转化为带高亮序号的列表
  */
 function formatNumberedText(text) {
   if (!text) return '暂无'
-  
-  // HTML 转义防 XSS
   let formatted = text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-  
-  // 1. 圆圈数字换行 (①②...)
   formatted = formatted.replace(/([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])/g, '<br/><span class="text-cinnabar font-medium">$1</span>')
-  
-  // 2. 括号数字换行 (⑴⑵...)
   formatted = formatted.replace(/([⑴⑵⑶⑷⑸⑹⑺⑻⑼⑽])/g, '<br/><span class="text-cinnabar font-medium">$1</span>')
-  
-  // 3. 书名号引用换行 (《本草纲目》：)
   formatted = formatted.replace(/(《[^》]+》[：:]\s*)/g, '<br/><span class="text-bamboo">$1</span>')
-  
-  // 移除首行多余的换行
   formatted = formatted.replace(/^(<br\/>)+/, '')
-  
   return formatted
 }
 
 /**
  * 核心功能 2：高性能数据获取
- * 包含：预加载(秒开) + 静默更新 + 错误处理
  */
 const fetchHerbByName = async () => {
   const herbName = route.params.name
   if (!herbName) return
 
-  // A. 【秒开逻辑】检查路由是否携带了预加载数据
   const preloadData = history.state.preloadHerb
 
   if (preloadData && preloadData.name === herbName) {
-    // 命中缓存：直接渲染，无需等待
     herb.value = preloadData
     loading.value = false 
     
-    // B. 【静默更新】后台悄悄核对最新数据
     try {
       const { data } = await supabase
         .from('herbs')
@@ -71,7 +61,7 @@ const fetchHerbByName = async () => {
         .single()
       
       if (data) {
-        herb.value = data // 更新为最新全量数据
+        herb.value = data
       }
     } catch (e) {
       console.warn('后台更新数据失败，但不影响展示', e)
@@ -79,7 +69,6 @@ const fetchHerbByName = async () => {
     return 
   }
 
-  // C. 【常规逻辑】无预加载数据时，显示 Loading 并请求
   try {
     loading.value = true
     error.value = null
@@ -100,39 +89,136 @@ const fetchHerbByName = async () => {
   }
 }
 
+// --- 新增：检查收藏状态 ---
+const checkFavoriteStatus = async () => {
+  // 必须要有用户且有药材数据才查
+  if (!currentUser.value || !herb.value) return
+
+  try {
+    const { data, error } = await supabase
+      .from('favorite_herbs')
+      .select('id')
+      .eq('user_id', currentUser.value.id)
+      .eq('herb_id', herb.value.id)
+      .maybeSingle() // 用 maybeSingle 防止查不到报错
+
+    if (data) {
+      isFavorite.value = true
+    } else {
+      isFavorite.value = false
+    }
+  } catch (e) {
+    console.error('检查收藏状态失败', e)
+  }
+}
+
+// --- 新增：切换收藏/取消收藏 ---
+const toggleFavorite = async () => {
+  // 1. 检查登录
+  if (!currentUser.value) {
+    alert('请先登录后再收藏药材')
+    return
+  }
+  
+  if (isToggling.value) return // 防止连点
+  isToggling.value = true
+
+  try {
+    if (isFavorite.value) {
+      // --- 执行取消收藏 ---
+      const { error } = await supabase
+        .from('favorite_herbs')
+        .delete()
+        .eq('user_id', currentUser.value.id)
+        .eq('herb_id', herb.value.id)
+      
+      if (error) throw error
+      isFavorite.value = false // 更新 UI
+    } else {
+      // --- 执行收藏 ---
+      const { error } = await supabase
+        .from('favorite_herbs')
+        .insert({
+          user_id: currentUser.value.id,
+          herb_id: herb.value.id
+        })
+      
+      if (error) throw error
+      isFavorite.value = true // 更新 UI
+    }
+  } catch (e) {
+    console.error('操作失败', e)
+    alert('操作失败，请重试')
+  } finally {
+    isToggling.value = false
+  }
+}
+
 // 首次挂载
-onMounted(() => {
+onMounted(async () => {
+  // 1. 先获取当前用户信息
+  const { data: { user } } = await supabase.auth.getUser()
+  currentUser.value = user
+
+  // 2. 获取药材数据
   fetchHerbByName()
 })
 
-// 监听路由变化 (解决同页面切换药材不刷新的问题)
+// --- 新增：监听器 ---
+// 当 herb 数据加载完成，或者路由变化时，重新检查收藏状态
+watch(() => [herb.value, currentUser.value], ([newHerb, newUser]) => {
+  if (newHerb && newUser) {
+    checkFavoriteStatus()
+  }
+})
+
+// 监听路由变化
 watch(() => route.params.name, (newName) => {
-  if (newName) fetchHerbByName()
+  if (newName) {
+    herb.value = null // 清空旧数据
+    isFavorite.value = false // 重置收藏状态
+    fetchHerbByName()
+  }
 })
 
 function goBack() {
   if (window.history.length > 1) {
     router.back()
   } else {
-    router.push('/herbs') // 默认回列表页
+    router.push('/herbs') 
   }
 }
 </script>
 
 <template>
   <div class="min-h-screen pb-24 flex flex-col bg-[#FDFBF7]">
-    <header class="sticky top-0 z-10 glass-search wood-overlay px-4 py-2 flex items-center gap-3 border-b border-sandalwood/10">
-      <button
-        type="button"
-        class="p-1.5 rounded-lg text-sandalwood hover:bg-sandalwood/10 transition-colors"
-        aria-label="返回"
-        @click="goBack"
+    <header class="sticky top-0 z-10 glass-search wood-overlay px-4 py-2 flex items-center justify-between border-b border-sandalwood/10">
+      
+      <div class="flex items-center gap-3 overflow-hidden">
+        <button
+          type="button"
+          class="p-1.5 rounded-lg text-sandalwood hover:bg-sandalwood/10 transition-colors shrink-0"
+          aria-label="返回"
+          @click="goBack"
+        >
+          <ArrowLeft class="w-5 h-5" />
+        </button>
+        <h1 class="font-serif font-semibold text-sandalwood truncate text-lg">
+          {{ herb?.name || '药材详情' }}
+        </h1>
+      </div>
+
+      <button 
+        v-if="!loading && herb"
+        @click="toggleFavorite"
+        :disabled="isToggling"
+        class="p-2 rounded-full transition-all active:scale-90 hover:bg-red-50"
       >
-        <ArrowLeft class="w-5 h-5" />
+        <Heart 
+          :size="24" 
+          :class="isFavorite ? 'fill-red-500 text-red-500' : 'text-sandalwood/60'"
+        />
       </button>
-      <h1 class="font-serif font-semibold text-sandalwood truncate text-lg">
-        {{ herb?.name || '药材详情' }}
-      </h1>
     </header>
 
     <template v-if="loading">
@@ -233,14 +319,12 @@ function goBack() {
 </template>
 
 <style scoped>
-/* 核心样式：让 v-html 渲染出的换行生效 */
 .formatted-content :deep(br) {
   content: '';
   display: block;
-  margin-top: 0.5rem; /* 控制列表项之间的间距 */
+  margin-top: 0.5rem; 
 }
 
-/* 隐藏第一个多余的换行（如果有） */
 .formatted-content :deep(br:first-child) {
   display: none;
 }
