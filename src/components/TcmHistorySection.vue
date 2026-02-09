@@ -1,6 +1,8 @@
 <script setup>
 import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 
+const router = useRouter()
 const historyBgUrl = new URL('../menu/photo/历史模块背景.jpg', import.meta.url).href
 
 function getPhotoUrl(name) {
@@ -16,13 +18,13 @@ const scrollContentWidth = computed(() => unfolded.value ? PAPER_WIDTH : '0')
 const rodLeft = computed(() => unfolded.value ? `calc(56px + ${PAPER_WIDTH})` : '56px')
 
 const historyCards = [
-  { img: '神农尝百草图.jpg', label: '上古' },
-  { img: '伤寒杂病论.jpg', label: '秦汉' },
-  { img: '华佗.jpg', label: '东汉' },
-  { img: '千金方.jpg', label: '唐代' },
-  { img: '本草纲目封面.jpg', label: '明代' },
-  { img: '屠呦呦.jpg', label: '现代' },
-  { img: '现代食疗.jpg', label: '当下' },
+  { img: '神农尝百草图.jpg', label: '上古', dynastyId: 'shanggu' },
+  { img: '伤寒杂病论.jpg', label: '秦汉', dynastyId: 'qinhan' },
+  { img: '华佗.jpg', label: '东汉', dynastyId: 'donghan' },
+  { img: '千金方.jpg', label: '唐代', dynastyId: 'tang' },
+  { img: '本草纲目封面.jpg', label: '明代', dynastyId: 'ming' },
+  { img: '屠呦呦.jpg', label: '现代', dynastyId: 'xiandai' },
+  { img: '现代食疗.jpg', label: '当下', dynastyId: 'dangxia' },
 ]
 
 // 每张卡片的纵向偏移（px），无规则错落
@@ -34,6 +36,11 @@ function toggleScroll() {
 
 function handleWrapperClick() {
   if (!unfolded.value) toggleScroll()
+}
+
+function goToDynasty(dynastyId) {
+  if (!unfolded.value) return // 卷轴未展开时不跳转
+  router.push({ name: 'DynastyDetail', params: { id: dynastyId } })
 }
 </script>
 
@@ -74,7 +81,9 @@ function handleWrapperClick() {
                   v-for="(card, index) in historyCards"
                   :key="card.label"
                   class="tcm-history-card"
+                  :class="{ 'tcm-history-card--clickable': unfolded }"
                   :style="{ '--card-offset': (cardOffsets[index] ?? 0) + 'px' }"
+                  @click.stop="goToDynasty(card.dynastyId)"
                 >
                   <div class="tcm-history-card-img-wrap">
                     <img :src="getPhotoUrl(card.img)" :alt="card.label" class="tcm-history-card-img" />
@@ -364,9 +373,19 @@ function handleWrapperClick() {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
+.tcm-history-card--clickable {
+  cursor: pointer;
+}
+
 .tcm-history-card:hover {
   transform: translateY(calc(var(--card-offset) - 2px));
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.tcm-history-card--clickable:hover {
+  transform: translateY(calc(var(--card-offset) - 6px));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border-color: rgba(139, 94, 60, 0.3);
 }
 
 .tcm-history-card-img-wrap {
