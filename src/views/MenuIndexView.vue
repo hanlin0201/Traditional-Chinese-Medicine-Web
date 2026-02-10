@@ -3,6 +3,8 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import TcmHistorySection from '@/components/TcmHistorySection.vue'
 import { supabase } from '@/supabaseClient'
+import HerbalPairing from '@/components/home/HerbalPairing.vue'
+import MythBuster from '@/components/home/MythBuster.vue'
 // 图标库
 import { Sun, CloudRain, Wind, Snowflake, Soup, ArrowRight, BookOpen, Utensils, ScrollText } from 'lucide-vue-next'
 
@@ -207,7 +209,10 @@ onMounted(() => { fetchSeasonalData() })
           </div>
         </div>
       </section>
-
+  <div class="animate-fade-in-up delay-200">
+    <HerbalPairing />
+    <MythBuster />
+      </div>
       <TcmHistorySection />
     </main>
   </div>
