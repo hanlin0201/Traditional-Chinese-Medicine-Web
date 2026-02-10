@@ -3,8 +3,9 @@
  * 内容待填充，目前为框架占位
  */
 
+// 图片放在 public/photo/，通过根路径加载
 function getPhotoUrl(name) {
-  return new URL(`../menu/photo/${name}`, import.meta.url).href
+  return `/photo/${name}`
 }
 
 export const DYNASTIES = [
@@ -24,6 +25,24 @@ export const DYNASTIES = [
     achievements: [
       { year: '远古时期', title: '药食同源', description: '先民在采集食物过程中发现了药物的疗效' },
       { year: '传说时代', title: '神农尝百草', description: '奠定了中药学的基础理论' },
+    ],
+  },
+  {
+    id: 'chunqiu',
+    name: '春秋战国',
+    period: '公元前770年—公元前221年',
+    heroImage: '黄帝内经.jpg',
+    overview: '春秋战国时期诸子百家争鸣，医学理论开始系统化。《黄帝内经》成书于这一时期，奠定了中医学的理论基础，系统阐述阴阳五行、脏腑经络、病因病机等，与《伤寒杂病论》《神农本草经》并称中医四大经典。',
+    figures: [
+      { name: '扁鹊', description: '脉学与四诊法的集大成者，开创望闻问切' },
+      { name: '岐伯', description: '《黄帝内经》中与黄帝论医的医家，代表当时医学智慧' },
+    ],
+    texts: [
+      { name: '《黄帝内经》', description: '中医学理论奠基之作，含《素问》《灵枢》，阐述阴阳五行、藏象经络、病因病机与治则' },
+    ],
+    achievements: [
+      { year: '春秋战国', title: '《黄帝内经》成书', description: '奠定中医理论体系，确立整体观念与辨证论治思想' },
+      { year: '战国时期', title: '扁鹊行医与脉学', description: '四诊合参、脉学发展，推动临床诊断规范化' },
     ],
   },
   {
@@ -65,6 +84,25 @@ export const DYNASTIES = [
     ],
   },
   {
+    id: 'liangjin',
+    name: '两晋',
+    period: '公元266年—420年',
+    heroImage: '肘后方与急救.jpg',
+    overview: '两晋时期医学注重实用与急救。葛洪《肘后备急方》记载了大量简便验廉的急救方与传染病治法，其中"青蒿一握绞汁"治疟的记载，为后世青蒿素的发现提供了古典依据。',
+    figures: [
+      { name: '葛洪', description: '著《肘后备急方》，记载急救方与传染病治法，影响深远' },
+      { name: '王叔和', description: '著《脉经》，系统整理脉学，确立二十四脉' },
+    ],
+    texts: [
+      { name: '《肘后备急方》', description: '葛洪著，收录简便急救方，记载天花、狂犬病等治法' },
+      { name: '《脉经》', description: '王叔和著，现存最早脉学专著，确立脉诊规范' },
+    ],
+    achievements: [
+      { year: '约4世纪', title: '《肘后备急方》成书', description: '记载青蒿绞汁治疟等，为后世青蒿素研究提供古典依据' },
+      { year: '晋代', title: '《脉经》确立脉学', description: '脉学理论系统化，促进诊法发展' },
+    ],
+  },
+  {
     id: 'tang',
     name: '唐代',
     period: '公元618年—907年',
@@ -86,6 +124,25 @@ export const DYNASTIES = [
     ],
   },
   {
+    id: 'song',
+    name: '宋代',
+    period: '公元960年—1279年',
+    heroImage: '宋代针灸铜人.jpg',
+    overview: '宋代官方高度重视医学教育与考核。王惟一主持铸造针灸铜人用于教学与考试，并撰《铜人腧穴针灸图经》，针灸学与本草学均有重要发展，太医局制度完善。',
+    figures: [
+      { name: '王惟一', description: '主持铸造针灸铜人，撰《铜人腧穴针灸图经》，统一腧穴标准' },
+      { name: '唐慎微', description: '著《证类本草》，集宋代以前本草之大成' },
+    ],
+    texts: [
+      { name: '《铜人腧穴针灸图经》', description: '王惟一撰，与针灸铜人配套，规范腧穴定位与主治' },
+      { name: '《证类本草》', description: '唐慎微著，宋代本草学代表作，为《本草纲目》重要蓝本' },
+    ],
+    achievements: [
+      { year: '1027年', title: '针灸铜人铸造', description: '世界上最早的针灸教学模型，用于考试与教学' },
+      { year: '宋代', title: '太医局与医学教育', description: '官方设立太医局，医学分科与考核制度完善' },
+    ],
+  },
+  {
     id: 'ming',
     name: '明代',
     period: '公元1368年—1644年',
@@ -100,6 +157,25 @@ export const DYNASTIES = [
     achievements: [
       { year: '1578年', title: '《本草纲目》完成', description: '李时珍历时27年完成，收药1892种、方剂11096个' },
       { year: '明代中期', title: '温病学派兴起', description: '开创温病辨治新体系，补充伤寒学说' },
+    ],
+  },
+  {
+    id: 'qing',
+    name: '清代',
+    period: '公元1644年—1912年',
+    heroImage: '清代温病学说.jpg',
+    overview: '清代温病学派成熟，与伤寒学派并立。叶天士创立卫气营血辨证，吴鞠通著《温病条辨》确立三焦辨证，对发热性、传染性疾病的辨证与方药有系统总结，影响至今。',
+    figures: [
+      { name: '叶天士', description: '温病学奠基人，创卫气营血辨证，《温热论》代表其学术思想' },
+      { name: '吴鞠通', description: '著《温病条辨》，确立三焦辨证，与叶天士并称温病大家' },
+    ],
+    texts: [
+      { name: '《温热论》', description: '叶天士口述，阐述卫气营血辨证与温病治法' },
+      { name: '《温病条辨》', description: '吴鞠通著，以三焦为纲、病名为目，系统论述温病' },
+    ],
+    achievements: [
+      { year: '清代前期', title: '温病学派形成', description: '叶天士、薛生白等确立温病辨治体系' },
+      { year: '1798年', title: '《温病条辨》成书', description: '三焦辨证与银翘散、桑菊饮等名方流传至今' },
     ],
   },
   {

@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { Search, ChevronRight, ChevronDown, X, ZoomIn, ZoomOut, RotateCcw } from 'lucide-vue-next'
 import { MERIDIAN_GROUPS, CATEGORIES, searchAcupoints } from '@/constants/acupoints.js'
+import { supabase } from '@/supabaseClient'
 
 // ===================== 状态 =====================
 
@@ -19,6 +20,36 @@ const expandedMeridianId = ref(null)
 // 选中的穴位
 const selectedPoint = ref(null)      // { meridianId, meridianName, meridianColor, point }
 const showDetailPanel = ref(false)
+
+// Supabase 数据
+const pointDetail = ref(null)        // { name, position, disease }
+const detailLoading = ref(false)
+
+// ===================== Supabase 查询 =====================
+
+/** 从 Supabase 获取穴位详情 */
+async function fetchPointDetail(pointName) {
+  detailLoading.value = true
+  pointDetail.value = null
+
+  try {
+    const { data, error } = await supabase
+      .from('acupoint')
+      .select('name, position, disease')
+      .eq('name', pointName)
+      .maybeSingle()
+
+    if (error) {
+      console.warn('查询穴位失败:', error)
+    } else {
+      pointDetail.value = data // data 为 null 表示该穴位暂无数据
+    }
+  } catch (e) {
+    console.error('穴位查询异常:', e)
+  } finally {
+    detailLoading.value = false
+  }
+}
 
 // ===================== 交互逻辑 =====================
 
@@ -40,6 +71,7 @@ function selectPoint(meridian, pointName) {
     point: pointName,
   }
   showDetailPanel.value = true
+  fetchPointDetail(pointName)
 }
 
 /** 从搜索结果中选中穴位 */
@@ -55,6 +87,7 @@ function selectFromSearch(result) {
 /** 关闭详情面板 */
 function closeDetail() {
   showDetailPanel.value = false
+  pointDetail.value = null
 }
 
 /** 判断穴位是否选中 */
@@ -73,6 +106,16 @@ function getMeridiansByCategory(category) {
 const activeMeridian = computed(() => {
   if (!expandedMeridianId.value) return null
   return MERIDIAN_GROUPS.find(m => m.id === expandedMeridianId.value) || null
+})
+
+/** 将主治文本拆分为标签数组 */
+const diseaseTags = computed(() => {
+  if (!pointDetail.value?.disease) return []
+  // 按常见分隔符拆分：顿号、逗号、分号、空格
+  return pointDetail.value.disease
+    .split(/[、，,；;]+/)
+    .map(s => s.trim())
+    .filter(s => s.length > 0)
 })
 </script>
 
@@ -265,30 +308,52 @@ const activeMeridian = computed(() => {
           <span class="divider-line"></span>
         </div>
 
-        <!-- 定位 -->
-        <div class="detail-section">
-          <div class="section-label">
-            <span class="section-bar red"></span>
-            <span class="section-title">定位</span>
-          </div>
-          <p class="section-content placeholder-content">
-            暂无数据（待连接 Supabase）
-          </p>
+        <!-- 加载中 -->
+        <div v-if="detailLoading" class="detail-loading">
+          <div class="loading-spinner"></div>
+          <span>查询中...</span>
         </div>
 
-        <!-- 主治 -->
-        <div class="detail-section">
-          <div class="section-label">
-            <span class="section-bar red"></span>
-            <span class="section-title">主治</span>
+        <!-- 已获取到数据 -->
+        <template v-else-if="pointDetail">
+          <!-- 定位 -->
+          <div class="detail-section">
+            <div class="section-label">
+              <span class="section-bar red"></span>
+              <span class="section-title">定位</span>
+            </div>
+            <p class="section-content">
+              {{ pointDetail.position || '暂无定位信息' }}
+            </p>
           </div>
-          <div class="indication-tags placeholder-content">
-            <span class="indication-tag">待填充</span>
+
+          <!-- 主治 -->
+          <div class="detail-section">
+            <div class="section-label">
+              <span class="section-bar red"></span>
+              <span class="section-title">主治</span>
+            </div>
+            <div v-if="diseaseTags.length" class="indication-tags">
+              <span
+                v-for="(tag, idx) in diseaseTags"
+                :key="idx"
+                class="indication-tag"
+              >
+                {{ tag }}
+              </span>
+            </div>
+            <p v-else class="section-content muted">暂无主治信息</p>
           </div>
+        </template>
+
+        <!-- 数据库中无该穴位 -->
+        <div v-else class="detail-empty">
+          <span class="empty-icon">📋</span>
+          <p>该穴位数据尚未录入</p>
         </div>
 
         <!-- 底部来源 -->
-        <p class="detail-source">数据来源：Supabase</p>
+        <p class="detail-source">数据来源：中医百科</p>
       </aside>
     </Transition>
 
@@ -862,6 +927,56 @@ const activeMeridian = computed(() => {
 .placeholder-content {
   color: var(--text-muted);
   font-style: italic;
+}
+
+.section-content.muted {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* 加载状态 */
+.detail-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 32px 0;
+  color: var(--primary);
+  font-size: 0.85rem;
+}
+
+.loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(139, 94, 60, 0.15);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 无数据状态 */
+.detail-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 32px 0;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 2rem;
+  opacity: 0.5;
+}
+
+.detail-empty p {
+  margin: 0;
+  font-size: 0.85rem;
 }
 
 /* 主治标签 */
