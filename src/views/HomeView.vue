@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search, Loader2 } from 'lucide-vue-next'
+import { pinyin } from 'pinyin-pro'
 import HerbCard from '@/components/HerbCard.vue'
 import { useHerbList } from '@/composables/useHerbData'
 
@@ -14,46 +15,21 @@ const router = useRouter()
 const CATEGORY_TAGS = ['全部', '根茎类', '果实/种子类', '全草类', '花类', '藤木类', '动物类', '枝叶/树皮类', '菌藻类', '矿物类', '其他']
 const LETTER_TAGS = ['全部', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'W', 'X', 'Y', 'Z']
 
-// 拼音映射表 (逻辑保留，为节省篇幅折叠，功能不变)
-const pinyinMap = {
-  '阿': 'A', '艾': 'A', '安': 'A', '矮': 'A',
-  '巴': 'B', '白': 'B', '百': 'B', '柏': 'B', '半': 'B', '薄': 'B', '贝': 'B', '补': 'B',
-  '苍': 'C', '草': 'C', '茶': 'C', '柴': 'C', '陈': 'C', '沉': 'C', '川': 'C', '刺': 'C',
-  '大': 'D', '丹': 'D', '当': 'D', '党': 'D', '地': 'D', '冬': 'D', '独': 'D', '杜': 'D',
-  '儿': 'E', '莪': 'E',
-  '防': 'F', '茯': 'F', '附': 'F', '佛': 'F', '粉': 'F',
-  '甘': 'G', '干': 'G', '葛': 'G', '枸': 'G', '骨': 'G', '瓜': 'G', '桂': 'G', '归': 'G',
-  '海': 'H', '何': 'H', '黑': 'H', '红': 'H', '厚': 'H', '胡': 'H', '花': 'H', '黄': 'H',
-  '鸡': 'J', '姜': 'J', '僵': 'J', '椒': 'J', '金': 'J', '荆': 'J', '菊': 'J', '桔': 'J',
-  '苦': 'K', '昆': 'K',
-  '连': 'L', '莲': 'L', '龙': 'L', '鹿': 'L', '灵': 'L', '苓': 'L',
-  '麻': 'M', '麦': 'M', '梅': 'M', '牡': 'M', '木': 'M', '母': 'M', '芒': 'M',
-  '南': 'N', '牛': 'N', '女': 'N', '糯': 'N',
-  '藕': 'O',
-  '胖': 'P', '皮': 'P', '蒲': 'P', '朴': 'P',
-  '七': 'Q', '芪': 'Q', '前': 'Q', '羌': 'Q', '秦': 'Q', '青': 'Q', '全': 'Q',
-  '人': 'R', '肉': 'R', '乳': 'R',
-  '三': 'S', '桑': 'S', '沙': 'S', '山': 'S', '芍': 'S', '神': 'S', '生': 'S', '石': 'S', '熟': 'S', '水': 'S',
-  '太': 'T', '桃': 'T', '天': 'T', '田': 'T', '通': 'T', '土': 'T', '菟': 'T',
-  '瓦': 'W', '威': 'W', '乌': 'W', '五': 'W', '吴': 'W',
-  '细': 'X', '仙': 'X', '香': 'X', '小': 'X', '杏': 'X', '雄': 'X', '玄': 'X', '血': 'X',
-  '洋': 'Y', '羊': 'Y', '药': 'Y', '叶': 'Y', '一': 'Y', '银': 'Y', '樱': 'Y', '郁': 'Y', '鱼': 'Y', '益': 'Y', '玉': 'Y', '元': 'Y',
-  '藻': 'Z', '泽': 'Z', '知': 'Z', '栀': 'Z', '芷': 'Z', '竹': 'Z', '猪': 'Z', '朱': 'Z', '紫': 'Z', '子': 'Z'
-}
-
-// 获取首字母逻辑
+// 获取首字母逻辑（使用 pinyin-pro 自动转换，支持所有汉字）
 function getFirstLetter(name) {
   if (!name) return '#'
   const firstChar = name.charAt(0)
   if (/[A-Za-z]/.test(firstChar)) return firstChar.toUpperCase()
-  return pinyinMap[firstChar] || '#'
+  const py = pinyin(firstChar, { toneType: 'none', type: 'array' })
+  if (py && py[0]) return py[0].charAt(0).toUpperCase()
+  return '#'
 }
 
 // ==========================================
 // 2. 核心逻辑
 // ==========================================
 
-const { herbs, loading, error, load, loadMore, hasMore, loadingMore } = useHerbList()
+const { herbs, loading, error, load, loadMore, hasMore, loadingMore, loadAll } = useHerbList()
 
 const keyword = ref('')
 const activeTag = ref('全部')
@@ -71,9 +47,8 @@ const filteredHerbs = computed(() => {
     list = list.filter(h =>
       (h.name || '').toLowerCase().includes(k) ||
       (h.namePinyin || h.name_pinyin || '').toLowerCase().includes(k) ||
-      (h.tags || []).some(t => String(t).includes(k)) ||
       (h.classification || '').toLowerCase().includes(k) ||
-      (h.effect || '').toLowerCase().includes(k)
+      (h.tags || []).some(t => String(t).toLowerCase().includes(k))
     )
   }
   // 2. 标签过滤
@@ -104,6 +79,13 @@ const goToDetail = (herb) => {
     state: { preloadHerb: JSON.parse(JSON.stringify(herb)) } 
   })
 }
+
+// 当切换到 A-Z 模式或输入搜索关键词时，自动加载全量数据
+watch([filterMode, keyword], ([mode, kw]) => {
+  if (mode === 'letter' || kw.trim()) {
+    loadAll()
+  }
+})
 
 onMounted(() => {
   load()
@@ -159,14 +141,21 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <div class="w-full overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
-          <div class="flex gap-2 min-w-max pb-1">
+        <div :class="[
+          'w-full',
+          filterMode === 'category' ? 'overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0' : ''
+        ]">
+          <div :class="[
+            'flex gap-2 pb-1',
+            filterMode === 'category' ? 'min-w-max' : 'flex-wrap'
+          ]">
             <button
               v-for="tag in currentTags"
               :key="tag"
               @click="activeTag = tag"
               :class="[
-                'px-3.5 py-1 rounded-full text-xs font-medium transition-all duration-200 border',
+                'rounded-full text-xs font-medium transition-all duration-200 border',
+                filterMode === 'letter' ? 'px-2.5 py-1' : 'px-3.5 py-1',
                 activeTag === tag
                   ? 'bg-cinnabar text-white border-cinnabar shadow-sm'
                   : 'bg-white text-sandalwood/70 border-sandalwood/10 hover:border-sandalwood/30 hover:text-sandalwood'

@@ -118,7 +118,31 @@ export function useHerbList() {
     }
   }
 
-  return { herbs, loading, error, load, loadMore, hasMore, loadingMore }
+  // 全量加载标记
+  let allLoaded = false
+
+  /**
+   * 一次性加载全部药材数据（用于 A-Z 过滤 / 搜索场景）
+   * 如果已经加载过全量数据则直接返回，不重复请求
+   */
+  async function loadAll() {
+    if (allLoaded) return
+    loadingMore.value = true
+    try {
+      const { data, error: e } = await supabase
+        .from('herbs')
+        .select('*')
+        .order('id', { ascending: true })
+      if (e) return
+      herbs.value = normalizeHerbs(data || [])
+      hasMore.value = false
+      allLoaded = true
+    } finally {
+      loadingMore.value = false
+    }
+  }
+
+  return { herbs, loading, error, load, loadMore, hasMore, loadingMore, loadAll }
 }
 
 /**
