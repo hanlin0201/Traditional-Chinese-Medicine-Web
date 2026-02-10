@@ -3,32 +3,60 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
-const historyBgUrl = new URL('../menu/photo/历史模块背景.jpg', import.meta.url).href
+const historyBgUrl = '/photo/历史模块背景.jpg'
 
 function getPhotoUrl(name) {
-  return new URL(`../menu/photo/${name}`, import.meta.url).href
+  return `/photo/${name}`
 }
 
-// 卷轴是否已展开
 const unfolded = ref(false)
 
-/* 卷轴在左；展开后画心延伸到「当前卷轴右侧与页面右侧」的中间位置 */
-const PAPER_WIDTH = 'min(calc(85vw - 56px), 1100px)'
+// 卷轴展开宽度
+const PAPER_WIDTH = 'min(calc(96vw - 56px), 1600px)'
 const scrollContentWidth = computed(() => unfolded.value ? PAPER_WIDTH : '0')
 const rodLeft = computed(() => unfolded.value ? `calc(56px + ${PAPER_WIDTH})` : '56px')
 
 const historyCards = [
   { img: '神农尝百草图.jpg', label: '上古', dynastyId: 'shanggu' },
+  { img: '黄帝内经.jpg', label: '春秋战国', dynastyId: 'chunqiu' },
   { img: '伤寒杂病论.jpg', label: '秦汉', dynastyId: 'qinhan' },
   { img: '华佗.jpg', label: '东汉', dynastyId: 'donghan' },
+  { img: '肘后方与急救.jpg', label: '两晋', dynastyId: 'liangjin' },
   { img: '千金方.jpg', label: '唐代', dynastyId: 'tang' },
+  { img: '宋代针灸铜人.jpg', label: '宋代', dynastyId: 'song' },
   { img: '本草纲目封面.jpg', label: '明代', dynastyId: 'ming' },
+  { img: '清代温病学说.jpg', label: '清代', dynastyId: 'qing' },
   { img: '屠呦呦.jpg', label: '现代', dynastyId: 'xiandai' },
   { img: '现代食疗.jpg', label: '当下', dynastyId: 'dangxia' },
 ]
 
-// 每张卡片的纵向偏移（px），无规则错落
-const cardOffsets = [22, -34, 8, -28, 26, -16, 14]
+/**
+ * 布局配置：所有卡片大小统一（s=1），仅调整垂直偏移y实现错落
+ * y: 垂直偏移 (负数向上，正数向下)
+ * s: 缩放比例 (统一为1，保证大小一致)
+ * 匹配草图排版：
+ * 1. 上古：矮，极低
+ * 2. 春秋战国：高，极高
+ * 3. 秦汉：中，低
+ * 4. 东汉：中，高
+ * 5. 两晋：矮，极低
+ * 6. 唐代：中，高
+ * 7. 宋代：高，极高
+ * 8-11：仿照前7个的错落逻辑
+ */
+const cardLayouts = [
+  { y: 70, s: 1 },   // 1. 上古：矮，极低
+  { y: -130, s: 1 },   // 2. 春秋战国：高，极高
+  { y: 0, s: 1 },    // 3. 秦汉：中，低
+  { y: -60, s: 1 },   // 4. 东汉：中，高
+  { y: 90, s: 1 },    // 5. 两晋：矮，极低
+  { y: -30, s: 1 },   // 6. 唐代：中，高
+  { y: -150, s: 1 },   // 7. 宋代：高，极高
+  { y: 50, s: 1 },    // 8. 明代：中，低（仿秦汉）
+  { y: -50, s: 1 },   // 9. 清代：中，高（仿东汉）
+  { y: 80, s: 1 },    // 10. 现代：矮，极低（仿上古/两晋）
+  { y: -20, s: 1 },   // 11. 当下：中，高（仿唐代）
+]
 
 function toggleScroll() {
   unfolded.value = !unfolded.value
@@ -38,9 +66,9 @@ function handleWrapperClick() {
   if (!unfolded.value) toggleScroll()
 }
 
-function goToDynasty(dynastyId) {
-  if (!unfolded.value) return // 卷轴未展开时不跳转
-  router.push({ name: 'DynastyDetail', params: { id: dynastyId } })
+function goToDynasty(card) {
+  if (!unfolded.value || !card.dynastyId) return
+  router.push({ name: 'DynastyDetail', params: { id: card.dynastyId } })
 }
 </script>
 
@@ -52,13 +80,11 @@ function goToDynasty(dynastyId) {
   >
     <div class="tcm-history-inner">
       <div class="tcm-scroll-zone">
-        <!-- 卷轴容器：仅未展开时点击整条可展开；展开后仅点左侧卷轴杆可收起 -->
         <div
           class="tcm-scroll-wrapper"
           :class="{ 'tcm-scroll-wrapper--folded': !unfolded }"
           @click="handleWrapperClick"
         >
-          <!-- 左侧卷轴杆（收拢的卷 + 竖排文案），点击可展开/收起 -->
           <div class="tcm-scroll-roll" @click.stop="toggleScroll">
             <div class="tcm-roll-shade"></div>
             <div class="tcm-roll-body"></div>
@@ -66,24 +92,23 @@ function goToDynasty(dynastyId) {
             <p class="tcm-roll-label">青囊传世，一卷千年</p>
           </div>
 
-          <!-- 轴杆（随展开向右移动） -->
           <div class="tcm-scroll-rod" :style="{ left: rodLeft }"></div>
 
-          <!-- 画心（纸张，由左至右展开） -->
           <div
             class="tcm-scroll-paper"
             :style="{ width: scrollContentWidth }"
           >
             <div class="tcm-paper-inner">
-              <!-- 卷轴完全展开时显示：七张历史内容卡片，横向无规则错落 -->
               <div v-show="unfolded" class="tcm-history-cards">
                 <div
                   v-for="(card, index) in historyCards"
                   :key="card.label"
                   class="tcm-history-card"
-                  :class="{ 'tcm-history-card--clickable': unfolded }"
-                  :style="{ '--card-offset': (cardOffsets[index] ?? 0) + 'px' }"
-                  @click.stop="goToDynasty(card.dynastyId)"
+                  :class="{ 'tcm-history-card--clickable': unfolded && card.dynastyId }"
+                  :style="{ 
+                    transform: `translateY(${cardLayouts[index]?.y || 0}px) scale(${cardLayouts[index]?.s || 1})`
+                  }"
+                  @click.stop="goToDynasty(card)"
                 >
                   <div class="tcm-history-card-img-wrap">
                     <img :src="getPhotoUrl(card.img)" :alt="card.label" class="tcm-history-card-img" />
@@ -94,7 +119,6 @@ function goToDynasty(dynastyId) {
             </div>
           </div>
 
-          <!-- 未展开时：卷轴右侧引导（箭头左侧接卷轴杆） -->
           <div v-if="!unfolded" class="tcm-explore-hint">
             <span class="tcm-explore-line"></span>
             <span class="tcm-explore-arrow"></span>
@@ -112,7 +136,6 @@ function goToDynasty(dynastyId) {
 .tcm-history-section {
   position: relative;
   width: 100%;
-  min-height: 100vh;
   height: 100vh;
   box-sizing: border-box;
   background-color: #e2ddd4;
@@ -122,7 +145,6 @@ function goToDynasty(dynastyId) {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  padding: 0;
   overflow: hidden;
 }
 
@@ -130,21 +152,14 @@ function goToDynasty(dynastyId) {
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: 100%;
   display: flex;
   align-items: center;
   justify-content: flex-start;
   min-height: 100%;
-  padding: 0 10vw;
+  padding: 0 2vw; 
   box-sizing: border-box;
 }
-@media (min-width: 900px) {
-  .tcm-history-inner {
-    padding-right: 5vw;
-  }
-}
 
-/* 卷轴区域：靠左，展开后左右与留白对称 */
 .tcm-scroll-zone {
   position: relative;
   display: flex;
@@ -158,12 +173,12 @@ function goToDynasty(dynastyId) {
   color: rgba(45, 55, 45, 0.4);
   letter-spacing: 0.2em;
   margin: 0;
+  padding-left: 10px;
 }
 
-/* 卷轴整体容器；仅折叠时整条可点，展开后仅左侧杆可点 */
 .tcm-scroll-wrapper {
   position: relative;
-  height: clamp(380px, 78vh, 680px);
+  height: clamp(500px, 85vh, 800px);
   cursor: default;
   display: flex;
   align-items: stretch;
@@ -173,7 +188,7 @@ function goToDynasty(dynastyId) {
   cursor: pointer;
 }
 
-/* 未展开时：卷轴右侧引导（箭头左端接卷轴杆），淡色、大字号、闪动 */
+/* 引导动画 */
 .tcm-explore-hint {
   position: absolute;
   left: 56px;
@@ -182,44 +197,34 @@ function goToDynasty(dynastyId) {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding-left: 0;
   pointer-events: none;
   z-index: 1;
   animation: tcm-explore-flicker 2.2s ease-in-out infinite;
 }
-
 .tcm-explore-line {
-  width: 28px;
-  height: 2px;
+  width: 28px; height: 2px;
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.4) 100%);
-  border-radius: 1px;
-  flex-shrink: 0;
 }
-
 .tcm-explore-arrow {
-  width: 0;
-  height: 0;
+  width: 0; height: 0;
   border-top: 6px solid transparent;
   border-bottom: 6px solid transparent;
   border-left: 10px solid rgba(255, 255, 255, 0.7);
-  flex-shrink: 0;
   margin-left: -2px;
 }
-
 .tcm-explore-text {
-  font-family: 'Noto Serif SC', 'SimSun', 宋体, serif;
+  font-family: 'Noto Serif SC', serif;
   font-size: clamp(1.05rem, 2.5vw, 1.45rem);
   color: rgba(255, 255, 255, 0.75);
   letter-spacing: 0.35em;
   white-space: nowrap;
 }
-
 @keyframes tcm-explore-flicker {
   0%, 100% { opacity: 0.65; }
   50% { opacity: 1; }
 }
 
-/* 左侧收拢的卷（圆柱），上竖排文案 + 轻微闪动 */
+/* 卷轴杆 */
 .tcm-scroll-roll {
   position: relative;
   width: 56px;
@@ -232,145 +237,111 @@ function goToDynasty(dynastyId) {
   align-items: center;
   justify-content: center;
 }
-
 .tcm-roll-label {
   position: absolute;
   margin: 0;
   padding: 10px 0;
   writing-mode: vertical-rl;
   letter-spacing: 0.28em;
-  font-family: 'Ma Shan Zheng', 'STKaiti', 'KaiTi', '楷体', serif;
+  font-family: 'Ma Shan Zheng', 'STKaiti', '楷体', serif;
   font-size: clamp(0.95rem, 2.2vw, 1.2rem);
   color: rgba(35, 28, 22, 0.98);
-  text-shadow:
-    0 0 24px rgba(255,255,255,0.6),
-    0 1px 2px rgba(255,255,255,0.8),
-    1px 0 1px rgba(0,0,0,0.15),
-    0 1px 1px rgba(0,0,0,0.12);
+  text-shadow: 0 0 24px rgba(255,255,255,0.6);
   z-index: 2;
   user-select: none;
   animation: tcm-label-shine 4s ease-in-out infinite;
 }
-
 @keyframes tcm-label-shine {
   0%, 100% { opacity: 0.92; }
   50% { opacity: 1; }
 }
-
 .tcm-roll-body {
-  position: absolute;
-  inset: 0;
+  position: absolute; inset: 0;
   background: linear-gradient(90deg, #C4B8A8 0%, #D4C8B8 25%, #E2D8C8 50%, #D4C8B8 75%, #C4B8A8 100%);
-  border-radius: 28px 0 0 28px;
 }
-
 .tcm-roll-shade {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 40%;
+  position: absolute; left: 0; top: 0; bottom: 0; width: 40%;
   background: linear-gradient(90deg, rgba(0,0,0,0.15) 0%, transparent 100%);
-  border-radius: 28px 0 0 28px;
   pointer-events: none;
 }
-
 .tcm-roll-highlight {
-  position: absolute;
-  right: 0;
-  top: 15%;
-  bottom: 15%;
-  width: 20%;
+  position: absolute; right: 0; top: 15%; bottom: 15%; width: 20%;
   background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.35) 100%);
-  border-radius: 0 4px 4px 0;
   pointer-events: none;
 }
-
-/* 轴杆 */
 .tcm-scroll-rod {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 12px;
-  margin-left: -6px;
+  position: absolute; top: 0; bottom: 0; width: 12px; margin-left: -6px;
   background: linear-gradient(90deg, #6B5344 0%, #8B6F5C 30%, #A0806A 50%, #8B6F5C 70%, #6B5344 100%);
   border-radius: 6px;
-  box-shadow: 2px 0 8px rgba(0,0,0,0.2), inset 0 0 0 1px rgba(255,255,255,0.1);
+  box-shadow: 2px 0 8px rgba(0,0,0,0.2);
   transition: left 1.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-  left: 0;
-  z-index: 2;
-  flex-shrink: 0;
+  left: 0; z-index: 2; flex-shrink: 0;
 }
 
 /* 画心（纸张） */
 .tcm-scroll-paper {
   position: absolute;
-  left: 56px;
-  top: 0;
-  bottom: 0;
+  left: 56px; top: 0; bottom: 0;
   width: 0;
   overflow: hidden;
   transition: width 1.2s cubic-bezier(0.34, 1.56, 0.64, 1);
   box-shadow: 4px 0 20px rgba(0,0,0,0.06);
+}
+.tcm-scroll-paper::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 1px;
+  background: rgba(139, 90, 43, 0.12);
 }
 
 .tcm-paper-inner {
   position: relative;
   height: 100%;
   min-width: 100%;
-  background: linear-gradient(90deg, #F5F0E8 0%, #FDFBF7 8%, #FDFBF7 92%, #F0EBE2 100%);
-  background-image:
-    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E"),
-    linear-gradient(90deg, #F5F0E8 0%, #FDFBF7 8%, #FDFBF7 92%, #F0EBE2 100%);
+  background: url('/photo/卷轴背景.jpg') center center / cover no-repeat;
+  background-color: #F5F0E8; /* 图片未覆盖时的底色 */
   border-left: 1px solid rgba(139, 90, 43, 0.08);
-  padding: 40px 24px;
+  padding: 80px 40px 80px 20px;
   box-sizing: border-box;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   overflow-x: auto;
-  overflow-y: visible;
+  overflow-y: hidden;
 }
 
-/* 七张历史内容卡片：白底圆角、上图下文、横向交错排列 */
+/* --- 卡片容器 --- */
 .tcm-history-cards {
   position: relative;
   z-index: 1;
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 10px;
-  width: 100%;
-  max-width: 100%;
-  padding: 8px 0;
+  align-items: center; /* 垂直居中基准 */
+  justify-content: flex-start;
+  gap: 28px; /* 卡片水平间距，可根据需要调整 */
+  width: max-content;
+  height: 100%;
   animation: tcm-cards-in 0.5s ease-out 0.25s both;
 }
 
 @keyframes tcm-cards-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
 }
 
+/* --- 卡片样式 --- */
+/* --- 要改历史卡片大小比例改这里 --- */
 .tcm-history-card {
-  --card-offset: 0px;
-  flex: 1 1 0;
-  min-width: 52px;
-  max-width: 100px;
+  flex-shrink: 0;
+  width: 125px; /* 所有卡片统一宽度 */
+  aspect-ratio: 1 / 2; /* 所有卡片统一宽高比 */
   background: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.06);
   border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  transform: translateY(var(--card-offset));
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  /* 统一大小，仅通过y值调整垂直位置 */
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+  transform-origin: center center;
 }
 
 .tcm-history-card--clickable {
@@ -378,19 +349,19 @@ function goToDynasty(dynastyId) {
 }
 
 .tcm-history-card:hover {
-  transform: translateY(calc(var(--card-offset) - 2px));
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  z-index: 10;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+  border-color: rgba(139, 94, 60, 0.5);
 }
 
-.tcm-history-card--clickable:hover {
-  transform: translateY(calc(var(--card-offset) - 6px));
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  border-color: rgba(139, 94, 60, 0.3);
+/* 图片hover放大效果 */
+.tcm-history-card:hover .tcm-history-card-img {
+  transform: scale(1.1);
 }
 
 .tcm-history-card-img-wrap {
   width: 100%;
-  aspect-ratio: 3 / 4;
+  flex: 1; 
   background: #f8f6f3;
   overflow: hidden;
 }
@@ -399,27 +370,20 @@ function goToDynasty(dynastyId) {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  display: block;
+  transition: transform 0.6s ease;
 }
 
 .tcm-history-card-label {
   margin: 0;
-  padding: 8px 4px 10px;
+  padding: 10px 4px;
   font-family: 'Noto Serif SC', 'SimSun', 宋体, serif;
-  font-size: clamp(0.7rem, 1.2vw, 0.85rem);
+  font-size: 0.9rem;
+  font-weight: 600;
   color: #5D4037;
   text-align: center;
   letter-spacing: 0.1em;
-}
-
-/* 展开后轴杆不遮挡纸张边缘 */
-.tcm-scroll-paper::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: rgba(139, 90, 43, 0.12);
+  background-color: #fff;
+  border-top: 1px solid rgba(0,0,0,0.02);
+  flex-shrink: 0;
 }
 </style>
