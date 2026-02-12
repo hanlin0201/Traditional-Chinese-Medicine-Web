@@ -90,7 +90,7 @@ const handleTouchEnd = (e) => {
 // --- 业务跳转 ---
 function goToHistory() { moveTo(4) }
 function scrollToSeasonal() { moveTo(1) }
-function handleMainPanelClick() { console.log('连接3D模块...') }
+function handleMainPanelClick() { router.push('/acupoints') }
 function goToHerbs() { router.push('/herbs') }
 function goToRecipes() { router.push('/recipes') }
 function goToRecipeDetail(id) { router.push({ path: '/recipes', query: { open_id: id } }) }

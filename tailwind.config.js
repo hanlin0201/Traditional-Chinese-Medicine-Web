@@ -11,6 +11,9 @@ export default {
         sandalwood: '#8B5A2B', // 檀木褐
         cinnabar: '#C44E46',   // 朱砂红
         bamboo: '#5D7A47',     // 竹青绿
+        walnut: '#4A3228',     // 胡桃木深（药柜柜体）
+        chestnut: '#6B4C3B',   // 栗壳棕（抽屉面板）
+        brass: '#B8860B',      // 铜拉手
       },
       fontFamily: {
         serif: ['"Noto Serif SC"', 'SimSun', '宋体', 'serif'],

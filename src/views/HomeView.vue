@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Search, Loader2 } from 'lucide-vue-next'
+import { Search, Loader2, ArrowLeft } from 'lucide-vue-next'
 import { pinyin } from 'pinyin-pro'
 import HerbCard from '@/components/HerbCard.vue'
 import { useHerbList } from '@/composables/useHerbData'
@@ -71,13 +71,28 @@ function switchFilterMode(mode) {
   activeTag.value = '全部' // 切换模式重置选中
 }
 
-// 核心优化：携带数据跳转 (Preload)
+// ==========================================
+// 3. 抽屉打开动画 + 跳转
+// ==========================================
+const openingHerb = ref(null)
+
 const goToDetail = (herb) => {
-  router.push({ 
-    name: 'HerbDetail', 
-    params: { name: herb.name },
-    state: { preloadHerb: JSON.parse(JSON.stringify(herb)) } 
-  })
+  // 如果已经在动画中，忽略
+  if (openingHerb.value) return
+
+  // 触发抽屉拉开动画
+  openingHerb.value = herb.name
+
+  // 动画结束后跳转
+  setTimeout(() => {
+    router.push({
+      name: 'HerbDetail',
+      params: { name: herb.name },
+      state: { preloadHerb: JSON.parse(JSON.stringify(herb)) }
+    })
+    // 跳转后重置状态（用于浏览器返回时）
+    setTimeout(() => { openingHerb.value = null }, 100)
+  }, 450)
 }
 
 // 当切换到 A-Z 模式或输入搜索关键词时，自动加载全量数据
@@ -113,6 +128,13 @@ onUnmounted(() => {
       <div class="max-w-6xl mx-auto space-y-3">
         
         <div class="flex flex-col sm:flex-row gap-3">
+          <button
+            @click="router.push('/')"
+            class="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-sandalwood/10 bg-white/60 text-sandalwood hover:bg-white hover:border-sandalwood/20 text-sm font-serif transition-all shadow-sm shrink-0"
+          >
+            <ArrowLeft class="w-4 h-4" />
+            <span>返回主页</span>
+          </button>
           <div class="relative flex-1 group">
             <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-sandalwood/40 group-focus-within:text-cinnabar transition-colors" />
             <input
@@ -170,11 +192,10 @@ onUnmounted(() => {
 
     <main class="max-w-6xl mx-auto px-4 py-4">
       
-      <div v-if="loading" class="masonry-columns animate-pulse">
-        <div v-for="i in 8" :key="i" class="masonry-item mb-4">
-          <div class="bg-sandalwood/5 rounded-xl h-48 w-full mb-2"></div>
-          <div class="bg-sandalwood/5 rounded h-4 w-3/4 mb-2"></div>
-          <div class="bg-sandalwood/5 rounded h-3 w-1/2"></div>
+      <!-- 加载骨架屏 -->
+      <div v-if="loading" class="herb-cabinet animate-pulse">
+        <div v-for="i in 12" :key="i" class="cabinet-skeleton">
+          <div class="skeleton-face"></div>
         </div>
       </div>
 
@@ -183,14 +204,17 @@ onUnmounted(() => {
         <span class="text-sm font-serif">加载出错了，请刷新重试</span>
       </div>
 
-      <div v-else class="masonry-columns">
+      <!-- 药柜网格 -->
+      <div v-else class="herb-cabinet">
         <div
           v-for="herb in filteredHerbs"
           :key="herb.name"
-          class="masonry-item mb-4 group cursor-pointer" 
           @click="goToDetail(herb)"
         >
-          <HerbCard :herb="herb" class="transition-transform duration-300 group-hover:-translate-y-1 group-hover:shadow-lg" />
+          <HerbCard
+            :herb="herb"
+            :opening="openingHerb === herb.name"
+          />
         </div>
       </div>
 
@@ -220,29 +244,57 @@ onUnmounted(() => {
 <style scoped>
 /* 隐藏滚动条但保留功能 */
 .scrollbar-hide {
-  -ms-overflow-style: none; /* IE and Edge */
-  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 .scrollbar-hide::-webkit-scrollbar {
-  display: none; /* Chrome, Safari and Opera */
+  display: none;
 }
 
-/* 瀑布流布局 */
-.masonry-columns {
-  column-count: 2;
-  column-gap: 1rem;
+/* ========== 药柜网格布局 ========== */
+.herb-cabinet {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+  gap: 12px;
+  /* 药柜背景 */
+  background:
+    linear-gradient(145deg, #3E2723 0%, #4A3228 50%, #3E2723 100%);
+  background-image:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.05'/%3E%3C/svg%3E"),
+    linear-gradient(145deg, #3E2723 0%, #4A3228 50%, #3E2723 100%);
+  border-radius: 10px;
+  padding: 16px;
+  border: 2px solid #2E1B11;
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.3),
+    0 4px 16px rgba(62, 39, 35, 0.25);
 }
+
 @media (min-width: 640px) {
-  .masonry-columns {
-    column-count: 3;
+  .herb-cabinet {
+    grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
+    gap: 14px;
+    padding: 20px;
   }
 }
+
 @media (min-width: 1024px) {
-  .masonry-columns {
-    column-count: 4;
+  .herb-cabinet {
+    grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+    gap: 16px;
   }
 }
-.masonry-item {
-  break-inside: avoid;
+
+/* ========== 加载骨架屏 ========== */
+.cabinet-skeleton {
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.skeleton-face {
+  height: 120px;
+  border-radius: 6px;
+  background: linear-gradient(170deg, #6B4C3B 0%, #5C3D2E 40%, #4A3228 100%);
+  opacity: 0.6;
 }
 </style>

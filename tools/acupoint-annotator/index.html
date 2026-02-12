@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>穴位坐标标注工具</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Noto Serif SC', 'SimSun', serif;
+    background: #FAF8F4;
+    color: #2c2c2c;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ==================== 顶栏 ==================== */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 20px;
+    background: #5D4037;
+    color: #fff;
+    flex-shrink: 0;
+  }
+  .topbar h1 { font-size: 1.1rem; letter-spacing: 2px; font-weight: 600; }
+  .topbar .progress {
+    font-size: 0.85rem;
+    opacity: 0.85;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .progress-bar-bg {
+    width: 120px;
+    height: 6px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: #FFB74D;
+    border-radius: 3px;
+    transition: width 0.3s;
+  }
+
+  /* ==================== 主体 ==================== */
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ==================== 左栏：经脉与穴位列表 ==================== */
+  .left-panel {
+    width: 280px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border-right: 1px solid #e8e0d8;
+    overflow: hidden;
+  }
+
+  .meridian-selector {
+    padding: 12px;
+    border-bottom: 1px solid #e8e0d8;
+  }
+  .meridian-selector label {
+    display: block;
+    font-size: 0.78rem;
+    color: #8B5E3C;
+    margin-bottom: 6px;
+    font-weight: 600;
+    letter-spacing: 1px;
+  }
+  .meridian-selector select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #d4c8bc;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.88rem;
+    color: #5D4037;
+    background: #FDFBF7;
+    outline: none;
+    cursor: pointer;
+  }
+  .meridian-selector select:focus {
+    border-color: #8B5E3C;
+    box-shadow: 0 0 0 3px rgba(139,94,60,0.1);
+  }
+
+  .point-list-header {
+    padding: 10px 14px;
+    font-size: 0.8rem;
+    color: #8B5E3C;
+    font-weight: 600;
+    border-bottom: 1px solid #f0ebe5;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .point-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(139,94,60,0.15) transparent;
+  }
+
+  .point-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
+    font-size: 0.85rem;
+  }
+  .point-item:hover { background: rgba(139,94,60,0.05); }
+  .point-item.active {
+    background: #5D4037;
+    color: #fff;
+  }
+  .point-item.annotated .point-status { background: #4CAF50; }
+  .point-item.active .point-status { background: #FFB74D; border-color: #fff; }
+
+  .point-status {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ddd;
+    border: 1px solid #ccc;
+    flex-shrink: 0;
+  }
+  .point-name { flex: 1; }
+  .point-coord {
+    font-size: 0.72rem;
+    color: #999;
+    font-family: 'Consolas', monospace;
+  }
+  .point-item.active .point-coord { color: rgba(255,255,255,0.7); }
+
+  /* ==================== 中央：图片标注区 ==================== */
+  .center-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .image-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    background: #FDFBF7;
+    border-bottom: 1px solid #e8e0d8;
+    flex-shrink: 0;
+  }
+  .current-hint {
+    font-size: 0.9rem;
+    color: #5D4037;
+  }
+  .current-hint strong {
+    color: #C44E46;
+    font-size: 1rem;
+  }
+  .toolbar-actions {
+    display: flex;
+    gap: 6px;
+  }
+  .toolbar-actions button {
+    padding: 5px 14px;
+    border: 1px solid #d4c8bc;
+    border-radius: 6px;
+    background: #fff;
+    font-family: inherit;
+    font-size: 0.8rem;
+    color: #5D4037;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .toolbar-actions button:hover {
+    background: #5D4037;
+    color: #fff;
+    border-color: #5D4037;
+  }
+  .toolbar-actions button.danger:hover {
+    background: #C44E46;
+    border-color: #C44E46;
+  }
+
+  .image-viewport {
+    flex: 1;
+    position: relative;
+    overflow: auto;
+    background:
+      repeating-conic-gradient(#f5f0ea 0% 25%, transparent 0% 50%) 0 0 / 20px 20px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .image-container {
+    position: relative;
+    display: inline-block;
+    cursor: crosshair;
+    line-height: 0;
+  }
+  .image-container img {
+    max-height: calc(100vh - 140px);
+    display: block;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+
+  /* 标注点 */
+  .marker {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: rgba(76, 175, 80, 0.85);
+    border: 2px solid #fff;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    pointer-events: auto;
+    cursor: pointer;
+    transition: transform 0.15s, background 0.15s;
+    z-index: 2;
+  }
+  .marker:hover {
+    transform: translate(-50%, -50%) scale(1.4);
+    z-index: 3;
+  }
+  .marker.current {
+    background: rgba(255, 183, 77, 0.95);
+    width: 18px;
+    height: 18px;
+    animation: pulse-marker 1.2s ease-in-out infinite;
+    z-index: 4;
+  }
+  .marker .marker-label {
+    position: absolute;
+    left: 18px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(93, 64, 55, 0.9);
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .marker:hover .marker-label { opacity: 1; }
+
+  @keyframes pulse-marker {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255,183,77,0.5); }
+    50% { box-shadow: 0 0 0 8px rgba(255,183,77,0); }
+  }
+
+  /* 无图片提示 */
+  .no-image {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #999;
+    font-size: 0.95rem;
+    letter-spacing: 2px;
+  }
+
+  /* ==================== 右栏：JSON 输出 ==================== */
+  .right-panel {
+    width: 360px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border-left: 1px solid #e8e0d8;
+    overflow: hidden;
+  }
+
+  .json-header {
+    padding: 12px 14px;
+    border-bottom: 1px solid #e8e0d8;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .json-header h3 {
+    font-size: 0.88rem;
+    color: #5D4037;
+    letter-spacing: 1px;
+  }
+  .json-actions {
+    display: flex;
+    gap: 6px;
+  }
+  .json-actions button {
+    padding: 4px 12px;
+    border: 1px solid #d4c8bc;
+    border-radius: 6px;
+    background: #fff;
+    font-family: inherit;
+    font-size: 0.75rem;
+    color: #5D4037;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .json-actions button:hover {
+    background: #5D4037;
+    color: #fff;
+    border-color: #5D4037;
+  }
+  .json-actions button.primary {
+    background: #5D4037;
+    color: #fff;
+    border-color: #5D4037;
+  }
+  .json-actions button.primary:hover {
+    background: #3E2723;
+  }
+
+  .json-output {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+  }
+  .json-output pre {
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 0.78rem;
+    line-height: 1.6;
+    color: #333;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: #5D4037;
+    color: #fff;
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    transition: transform 0.3s ease;
+    z-index: 100;
+    pointer-events: none;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* 快捷键提示 */
+  .shortcuts {
+    padding: 10px 14px;
+    border-top: 1px solid #e8e0d8;
+    font-size: 0.72rem;
+    color: #999;
+    line-height: 1.8;
+    flex-shrink: 0;
+  }
+  .shortcuts kbd {
+    display: inline-block;
+    padding: 1px 6px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    background: #f5f5f5;
+    font-family: inherit;
+    font-size: 0.72rem;
+  }
+</style>
+</head>
+<body>
+
+<!-- 顶栏 -->
+<div class="topbar">
+  <h1>穴位坐标标注工具</h1>
+  <div class="progress">
+    <span id="progressText">0 / 0</span>
+    <div class="progress-bar-bg">
+      <div class="progress-bar-fill" id="progressBar" style="width: 0%"></div>
+    </div>
+    <span id="totalProgress">总进度: 0/0</span>
+  </div>
+</div>
+
+<!-- 主体 -->
+<div class="main">
+
+  <!-- 左栏 -->
+  <div class="left-panel">
+    <div class="meridian-selector">
+      <label>选择经脉</label>
+      <select id="meridianSelect"></select>
+    </div>
+    <div class="point-list-header">
+      <span>穴位列表</span>
+      <span id="meridianCount"></span>
+    </div>
+    <div class="point-list" id="pointList"></div>
+  </div>
+
+  <!-- 中央 -->
+  <div class="center-panel">
+    <div class="image-toolbar">
+      <div class="current-hint" id="currentHint">请选择经脉开始标注</div>
+      <div class="toolbar-actions">
+        <button onclick="prevPoint()">← 上一个</button>
+        <button onclick="nextPoint()">下一个 →</button>
+        <button onclick="undoLast()" class="danger">撤销</button>
+        <button onclick="clearMeridian()" class="danger">清空本经</button>
+      </div>
+    </div>
+    <div class="image-viewport" id="imageViewport">
+      <div class="no-image" id="noImage">请在左侧选择一条经脉</div>
+      <div class="image-container" id="imageContainer" style="display:none">
+        <img id="mainImage" />
+      </div>
+    </div>
+  </div>
+
+  <!-- 右栏 -->
+  <div class="right-panel">
+    <div class="json-header">
+      <h3>坐标数据 (JSON)</h3>
+      <div class="json-actions">
+        <button onclick="copyCurrentJSON()">复制本经</button>
+        <button onclick="copyAllJSON()" class="primary">复制全部</button>
+        <button onclick="downloadJSON()">下载</button>
+      </div>
+    </div>
+    <div class="json-output">
+      <pre id="jsonPreview">// 标注后此处显示 JSON</pre>
+    </div>
+    <div class="json-header" style="border-top: 1px solid #e8e0d8; border-bottom: none;">
+      <h3>导入已有数据</h3>
+      <div class="json-actions">
+        <button onclick="importJSON()">粘贴导入</button>
+        <button onclick="loadFromStorage()">恢复本地</button>
+      </div>
+    </div>
+    <div class="shortcuts">
+      快捷键：<kbd>←</kbd> 上一个 &nbsp; <kbd>→</kbd> 下一个 &nbsp; <kbd>Ctrl+Z</kbd> 撤销 &nbsp; <kbd>S</kbd> 跳过
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// 经脉数据（来自 src/constants/acupoints.js，仅取有图片的14条）
+// ============================================================
+const MERIDIANS = [
+  { id: 'zu-taiyang-pangguang', name: '足太阳膀胱经', image: '1.jpg', color: '#4A90D9',
+    points: ['睛明','攒竹','眉冲','曲差','五处','承光','通天','络却','玉枕','天柱','大杼','风门','肺俞','厥阴俞','心俞','督俞','膈俞','肝俞','胆俞','脾俞','胃俞','三焦俞','肾俞','气海俞','大肠俞','关元俞','小肠俞','膀胱俞','中膂俞','白环俞','上髎','次髎','中髎','下髎','会阳','承扶','殷门','浮郄','委阳','委中','附分','魄户','膏肓','神堂','譩譆','膈关','魂门','阳纲','意舍','胃仓','肓门','志室','胞肓','秩边','合阳','承筋','承山','飞扬','跗阳','昆仑','仆参','申脉','金门','京骨','束骨','足通骨','至阴'] },
+  { id: 'zu-jueyin-gan', name: '足厥阴肝经', image: '2.jpg', color: '#2E7D32',
+    points: ['大敦','行间','太冲','中封','蠡沟','中都','膝关','曲泉','阴包','足五里','阴廉','急脉','章门','期门'] },
+  { id: 'zu-shaoyang-dan', name: '足少阳胆经', image: '3.jpg', color: '#8BC34A',
+    points: ['瞳子髎','听会','上关','颔厌','悬颅','悬厘','曲鬓','率谷','天冲','浮白','头窍阴','完骨','本神','阳白','头临泣','目窗','正营','承灵','脑空','风池','肩井','渊腋','辄筋','日月','京门','带脉','五枢','维道','居髎','环跳','风市','中渎','膝阳关','阳陵泉','阳交','外丘','光明','阳辅','悬钟','丘墟','足临泣','地五会','侠溪','足窍阴'] },
+  { id: 'shou-shaoyin-xin', name: '手少阴心经', image: '4.jpg', color: '#C62828',
+    points: ['极泉','青灵','少海','灵道','通里','阴郄','神门','少府','少冲'] },
+  { id: 'zu-taiyin-pi', name: '足太阴脾经', image: '5.jpg', color: '#F9A825',
+    points: ['隐白','大都','太白','公孙','商丘','三阴交','漏谷','地机','阴陵泉','血海','箕门','冲门','府舍','腹结','大横','腹哀','食窦','天溪','胸乡','周荣','大包'] },
+  { id: 'shou-yangming-dachang', name: '手阳明大肠经', image: '6.jpg', color: '#E65100',
+    points: ['商阳','二间','三间','合谷','阳溪','偏历','温溜','下廉','上廉','手三里','曲池','肘髎','手五里','臂臑','肩髃','巨骨','天鼎','扶突','口禾髎','迎香'] },
+  { id: 'shou-taiyang-xiaochang', name: '手太阳小肠经', image: '7.jpg', color: '#AD1457',
+    points: ['少泽','前谷','后溪','腕骨','阳谷','养老','支正','小海','肩贞','臑俞','天宗','秉风','曲垣','肩外俞','肩中俞','天窗','天容','颧髎','听宫'] },
+  { id: 'shou-taiyin-fei', name: '手太阴肺经', image: '8.jpg', color: '#B0BEC5',
+    points: ['中府','云门','天府','侠白','尺泽','孔最','列缺','经渠','太渊','鱼际','少商'] },
+  { id: 'zu-yangming-wei', name: '足阳明胃经', image: '9.jpg', color: '#FF8F00',
+    points: ['承泣','四白','巨髎','地仓','大迎','颊车','下关','头维','人迎','水突','气舍','缺盆','气户','库房','屋翳','膺窗','乳中','乳根','不容','承满','梁门','关门','太乙','滑肉门','天枢','外陵','大巨','水道','归来','气冲','髀关','伏兔','阴市','梁丘','犊鼻','足三里','上巨虚','条口','下巨虚','丰隆','解溪','冲阳','陷谷','内庭','厉兑'] },
+  { id: 'shou-jueyin-xinbao', name: '手厥阴心包经', image: '10.jpg', color: '#7B1FA2',
+    points: ['天池','天泉','曲泽','郄门','间使','内关','大陵','劳宫','中冲'] },
+  { id: 'zu-shaoyin-shen', name: '足少阴肾经', image: '11.jpg', color: '#1565C0',
+    points: ['涌泉','然谷','太溪','大钟','水泉','照海','复溜','交信','筑宾','阴谷','横骨','大赫','气穴','四满','中注','肓俞','商曲','石关','阴都','腹通谷','幽门','步廊','神封','灵墟','神藏','彧中','俞府'] },
+  { id: 'shou-shaoyang-sanjiao', name: '手少阳三焦经', image: '12.jpg', color: '#00838F',
+    points: ['关冲','液门','中渚','阳池','外关','支沟','会宗','三阳络','四渎','天井','清冷渊','消泺','臑会','肩髎','天髎','天牖','翳风','瘛脉','颅息','角孙','耳门','耳和髎','丝竹空'] },
+  { id: 'du-mai', name: '督脉', image: '13.jpg', color: '#D84315',
+    points: ['长强','腰俞','腰阳关','命门','悬枢','脊中','中枢','筋缩','至阳','灵台','神道','身柱','陶道','大椎','哑门','风府','脑户','强间','后顶','百会','前顶','囟会','上星','神庭','素髎','水沟','兑端','龈交'] },
+  { id: 'ren-mai', name: '任脉', image: '14.jpg', color: '#6A1B9A',
+    points: ['会阴','曲骨','中极','关元','石门','气海','阴交','神阙','水分','下脘','建里','中脘','上脘','巨阙','鸠尾','中庭','膻中','玉堂','紫宫','华盖','璇玑','天突','廉泉','承浆'] },
+];
+
+// 图片路径前缀（相对于此 HTML 文件的路径）
+const IMAGE_BASE = '../../public/photo/acupoints/';
+
+// ============================================================
+// 状态
+// ============================================================
+let allData = {};          // { meridianId: { pointName: { x, y }, ... }, ... }
+let currentMeridianIdx = 0;
+let currentPointIdx = 0;
+let history = [];          // 撤销栈：[{ meridianId, point, prevCoord }]
+
+const STORAGE_KEY = 'acupoint_annotator_data';
+
+// ============================================================
+// 初始化
+// ============================================================
+function init() {
+  // 从 localStorage 恢复
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) allData = JSON.parse(saved);
+  } catch(e) {}
+
+  // 确保每条经脉都有对象
+  MERIDIANS.forEach(m => { if (!allData[m.id]) allData[m.id] = {}; });
+
+  // 渲染经脉选择器
+  const sel = document.getElementById('meridianSelect');
+  MERIDIANS.forEach((m, i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    const count = Object.keys(allData[m.id] || {}).length;
+    opt.textContent = `${m.name} (${count}/${m.points.length})`;
+    sel.appendChild(opt);
+  });
+  sel.addEventListener('change', () => {
+    currentMeridianIdx = parseInt(sel.value);
+    currentPointIdx = 0;
+    renderAll();
+  });
+
+  // 图片点击
+  document.getElementById('mainImage').addEventListener('click', onImageClick);
+
+  // 键盘快捷键
+  document.addEventListener('keydown', onKeyDown);
+
+  renderAll();
+}
+
+// ============================================================
+// 渲染
+// ============================================================
+function renderAll() {
+  renderImage();
+  renderPointList();
+  renderMarkers();
+  renderJSON();
+  updateProgress();
+  updateHint();
+}
+
+function renderImage() {
+  const m = MERIDIANS[currentMeridianIdx];
+  const container = document.getElementById('imageContainer');
+  const noImg = document.getElementById('noImage');
+  const img = document.getElementById('mainImage');
+
+  if (m && m.image) {
+    container.style.display = 'inline-block';
+    noImg.style.display = 'none';
+    img.src = IMAGE_BASE + m.image;
+  } else {
+    container.style.display = 'none';
+    noImg.style.display = 'flex';
+  }
+}
+
+function renderPointList() {
+  const m = MERIDIANS[currentMeridianIdx];
+  const list = document.getElementById('pointList');
+  list.innerHTML = '';
+
+  const data = allData[m.id] || {};
+
+  m.points.forEach((p, i) => {
+    const div = document.createElement('div');
+    div.className = 'point-item';
+    if (i === currentPointIdx) div.classList.add('active');
+    if (data[p]) div.classList.add('annotated');
+
+    const status = document.createElement('span');
+    status.className = 'point-status';
+
+    const name = document.createElement('span');
+    name.className = 'point-name';
+    name.textContent = p;
+
+    const coord = document.createElement('span');
+    coord.className = 'point-coord';
+    coord.textContent = data[p] ? `(${data[p].x}, ${data[p].y})` : '';
+
+    div.appendChild(status);
+    div.appendChild(name);
+    div.appendChild(coord);
+
+    div.addEventListener('click', () => {
+      currentPointIdx = i;
+      renderAll();
+    });
+
+    list.appendChild(div);
+  });
+
+  // 滚动到当前项
+  const activeEl = list.querySelector('.active');
+  if (activeEl) activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+
+  // 更新计数
+  const annotated = Object.keys(data).length;
+  document.getElementById('meridianCount').textContent = `${annotated} / ${m.points.length}`;
+}
+
+function renderMarkers() {
+  const m = MERIDIANS[currentMeridianIdx];
+  const container = document.getElementById('imageContainer');
+  const data = allData[m.id] || {};
+
+  // 移除旧标记
+  container.querySelectorAll('.marker').forEach(el => el.remove());
+
+  // 创建标记
+  m.points.forEach((p, i) => {
+    if (!data[p]) return;
+    const marker = document.createElement('div');
+    marker.className = 'marker';
+    if (i === currentPointIdx) marker.classList.add('current');
+    marker.style.left = data[p].x + '%';
+    marker.style.top = data[p].y + '%';
+
+    const label = document.createElement('span');
+    label.className = 'marker-label';
+    label.textContent = p;
+    marker.appendChild(label);
+
+    marker.addEventListener('click', (e) => {
+      e.stopPropagation();
+      currentPointIdx = i;
+      renderAll();
+    });
+
+    container.appendChild(marker);
+  });
+}
+
+function renderJSON() {
+  const m = MERIDIANS[currentMeridianIdx];
+  const data = allData[m.id] || {};
+  const pre = document.getElementById('jsonPreview');
+
+  const entries = m.points
+    .filter(p => data[p])
+    .map(p => `    '${p}': { x: ${data[p].x}, y: ${data[p].y} }`);
+
+  const json = `// ${m.name} (${entries.length}/${m.points.length})\n'${m.id}': {\n${entries.join(',\n')}\n}`;
+  pre.textContent = json;
+}
+
+function updateProgress() {
+  const m = MERIDIANS[currentMeridianIdx];
+  const data = allData[m.id] || {};
+  const annotated = Object.keys(data).length;
+  const total = m.points.length;
+  const pct = total > 0 ? (annotated / total * 100) : 0;
+
+  document.getElementById('progressText').textContent = `${m.name}: ${annotated}/${total}`;
+  document.getElementById('progressBar').style.width = pct + '%';
+
+  // 总进度
+  let totalAnnotated = 0, totalPoints = 0;
+  MERIDIANS.forEach(m => {
+    totalPoints += m.points.length;
+    totalAnnotated += Object.keys(allData[m.id] || {}).length;
+  });
+  document.getElementById('totalProgress').textContent = `总进度: ${totalAnnotated}/${totalPoints}`;
+
+  // 更新选择器文字
+  const sel = document.getElementById('meridianSelect');
+  const opt = sel.options[currentMeridianIdx];
+  if (opt) {
+    opt.textContent = `${m.name} (${annotated}/${total})`;
+  }
+}
+
+function updateHint() {
+  const m = MERIDIANS[currentMeridianIdx];
+  const p = m.points[currentPointIdx];
+  const data = allData[m.id] || {};
+  const hint = document.getElementById('currentHint');
+
+  if (data[p]) {
+    hint.innerHTML = `请点击图片标注 <strong>${p}</strong> 的位置（已标注，点击可更新）`;
+  } else {
+    hint.innerHTML = `请点击图片标注 <strong>${p}</strong> 的位置`;
+  }
+}
+
+// ============================================================
+// 交互
+// ============================================================
+function onImageClick(e) {
+  const img = e.target;
+  if (img.tagName !== 'IMG') return;
+
+  const rect = img.getBoundingClientRect();
+  const x = ((e.clientX - rect.left) / rect.width * 100).toFixed(1);
+  const y = ((e.clientY - rect.top) / rect.height * 100).toFixed(1);
+
+  const m = MERIDIANS[currentMeridianIdx];
+  const p = m.points[currentPointIdx];
+
+  // 记录撤销
+  const prevCoord = allData[m.id][p] ? { ...allData[m.id][p] } : null;
+  history.push({ meridianId: m.id, point: p, prevCoord });
+
+  // 保存坐标
+  allData[m.id][p] = { x: Number(x), y: Number(y) };
+  save();
+
+  // 自动跳到下一个未标注的
+  autoAdvance();
+  renderAll();
+}
+
+function autoAdvance() {
+  const m = MERIDIANS[currentMeridianIdx];
+  const data = allData[m.id] || {};
+
+  // 从当前位置往后找第一个未标注的
+  for (let i = currentPointIdx + 1; i < m.points.length; i++) {
+    if (!data[m.points[i]]) {
+      currentPointIdx = i;
+      return;
+    }
+  }
+  // 从头找
+  for (let i = 0; i < currentPointIdx; i++) {
+    if (!data[m.points[i]]) {
+      currentPointIdx = i;
+      return;
+    }
+  }
+  // 全部标完，停在下一个
+  if (currentPointIdx < m.points.length - 1) {
+    currentPointIdx++;
+  }
+}
+
+function nextPoint() {
+  const m = MERIDIANS[currentMeridianIdx];
+  if (currentPointIdx < m.points.length - 1) {
+    currentPointIdx++;
+    renderAll();
+  }
+}
+
+function prevPoint() {
+  if (currentPointIdx > 0) {
+    currentPointIdx--;
+    renderAll();
+  }
+}
+
+function undoLast() {
+  if (history.length === 0) return;
+  const { meridianId, point, prevCoord } = history.pop();
+  if (prevCoord) {
+    allData[meridianId][point] = prevCoord;
+  } else {
+    delete allData[meridianId][point];
+  }
+  save();
+
+  // 跳回到那个穴位
+  const m = MERIDIANS[currentMeridianIdx];
+  if (m.id === meridianId) {
+    const idx = m.points.indexOf(point);
+    if (idx >= 0) currentPointIdx = idx;
+  }
+  renderAll();
+  showToast('已撤销');
+}
+
+function clearMeridian() {
+  if (!confirm('确定清空当前经脉的所有标注吗？')) return;
+  const m = MERIDIANS[currentMeridianIdx];
+  allData[m.id] = {};
+  currentPointIdx = 0;
+  save();
+  renderAll();
+  showToast('已清空 ' + m.name);
+}
+
+function onKeyDown(e) {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.key === 'ArrowRight' || e.key === 'd') { nextPoint(); e.preventDefault(); }
+  else if (e.key === 'ArrowLeft' || e.key === 'a') { prevPoint(); e.preventDefault(); }
+  else if (e.key === 'z' && (e.ctrlKey || e.metaKey)) { undoLast(); e.preventDefault(); }
+  else if (e.key === 's' || e.key === 'S') { nextPoint(); e.preventDefault(); } // 跳过
+}
+
+// ============================================================
+// 数据持久化
+// ============================================================
+function save() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(allData));
+  } catch(e) {}
+}
+
+function loadFromStorage() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      allData = JSON.parse(saved);
+      MERIDIANS.forEach(m => { if (!allData[m.id]) allData[m.id] = {}; });
+      renderAll();
+      showToast('已从本地恢复');
+    } else {
+      showToast('无本地数据');
+    }
+  } catch(e) {
+    showToast('恢复失败');
+  }
+}
+
+// ============================================================
+// 导出
+// ============================================================
+function generateAllJSON() {
+  let lines = ['export const ACUPOINT_COORDS = {'];
+  MERIDIANS.forEach(m => {
+    const data = allData[m.id] || {};
+    const entries = m.points.filter(p => data[p]);
+    if (entries.length === 0) {
+      lines.push(`  // ${m.name}: 未标注`);
+      return;
+    }
+    lines.push(`  // ${m.name} (${entries.length}/${m.points.length})`);
+    lines.push(`  '${m.id}': {`);
+    entries.forEach((p, i) => {
+      const comma = i < entries.length - 1 ? ',' : '';
+      lines.push(`    '${p}': { x: ${data[p].x}, y: ${data[p].y} }${comma}`);
+    });
+    lines.push(`  },`);
+  });
+  lines.push('}');
+  lines.push('');
+  lines.push('export function getPointCoord(meridianId, pointName) {');
+  lines.push('  const coords = ACUPOINT_COORDS[meridianId]');
+  lines.push('  return coords ? coords[pointName] || null : null');
+  lines.push('}');
+  return lines.join('\n');
+}
+
+function generateCurrentJSON() {
+  const m = MERIDIANS[currentMeridianIdx];
+  const data = allData[m.id] || {};
+  const entries = m.points.filter(p => data[p]);
+  let lines = [`'${m.id}': {`];
+  entries.forEach((p, i) => {
+    const comma = i < entries.length - 1 ? ',' : '';
+    lines.push(`  '${p}': { x: ${data[p].x}, y: ${data[p].y} }${comma}`);
+  });
+  lines.push('}');
+  return lines.join('\n');
+}
+
+function copyCurrentJSON() {
+  navigator.clipboard.writeText(generateCurrentJSON()).then(() => {
+    showToast('已复制当前经脉 JSON');
+  });
+}
+
+function copyAllJSON() {
+  navigator.clipboard.writeText(generateAllJSON()).then(() => {
+    showToast('已复制全部 JSON');
+  });
+}
+
+function downloadJSON() {
+  const blob = new Blob([generateAllJSON()], { type: 'text/javascript' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'acupointCoords.js';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('已下载 acupointCoords.js');
+}
+
+function importJSON() {
+  const input = prompt('请粘贴之前导出的 JSON 数据（ACUPOINT_COORDS 对象内容）：');
+  if (!input) return;
+  try {
+    // 尝试解析为对象
+    const parsed = JSON.parse(input);
+    Object.keys(parsed).forEach(k => {
+      if (allData[k]) {
+        Object.assign(allData[k], parsed[k]);
+      }
+    });
+    save();
+    renderAll();
+    showToast('导入成功');
+  } catch(e) {
+    showToast('导入失败：JSON 格式不正确');
+  }
+}
+
+// ============================================================
+// 工具
+// ============================================================
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+// ============================================================
+// 启动
+// ============================================================
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

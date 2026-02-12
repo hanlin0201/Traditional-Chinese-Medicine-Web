@@ -1,7 +1,8 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { Search, ChevronRight, ChevronDown, X, ZoomIn, ZoomOut, RotateCcw } from 'lucide-vue-next'
 import { MERIDIAN_GROUPS, CATEGORIES, searchAcupoints } from '@/constants/acupoints.js'
+import { ACUPOINT_COORDS, getPointCoord } from '@/constants/acupointCoords.js'
 import { supabase } from '@/supabaseClient'
 
 // ===================== 状态 =====================
@@ -72,6 +73,12 @@ function selectPoint(meridian, pointName) {
   }
   showDetailPanel.value = true
   fetchPointDetail(pointName)
+
+  // 自动聚焦到穴位坐标
+  if (viewMode.value === '2D') {
+    const coord = getPointCoord(meridian.id, pointName)
+    if (coord) focusOnPoint(coord.x, coord.y)
+  }
 }
 
 /** 从搜索结果中选中穴位 */
@@ -116,6 +123,156 @@ const diseaseTags = computed(() => {
     .split(/[、，,；;]+/)
     .map(s => s.trim())
     .filter(s => s.length > 0)
+})
+
+// ===================== 穴位坐标标记 =====================
+
+/** 当前经脉的穴位坐标列表 */
+const activePointCoords = computed(() => {
+  if (!activeMeridian.value) return []
+  const coords = ACUPOINT_COORDS[activeMeridian.value.id]
+  if (!coords) return []
+  return Object.entries(coords).map(([name, pos]) => ({ name, ...pos }))
+})
+
+/** 点击图上标记点 */
+function onMarkerClick(pointName) {
+  if (!activeMeridian.value) return
+  selectPoint(activeMeridian.value, pointName)
+}
+
+// ===================== 2D 缩放与拖拽 =====================
+
+const viewportRef = ref(null)
+const imgRef = ref(null)
+const scale = ref(1)
+const panX = ref(0)
+const panY = ref(0)
+const isAnimating = ref(false)
+const isDragging = ref(false)
+
+let imgBaseW = 0
+let imgBaseH = 0
+let dragStartX = 0
+let dragStartY = 0
+
+/** 图片加载后获取基础尺寸 */
+function onImageLoad() {
+  nextTick(() => {
+    const img = imgRef.value
+    if (!img) return
+    imgBaseW = img.clientWidth
+    imgBaseH = img.clientHeight
+  })
+}
+
+/** 重置视角 */
+function resetView() {
+  isAnimating.value = true
+  scale.value = 1
+  panX.value = 0
+  panY.value = 0
+  setTimeout(() => { isAnimating.value = false }, 500)
+}
+
+/** 放大 */
+function zoomIn() {
+  isAnimating.value = true
+  scale.value = Math.min(scale.value + 0.5, 4)
+  setTimeout(() => { isAnimating.value = false }, 400)
+}
+
+/** 缩小 */
+function zoomOut() {
+  isAnimating.value = true
+  const newScale = Math.max(scale.value - 0.5, 1)
+  scale.value = newScale
+  if (newScale === 1) {
+    panX.value = 0
+    panY.value = 0
+  }
+  setTimeout(() => { isAnimating.value = false }, 400)
+}
+
+/**
+ * 自动聚焦到指定穴位坐标
+ * transform: translate(tx,ty) scale(s)，transform-origin: center
+ * tx = -(xPct/100 - 0.5) * baseW * s
+ * ty = -(yPct/100 - 0.5) * baseH * s
+ */
+function focusOnPoint(xPct, yPct) {
+  if (!imgBaseW || !imgBaseH) return
+  isAnimating.value = true
+  const z = 2.2
+  panX.value = -(xPct / 100 - 0.5) * imgBaseW * z
+  panY.value = -(yPct / 100 - 0.5) * imgBaseH * z
+  scale.value = z
+  setTimeout(() => { isAnimating.value = false }, 500)
+}
+
+/** 鼠标滚轮缩放（以光标位置为中心） */
+function onWheel(e) {
+  const delta = e.deltaY > 0 ? -0.2 : 0.2
+  const newScale = Math.min(Math.max(scale.value + delta, 1), 4)
+  if (newScale === scale.value) return
+
+  const rect = viewportRef.value.getBoundingClientRect()
+  const mx = e.clientX - rect.left
+  const my = e.clientY - rect.top
+  const vw = rect.width
+  const vh = rect.height
+
+  const s1 = scale.value
+  const s2 = newScale
+
+  if (newScale <= 1) {
+    panX.value = 0
+    panY.value = 0
+  } else {
+    panX.value = (mx - vw / 2) * (1 - s2 / s1) + panX.value * (s2 / s1)
+    panY.value = (my - vh / 2) * (1 - s2 / s1) + panY.value * (s2 / s1)
+  }
+  scale.value = newScale
+}
+
+/** 拖拽开始 */
+function onDragStart(e) {
+  if (scale.value <= 1) return
+  isDragging.value = true
+  isAnimating.value = false
+  dragStartX = e.clientX - panX.value
+  dragStartY = e.clientY - panY.value
+  e.preventDefault()
+}
+
+/** 拖拽移动 */
+function onDragMove(e) {
+  if (!isDragging.value) return
+  panX.value = e.clientX - dragStartX
+  panY.value = e.clientY - dragStartY
+}
+
+/** 拖拽结束 */
+function onDragEnd() {
+  isDragging.value = false
+}
+
+/** 图片变换样式 */
+const imageTransformStyle = computed(() => ({
+  transform: `translate(${panX.value}px, ${panY.value}px) scale(${scale.value})`,
+  transition: isAnimating.value ? 'transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 'none',
+  cursor: scale.value > 1 ? (isDragging.value ? 'grabbing' : 'grab') : 'default',
+  willChange: 'transform',
+}))
+
+// 切换经脉时重置缩放
+watch(activeMeridian, () => {
+  scale.value = 1
+  panX.value = 0
+  panY.value = 0
+  isAnimating.value = false
+  imgBaseW = 0
+  imgBaseH = 0
 })
 </script>
 
@@ -236,13 +393,42 @@ const diseaseTags = computed(() => {
         <!-- 2D 视图 -->
         <div v-if="viewMode === '2D'" class="view-2d">
           <!-- 已选择经脉且有图片 -->
-          <div v-if="activeMeridian && activeMeridian.image" class="image-2d-container">
-            <img
-              :src="activeMeridian.image"
-              :alt="activeMeridian.name"
-              class="image-2d"
-              draggable="false"
-            />
+          <div
+            v-if="activeMeridian && activeMeridian.image"
+            class="image-2d-container"
+            ref="viewportRef"
+            @wheel.prevent="onWheel"
+            @mousedown="onDragStart"
+            @mousemove="onDragMove"
+            @mouseup="onDragEnd"
+            @mouseleave="onDragEnd"
+          >
+            <!-- 变换包裹层：图片和标记点一起缩放/平移 -->
+            <div class="image-transform-wrapper" :style="imageTransformStyle">
+              <img
+                ref="imgRef"
+                :src="activeMeridian.image"
+                :alt="activeMeridian.name"
+                class="image-2d"
+                draggable="false"
+                @load="onImageLoad"
+              />
+              <!-- 穴位标记点 -->
+              <div
+                v-for="pt in activePointCoords"
+                :key="pt.name"
+                class="acupoint-marker"
+                :class="{
+                  'acupoint-marker--selected': isPointSelected(activeMeridian.id, pt.name),
+                }"
+                :style="{ left: pt.x + '%', top: pt.y + '%' }"
+                @mousedown.stop
+                @click.stop="onMarkerClick(pt.name)"
+              >
+                <span class="marker-tooltip">{{ pt.name }}</span>
+              </div>
+            </div>
+
             <div class="image-2d-label">
               <span class="image-label-dot" :style="{ background: activeMeridian.color }"></span>
               {{ activeMeridian.name }}
@@ -275,11 +461,11 @@ const diseaseTags = computed(() => {
       <!-- 底部控制栏 -->
       <div class="viewport-footer">
         <div class="zoom-controls">
-          <button class="zoom-btn" title="缩小"><ZoomOut :size="16" /></button>
-          <button class="zoom-btn" title="放大"><ZoomIn :size="16" /></button>
-          <button class="zoom-btn" title="重置视角"><RotateCcw :size="16" /></button>
+          <button class="zoom-btn" title="缩小" @click="zoomOut"><ZoomOut :size="16" /></button>
+          <button class="zoom-btn" title="放大" @click="zoomIn"><ZoomIn :size="16" /></button>
+          <button class="zoom-btn" title="重置视角" @click="resetView"><RotateCcw :size="16" /></button>
         </div>
-        <span class="footer-hint">点击穴位查看详情</span>
+        <span class="footer-hint">{{ scale > 1 ? `${Math.round(scale * 100)}% · 滚轮缩放 · 拖拽平移` : '点击穴位查看详情 · 滚轮缩放' }}</span>
       </div>
     </main>
 
@@ -377,7 +563,8 @@ const diseaseTags = computed(() => {
 
   font-family: 'Noto Serif SC', 'SimSun', 宋体, serif;
   display: flex;
-  height: 100vh;
+  flex-direction: row;
+  height: calc(100vh - 64px);   /* 减去顶部导航栏高度 */
   overflow: hidden;
   background: var(--bg);
   position: relative;
@@ -601,7 +788,7 @@ const diseaseTags = computed(() => {
 .accordion-enter-active,
 .accordion-leave-active {
   transition: all 0.3s ease;
-  max-height: 500px;
+  max-height: 2000px;
   opacity: 1;
 }
 .accordion-enter-from,
@@ -703,19 +890,85 @@ const diseaseTags = computed(() => {
   overflow: hidden;
 }
 
+/* 变换包裹层：图片 + 标记点一同缩放平移 */
+.image-transform-wrapper {
+  position: relative;
+  display: inline-block;
+  line-height: 0;               /* 消除 img 底部间隙 */
+  transform-origin: center center;
+  will-change: transform;
+}
+
 .image-2d {
-  max-width: 100%;
-  max-height: 100%;
+  display: block;
+  max-height: calc(100vh - 64px - 100px);  /* 减去导航栏 + 顶部/底部控制栏 */
+  max-width: calc(100vw - 660px);
   object-fit: contain;
   border-radius: 12px;
   box-shadow: 0 4px 24px rgba(139, 94, 60, 0.08);
-  animation: imageIn 0.4s ease-out;
   user-select: none;
 }
 
-@keyframes imageIn {
-  from { opacity: 0; transform: scale(0.97); }
-  to { opacity: 1; transform: scale(1); }
+/* ---------- 穴位标记点 ---------- */
+.acupoint-marker {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(196, 78, 70, 0.75);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  z-index: 2;
+  transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+.acupoint-marker:hover {
+  transform: translate(-50%, -50%) scale(1.6);
+  background: var(--accent-red);
+  box-shadow: 0 0 0 4px rgba(196, 78, 70, 0.25);
+  z-index: 4;
+}
+.acupoint-marker--selected {
+  background: #FFB74D;
+  border-color: #fff;
+  box-shadow: 0 0 0 4px rgba(255, 183, 77, 0.35);
+  z-index: 3;
+}
+.acupoint-marker--selected:hover {
+  background: #FFA726;
+  box-shadow: 0 0 0 5px rgba(255, 183, 77, 0.45);
+}
+
+/* 穴位名悬浮提示 */
+.marker-tooltip {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(93, 64, 55, 0.92);
+  color: #fff;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  white-space: nowrap;
+  letter-spacing: 0.5px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+.marker-tooltip::before {
+  content: '';
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 5px solid transparent;
+  border-right-color: rgba(93, 64, 55, 0.92);
+}
+.acupoint-marker:hover .marker-tooltip {
+  opacity: 1;
 }
 
 .image-2d-label {
@@ -743,6 +996,9 @@ const diseaseTags = computed(() => {
   border-radius: 50%;
   flex-shrink: 0;
 }
+
+/* 拖拽时禁止文字选择 */
+.image-2d-container { user-select: none; }
 
 .placeholder-body {
   display: flex;
@@ -1020,11 +1276,11 @@ const diseaseTags = computed(() => {
 }
 
 /* ==================== 响应式 ==================== */
-@media (max-width: 900px) {
+@media (max-width: 768px) {
   .acupoint-page {
     flex-direction: column;
     height: auto;
-    min-height: 100vh;
+    min-height: calc(100vh - 64px);
   }
 
   .left-panel {
