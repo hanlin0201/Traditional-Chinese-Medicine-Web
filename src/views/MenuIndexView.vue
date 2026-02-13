@@ -7,14 +7,21 @@ import { supabase } from '@/supabaseClient'
 import HerbalPairing from '@/components/home/HerbalPairing.vue'
 import MythBuster from '@/components/home/MythBuster.vue'
 import { Sun, Soup, ArrowRight, BookOpen, Utensils, ScrollText, ChevronDown } from 'lucide-vue-next'
+import { getNearestSolarTerm } from '@/constants/solarTerms'
 
 const router = useRouter()
 
 // --- 数据状态 ---
 const currentTermName = ref('')
-const termInfo = ref(null)      
-const seasonalRecipes = ref([]) 
+const termInfo = ref(null)
+const seasonalRecipes = ref([])
 const loading = ref(true)
+const nearestDaysDiff = ref(0)
+
+const todayLabel = (() => {
+  const d = new Date()
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
+})()
 
 // --- 核心翻页逻辑 (精准防抖版) ---
 const activeIndex = ref(0)
@@ -95,40 +102,14 @@ function goToHerbs() { router.push('/herbs') }
 function goToRecipes() { router.push('/recipes') }
 function goToRecipeDetail(id) { router.push({ path: '/recipes', query: { open_id: id } }) }
 
-// --- 数据获取 (保持不变) ---
-const SOLAR_TERMS_LOOKUP = [
-  { name: '小寒', month: 1, day: 5 }, { name: '大寒', month: 1, day: 20 },
-  { name: '立春', month: 2, day: 3 }, { name: '雨水', month: 2, day: 18 },
-  { name: '惊蛰', month: 3, day: 5 }, { name: '春分', month: 3, day: 20 },
-  { name: '清明', month: 4, day: 4 }, { name: '谷雨', month: 4, day: 19 },
-  { name: '立夏', month: 5, day: 5 }, { name: '小满', month: 5, day: 20 },
-  { name: '芒种', month: 6, day: 5 }, { name: '夏至', month: 6, day: 21 },
-  { name: '小暑', month: 7, day: 6 }, { name: '大暑', month: 7, day: 22 },
-  { name: '立秋', month: 8, day: 7 }, { name: '处暑', month: 8, day: 22 },
-  { name: '白露', month: 9, day: 7 }, { name: '秋分', month: 9, day: 22 },
-  { name: '寒露', month: 10, day: 8 }, { name: '霜降', month: 10, day: 23 },
-  { name: '立冬', month: 11, day: 7 }, { name: '小雪', month: 11, day: 22 },
-  { name: '大雪', month: 12, day: 6 }, { name: '冬至', month: 12, day: 21 }
-];
-function getTermLocally() {
-  const now = new Date();
-  const month = now.getMonth() + 1;
-  const day = now.getDate();
-  const sorted = SOLAR_TERMS_LOOKUP.sort((a, b) => a.month !== b.month ? a.month - b.month : a.day - b.day);
-  let current = sorted[sorted.length - 1]; 
-  for (let i = sorted.length - 1; i >= 0; i--) {
-    if (month > sorted[i].month || (month === sorted[i].month && day >= sorted[i].day)) {
-      current = sorted[i]; break;
-    }
-  }
-  return current;
-}
+// --- 数据获取 ---
 const fetchSeasonalData = async () => {
   loading.value = true
-  const termBasic = getTermLocally() 
-  currentTermName.value = termBasic.name
+  const term = getNearestSolarTerm()
+  currentTermName.value = term.name
+  nearestDaysDiff.value = term.daysDiff ?? 0
   const MOCK_DATA = {
-    info: { name: termBasic.name, principle: '省酸增甘，以养脾气；疏肝理气，顺应春阳。', recommend_text: '韭菜、香椿、百合', avoid_text: '酸辣食物、生冷海鲜' },
+    info: { name: term.name, principle: '省酸增甘，以养脾气；疏肝理气，顺应春阳。', recommend_text: '韭菜、香椿、百合', avoid_text: '酸辣食物、生冷海鲜' },
     recipes: [
       { id: 1, name: '春笋炖排骨', image: 'https://images.unsplash.com/photo-1547592180-85f173990554?q=80&w=2070&auto=format&fit=crop' },
       { id: 2, name: '枸杞菊花茶', image: 'https://images.unsplash.com/photo-1623912852230-e374bb36934c?q=80&w=2070&auto=format&fit=crop' },
@@ -136,9 +117,9 @@ const fetchSeasonalData = async () => {
     ]
   }
   try {
-    const { data: info } = await supabase.from('solar_terms').select('*').eq('name', termBasic.name).single()
+    const { data: info } = await supabase.from('solar_terms').select('*').eq('name', term.name).single()
     termInfo.value = info || MOCK_DATA.info
-    const { data: recipes } = await supabase.from('recipes').select('id, name, image').eq('solar_term', termBasic.name).limit(3)
+    const { data: recipes } = await supabase.from('recipes').select('id, name, image').eq('solar_term', term.name).limit(3)
     seasonalRecipes.value = (recipes && recipes.length) ? recipes : MOCK_DATA.recipes
   } catch (e) {
     termInfo.value = MOCK_DATA.info; seasonalRecipes.value = MOCK_DATA.recipes
@@ -201,11 +182,27 @@ onUnmounted(() => {
       <div class="page-section">
         <section class="tcm-section tcm-seasonal-section">
           <div class="section-inner">
-            <div class="section-header"><h2 class="section-title">四时之序</h2><p class="section-subtitle">顺应天时，调和阴阳</p></div>
-            <div v-if="termInfo" class="seasonal-card">
+            <div class="section-header">
+              <h2 class="section-title">四时之序</h2>
+              <p class="section-subtitle">顺应天时，调和阴阳</p>
+              <div class="seasonal-header-decoration"><span class="line"></span><span class="dot"></span><span class="line"></span></div>
+              <p class="today-label"><span class="today-pill">今日：{{ todayLabel }}</span></p>
+            </div>
+            <div v-if="termInfo" class="seasonal-card seasonal-card-enter">
                <div class="stamp-decoration">节气</div>
                <div class="card-left">
-                  <div class="term-badge"><Sun class="w-3.5 h-3.5" /><span>今日</span></div>
+                  <div class="term-countdown">
+                    <span class="term-countdown-prefix">距离下一个节气日</span>
+                    <span class="term-countdown-days">
+                      {{
+                        nearestDaysDiff === 0
+                          ? '今天就是节气日'
+                          : nearestDaysDiff > 0
+                            ? `还有 ${nearestDaysDiff} 天`
+                            : `已过 ${Math.abs(nearestDaysDiff)} 天`
+                      }}
+                    </span>
+                  </div>
                   <h2 class="term-name">{{ termInfo.name }}</h2>
                   <div class="term-principle">{{ termInfo.principle }}</div>
                   <div class="advice-tags">
@@ -298,28 +295,41 @@ onUnmounted(() => {
 .btn-text .sub { font-size: 0.75rem; color: #888; }
 .arrow { width: 18px; color: #ccc; margin-left: auto; }
 .tcm-seasonal-section { background-image: url('https://images.unsplash.com/photo-1445964047600-cdbdb873673d?q=80&w=2584&auto=format&fit=crop'); background-size: cover; background-position: center; }
-.tcm-seasonal-section::before { content: ''; position: absolute; inset: 0; background: rgba(0, 0, 0, 0.2); }
+.tcm-seasonal-section::before { content: ''; position: absolute; inset: 0; background: rgba(0, 0, 0, 0.25); }
+.tcm-seasonal-section::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 30%; background: linear-gradient(to top, rgba(0,0,0,0.1), transparent); pointer-events: none; z-index: 1; }
 .section-inner { width: 100%; max-width: 1100px; padding: 0 5%; z-index: 2; }
 .section-header { text-align: center; margin-bottom: 40px; color: white; }
-.section-title { font-family: 'Ma Shan Zheng', cursive; font-size: 2.5rem; letter-spacing: 0.1em; margin: 0; }
+.section-title { font-family: 'Ma Shan Zheng', cursive; font-size: 2.5rem; letter-spacing: 0.1em; margin: 0; text-shadow: 0 2px 8px rgba(0,0,0,0.2); }
 .section-subtitle { font-size: 1rem; opacity: 0.9; letter-spacing: 0.3em; }
-.seasonal-card { width: 100%; background: rgba(255, 255, 255, 0.92); backdrop-filter: blur(20px); border-radius: 20px; padding: 40px; display: flex; gap: 50px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2); position: relative; }
-.stamp-decoration { position: absolute; top: 20px; right: 20px; border: 2px solid var(--accent); color: var(--accent); padding: 5px; font-weight: bold; transform: rotate(15deg); opacity: 0.3; }
-.term-badge { display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(135deg, var(--primary), var(--accent)); color: white; padding: 4px 12px; border-radius: 50px; font-size: 0.75rem; margin-bottom: 12px; }
-.term-name { font-size: 3rem; color: var(--primary-dark); font-family: 'Ma Shan Zheng', serif; margin: 0 0 10px 0; }
+.seasonal-header-decoration { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 10px 0; }
+.seasonal-header-decoration .line { width: 30px; height: 1px; background: rgba(255,255,255,0.6); }
+.seasonal-header-decoration .dot { width: 4px; height: 4px; border-radius: 50%; background: rgba(255,255,255,0.8); }
+.today-label { margin-top: 4px; }
+.today-pill { display: inline-block; background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 50px; font-size: 0.9rem; letter-spacing: 0.05em; border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.seasonal-card { width: 100%; background: rgba(255, 255, 255, 0.92); backdrop-filter: blur(20px); border-radius: 20px; padding: 40px; display: flex; gap: 50px; box-shadow: 0 4px 6px rgba(0,0,0,0.07), 0 20px 40px rgba(0,0,0,0.15); border: 1px solid rgba(255,255,255,0.5); position: relative; }
+.seasonal-card-enter { animation: seasonal-card-enter 0.6s ease-out; }
+@keyframes seasonal-card-enter { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+.stamp-decoration { position: absolute; top: 20px; right: 20px; border: 2px solid var(--accent); color: var(--accent); padding: 5px; font-weight: bold; transform: rotate(15deg); opacity: 0.48; font-size: 0.95rem; }
+.term-badge { display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(135deg, var(--primary), var(--accent)); color: white; padding: 4px 12px; border-radius: 50px; font-size: 0.75rem; font-weight: 500; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(139,94,60,0.25); }
+.term-countdown { margin-bottom: 6px; font-size: 0.9rem; color: #666; display: flex; flex-wrap: wrap; gap: 4px; align-items: baseline; }
+.term-countdown-name,
+.term-countdown-days { font-size: 1rem; font-weight: 600; color: #111; }
+.term-name { font-size: 3rem; color: var(--primary-dark); font-family: 'Ma Shan Zheng', serif; margin: 0 0 10px 0; text-shadow: 0 1px 3px rgba(0,0,0,0.06); }
 .term-principle { color: #666; line-height: 1.6; margin-bottom: 20px; }
-.advice-row { display: flex; align-items: center; gap: 10px; background: rgba(245, 240, 230, 0.5); padding: 8px 12px; border-radius: 8px; margin-bottom: 8px; }
-.tag-label { padding: 2px 6px; border-radius: 4px; color: white; font-size: 0.75rem; }
+.advice-row { display: flex; align-items: center; gap: 10px; background: rgba(245, 240, 230, 0.5); padding: 8px 12px; border-radius: 10px; margin-bottom: 8px; }
+.tag-label { padding: 4px 10px; border-radius: 6px; color: white; font-size: 0.75rem; box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
 .tag-label.good { background: #558B2F; }
 .tag-label.bad { background: #C62828; }
-.card-divider { width: 1px; background: rgba(0,0,0,0.1); }
+.card-divider { width: 1px; background: linear-gradient(to bottom, rgba(0,0,0,0.06), rgba(0,0,0,0.12), rgba(0,0,0,0.06)); }
 .card-right { flex: 1.5; }
-.right-title { font-weight: bold; color: var(--primary); margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+.right-title { font-weight: bold; color: var(--primary); margin-bottom: 15px; display: flex; align-items: center; gap: 8px; letter-spacing: 0.5px; }
 .mini-recipe-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-.mini-recipe { position: relative; aspect-ratio: 1; border-radius: 12px; overflow: hidden; cursor: pointer; }
+.mini-recipe { position: relative; aspect-ratio: 1; border-radius: 12px; overflow: hidden; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.08); transition: transform 0.3s, box-shadow 0.3s; }
 .recipe-thumb { width: 100%; height: 100%; object-fit: cover; transition: 0.5s; }
+.mini-recipe:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.15); }
 .mini-recipe:hover .recipe-thumb { transform: scale(1.1); }
-.recipe-overlay { position: absolute; bottom: 0; width: 100%; background: linear-gradient(transparent, rgba(0,0,0,0.7)); padding: 8px; color: white; text-align: center; font-size: 0.8rem; }
+.recipe-overlay { position: absolute; bottom: 0; width: 100%; background: linear-gradient(transparent, rgba(0,0,0,0.5), rgba(0,0,0,0.75)); padding: 8px; color: white; text-align: center; }
+.recipe-name { font-size: 0.85rem; font-weight: 500; }
 .bg-overlay-noise { position: absolute; inset: 0; background-image: url("data:image/svg+xml,%3Csvg width='200' height='200' viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E"); z-index: 1; pointer-events: none; }
 .scroll-hint { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; color: var(--primary); cursor: pointer; opacity: 0.6; }
 .title-decoration { display: flex; align-items: center; gap: 10px; margin: 10px 0; opacity: 0.6; }
@@ -331,7 +341,10 @@ onUnmounted(() => {
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 768px) {
   .menu-entry-grid { flex-direction: column; gap: 40px; }
-  .seasonal-card { flex-direction: column; gap: 20px; padding: 20px; }
+  .section-title { font-size: clamp(1.75rem, 5vw, 2.25rem); }
+  .today-pill { padding: 5px 12px; font-size: 0.85rem; }
+  .seasonal-card { flex-direction: column; gap: 24px; padding: 24px; }
   .card-divider { display: none; }
+  .mini-recipe-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
 }
 </style>
