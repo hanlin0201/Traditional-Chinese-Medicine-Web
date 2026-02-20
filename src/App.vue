@@ -67,9 +67,33 @@ function openAuthPanel() {
 
 <style>
 /* 当 body 拥有 hide-global-nav 类时，隐藏导航栏 */
-/* transform: translateY(-100%) 会把导航栏移出屏幕顶部 */
 body.hide-global-nav .main-nav {
   transform: translateY(-100%);
+}
+
+/* 上古朝代详情全屏：顶栏移出文档流 + 整页严格 100vh，消除顶端空白与滚动条 */
+body.dynasty-fullscreen {
+  overflow: hidden;
+  height: 100vh;
+}
+/* 顶栏改为 fixed 并移出视口，不再占位，main 才能从视口顶部开始 */
+body.dynasty-fullscreen .main-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  transform: translateY(-100%);
+}
+/* 根节点与 App 根 div 严格 100vh，内容从顶部起全屏 */
+body.dynasty-fullscreen #app,
+body.dynasty-fullscreen #app > div {
+  height: 100vh;
+  min-height: 100vh;
+  overflow: hidden;
+}
+body.dynasty-fullscreen #app > div main {
+  height: 100%;
+  min-height: 0;
 }
 </style>
 
