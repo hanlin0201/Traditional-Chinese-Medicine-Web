@@ -31,7 +31,7 @@ export const DYNASTIES = [
     id: 'chunqiu',
     name: '春秋战国',
     period: '公元前770年—公元前221年',
-    heroImage: '黄帝内经.jpg',
+    heroImage: '朝代背景2.jpg',
     overview: '春秋战国时期诸子百家争鸣，医学理论开始系统化。《黄帝内经》成书于这一时期，奠定了中医学的理论基础，系统阐述阴阳五行、脏腑经络、病因病机等，与《伤寒杂病论》《神农本草经》并称中医四大经典。',
     figures: [
       { name: '扁鹊', description: '脉学与四诊法的集大成者，开创望闻问切' },
@@ -106,7 +106,7 @@ export const DYNASTIES = [
     id: 'tang',
     name: '唐代',
     period: '公元618年—907年',
-    heroImage: '千金方.jpg',
+    heroImage: '新修本草.jpg',
     overview: '唐代是中国传统医学发展的鼎盛时期。政治稳定、经济繁荣，促进了医学的全面进步。官方设立了完善的医学教育和管理机构，医学典籍大量编纂，对外交流频繁。',
     figures: [
       { name: '孙思邈', description: '"药王"，著《备急千金要方》，集唐代以前医学大成' },
@@ -127,7 +127,7 @@ export const DYNASTIES = [
     id: 'song',
     name: '宋代',
     period: '公元960年—1279年',
-    heroImage: '宋代针灸铜人.jpg',
+    heroImage: '宋代医学.jpg',
     overview: '宋代官方高度重视医学教育与考核。王惟一主持铸造针灸铜人用于教学与考试，并撰《铜人腧穴针灸图经》，针灸学与本草学均有重要发展，太医局制度完善。',
     figures: [
       { name: '王惟一', description: '主持铸造针灸铜人，撰《铜人腧穴针灸图经》，统一腧穴标准' },
@@ -182,7 +182,7 @@ export const DYNASTIES = [
     id: 'xiandai',
     name: '现代',
     period: '1949年至今',
-    heroImage: '屠呦呦.jpg',
+    heroImage: '屠呦呦工作室.jpg',
     overview: '新中国成立后，中医药事业得到国家高度重视。屠呦呦因发现青蒿素获得诺贝尔奖，使中医药在世界舞台绽放光彩。中西医结合成为新的发展方向。',
     figures: [
       { name: '屠呦呦', description: '发现青蒿素，获2015年诺贝尔生理学或医学奖' },

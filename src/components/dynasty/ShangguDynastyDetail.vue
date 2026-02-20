@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch, onBeforeUnmount, nextTick } from 'vue'
 import gsap from 'gsap'
-import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-vue-next'
+import { ArrowRight, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-vue-next'
 import { getPhotoUrl } from '@/constants/dynasties.js'
 
 const props = defineProps({
@@ -9,19 +9,15 @@ const props = defineProps({
   adjacent: { type: Object, required: true },
 })
 
-const emit = defineEmits(['go-to-dynasty', 'page-change'])
+const emit = defineEmits(['go-to-dynasty', 'page-change', 'back'])
 
 const shangguRootRef = ref(null)
 const shangguFlipActiveIndex = ref(0)
 const shangguIsAnimating = ref(false)
 const SHANGGU_TOTAL_PAGES = 3
 
-// 第一屏+杂志区总高度：100vh + 杂志约 70vh，用于第二页、第三页的 translateY
-const CURTAIN_FIRST_VH = 100
-const MAGAZINE_VH = 70
-const CURTAIN_TOTAL_VH = CURTAIN_FIRST_VH + MAGAZINE_VH
-// 标题在“第一屏”中的位置（vh），升到顶需移动量
-const TITLE_OFFSET_VH = 42
+// 三页均为严格 100vh，与首页一致：翻页后刚好占满全屏
+const VH_PER_PAGE = 100
 
 function shangguMoveTo(index) {
   if (index < 0 || index >= SHANGGU_TOTAL_PAGES) return
@@ -38,18 +34,14 @@ function shangguMoveTo(index) {
   shangguFlipActiveIndex.value = index
   emit('page-change', index)
 
-  // 切回第一、二页时把根滚动条归零，避免下次进第三页时还在底栏
-  if (index <= 1 && shangguRootRef.value) {
-    shangguRootRef.value.scrollTop = 0
+  // 切到第三页时内部从顶部开始；切回第一、二页时也把第三页内部滚动归零
+  if (shangguRootRef.value) {
+    const thirdInner = shangguRootRef.value.querySelector('.shanggu-third-inner')
+    if (thirdInner) thirdInner.scrollTop = 0
   }
 
-  // 用 vh 做帷幕位移：0 → -42vh（第二页）→ -(100+70)vh（第三页）
-  const targets = {
-    0: 0,
-    1: -TITLE_OFFSET_VH,
-    2: -CURTAIN_TOTAL_VH,
-  }
-  const yVh = targets[index]
+  // 位移：0 → -100vh（第二页）→ -200vh（第三页），每页正好一屏
+  const yVh = -index * VH_PER_PAGE
   gsap.to(container, {
     y: `${yVh}vh`,
     duration: fromIndex === 0 && index === 1 ? 1 : 0.9,
@@ -62,17 +54,33 @@ function shangguMoveTo(index) {
 function shangguHandleWheel(e) {
   if (!shangguRootRef.value || !props.dynasty || props.dynasty.id !== 'shanggu') return
   const root = shangguRootRef.value
-  const atTop = root.scrollTop <= 2
-  if (!atTop) return
+  // 第三页：仅当内部滚到顶且用户向上滚时翻回第二页；其余情况让内部滚动
+  if (shangguFlipActiveIndex.value === 2) {
+    const thirdInner = root.querySelector('.shanggu-third-inner')
+    if (thirdInner) {
+      const atTop = thirdInner.scrollTop <= 2
+      const atBottom = thirdInner.scrollTop + thirdInner.clientHeight >= thirdInner.scrollHeight - 2
+      if (e.deltaY > 0 && !atBottom) return
+      if (e.deltaY < 0 && !atTop) return
+      if (e.deltaY < 0 && atTop) {
+        e.preventDefault()
+        if (shangguIsAnimating.value) return
+        if (Math.abs(e.deltaY) < 18) return
+        shangguMoveTo(1)
+        return
+      }
+      if (e.deltaY > 0 && atBottom) {
+        e.preventDefault()
+        return
+      }
+      return
+    }
+  }
   e.preventDefault()
   if (shangguIsAnimating.value) return
   if (Math.abs(e.deltaY) < 18) return
   if (e.deltaY > 0) {
-    if (shangguFlipActiveIndex.value < SHANGGU_TOTAL_PAGES - 1) {
-      shangguMoveTo(shangguFlipActiveIndex.value + 1)
-    } else {
-      root.scrollTo({ top: root.clientHeight, behavior: 'smooth' })
-    }
+    if (shangguFlipActiveIndex.value < SHANGGU_TOTAL_PAGES - 1) shangguMoveTo(shangguFlipActiveIndex.value + 1)
   } else {
     shangguMoveTo(shangguFlipActiveIndex.value - 1)
   }
@@ -141,10 +149,11 @@ watch(
     nextTick(() => {
       const root = shangguRootRef.value
       if (!root) return
-      root.scrollTop = 0
       root.addEventListener('wheel', shangguHandleWheel, { passive: false })
       const container = root.querySelector('.shanggu-scroll-container')
       if (container) gsap.set(container, { y: '0vh' })
+      const thirdInner = root.querySelector('.shanggu-third-inner')
+      if (thirdInner) thirdInner.scrollTop = 0
       shangguFlipActiveIndex.value = 0
       emit('page-change', 0)
       bookOpen.value = false
@@ -165,7 +174,13 @@ onBeforeUnmount(() => {
     class="shanggu-root"
     :class="{ 'shanggu-root--fullscreen': shangguFlipActiveIndex <= 1 }"
   >
-    <!-- 第一、二页共用：固定全屏背景图；切到第三页时淡出，避免突然消失 -->
+    <!-- 悬浮返回：不占顶栏，达成全屏 -->
+    <button type="button" class="shanggu-back-float" @click="emit('back')" aria-label="返回">
+      <ArrowLeft :size="20" class="shanggu-back-float__icon" />
+      <span>返回</span>
+    </button>
+
+    <!-- 第一、二页共用：固定全屏背景图；切到第三页时淡出 -->
     <div
       v-show="dynasty"
       class="shanggu-fixed-bg"
@@ -177,8 +192,8 @@ onBeforeUnmount(() => {
 
     <div class="shanggu-flip-viewport">
       <div class="shanggu-scroll-container">
-        <!-- 帷幕：第一屏（渐变+标题+简介）+ 杂志区，整体上移形成“拉幕”效果 -->
-        <section class="shanggu-curtain">
+        <!-- 第一页：严格 100vh，标题+简介 -->
+        <section class="shanggu-screen shanggu-screen-1">
           <div class="shanggu-curtain__gradient"></div>
           <div class="shanggu-curtain__center">
             <h2 class="shanggu-curtain__name">{{ dynasty.name }}</h2>
@@ -192,111 +207,119 @@ onBeforeUnmount(() => {
           <div class="shanggu-curtain__overview">
             <p class="shanggu-curtain__overview-text">{{ dynasty.overview }}</p>
           </div>
-          <div class="shanggu-curtain__magazine">
+        </section>
+
+        <!-- 第二页：严格 100vh，杂志区一屏内 -->
+        <section class="shanggu-screen shanggu-screen-2">
+          <div class="shanggu-magazine">
             <div class="shanggu-magazine__col">
-              <p class="shanggu-magazine__p">{{ dynasty.overview }}</p>
-              <p class="shanggu-magazine__p">先民在采集与渔猎中，逐渐区分可食与有毒之物，积累下“药食同源”的早期经验。传说神农氏尝百草、一日而遇七十毒，正是这一漫长实践的神话化表达，也为后世本草学与中药学奠定了观念基础。从口尝、鼻嗅到观察动植物对人身的作用，早期药物知识在部落间代代相传；哪些草木可止血、哪些可退热、哪些误食会致病，都在反复试错中沉淀下来，成为后世《神农本草经》等经典的源头。这一时期尚未形成系统的医学理论，但"一物克一物""以毒攻毒"等朴素观念已经萌芽，为后来的配伍与方剂学埋下伏笔。</p>
+              <p class="shanggu-magazine__p">上古时期是中医药的起源阶段，彼时先民身处洪荒，瘴气弥漫、兽虫侵扰，风寒暑湿等外邪极易侵袭躯体，病痛与伤亡常伴左右。在与自然的长期斗争和求生实践中，先民们逐渐积累了零散却珍贵的用药经验，“神农尝百草”的传说正是这一漫长探索过程的生动缩影，凝聚着先民对生命与健康的敬畏与执着。</p>
+              <p class="shanggu-magazine__p">先民在采集果实、捕猎禽兽的日常活动中，不断区分可食之物与有毒之品，慢慢沉淀下“药食同源”的早期经验。传说中神农氏遍历名山大川，亲尝百草滋味、体察草木功效，一日而遇七十毒却始终坚守，这并非虚构的神话，而是先民无数次冒险试错、以身践验的集体记忆凝练，也为后世本草学与中药学的发展奠定了坚实的观念基础。从口尝辨味、鼻嗅辨气，到细致观察动植物对人体的各类作用，早期药物知识没有文字可依托，全靠部落老者口耳相传、代代延续；哪些草木可止血、哪些可退热、哪些误食会致病、哪些能缓解伤痛，都在反复实践、不断总结中沉淀下来，成为后世《神农本草经》等中医药经典的原始源头。这一时期尚未形成系统完整的医学理论，但“一物克一物”“以毒攻毒”等朴素的诊疗观念已经悄然萌芽，为后来中医药的配伍理论与方剂学发展埋下了重要伏笔。</p>
             </div>
             <div class="shanggu-magazine__divider"></div>
             <div class="shanggu-magazine__col">
-              <p class="shanggu-magazine__p">与此同时，伏羲制九针、创针灸之始，将治疗手段从内服拓展至外治与经络。上古时期虽无文字典籍传世，但口耳相传的经验与传说，已勾勒出中医药起源阶段的轮廓。针石、砭石与导引等外治法的出现，说明先民已认识到体表刺激与身体状态之间的关联，这与后世经络学说一脉相承。神农与伏羲在传说中往往并提，一个代表本草与农桑，一个代表针术与卦象，共同构成上古医药与文化的双翼。《神农本草经》虽成书于汉代，其序录中明确将药物分为上、中、下三品，并强调"轻身益气""延年"等观念，这些思想均可追溯至上古时期对生命与自然的朴素认识。</p>
+              <p class="shanggu-magazine__p">与此同时，伏羲观天地、察人体，模拟自然万物形态创制九针，开创了针灸之始，将治疗手段从单纯的内服药物，拓展至外治与经络调理相结合的新阶段。上古时期虽无文字典籍传世，但口耳相传的实践经验与神话传说，已清晰勾勒出中医药起源阶段的大致轮廓。针石、砭石的应用与导引术的出现，说明先民已逐渐认识到体表刺激与身体内部状态之间的密切关联，这种认知与后世经络学说一脉相承、源远流长。神农与伏羲在传说中往往并提，一个代表着本草与农桑的交融，一个代表着针术与自然规律的结合，二者相辅相成，共同构成了上古时期医药文化的双翼。后世成书于汉代的《神农本草经》，虽距上古已远，但其序录中明确将药物分为上、中、下三品，并强调“轻身益气”“延年益寿”等养生观念，这些思想均可追溯至上古时期先民对生命与自然的朴素认知，是上古中医药经验的传承与升华。</p>
+              <img :src="getPhotoUrl('伏羲制九针.jpg')" alt="伏羲制九针" class="shanggu-magazine__img" @error="($e) => ($e.target.style.display = 'none')" />
             </div>
           </div>
         </section>
 
-        <!-- 第三页：人物（左神农+右伏羲，文字与图对应）+ 典籍（半屏翻书 6 页） -->
-        <section class="shanggu-page shanggu-figures-dark">
-          <div class="shanggu-figures-row">
-            <div class="shanggu-figure-cell shanggu-figure-cell--left">
-              <img :src="getPhotoUrl('神农.jpg')" alt="神农" class="shanggu-figure-img" @error="($e) => ($e.target.src = getPhotoUrl(dynasty.heroImage))" />
-              <div class="shanggu-figure-text">
-                <h4 class="shanggu-figure-title">神农氏</h4>
-                <p class="shanggu-figure-desc">尝百草，辨药性，奠定中药学基础。传说神农氏为辨明草木性味，亲尝百草，一日而遇七十毒，从而区分可食、可药与有毒之物，被尊为药学与农业之祖。</p>
-              </div>
-            </div>
-            <div class="shanggu-figures__gap"></div>
-            <div class="shanggu-figure-cell shanggu-figure-cell--right">
-              <img :src="getPhotoUrl('伏羲.jpg')" alt="伏羲" class="shanggu-figure-img" @error="($e) => ($e.target.src = getPhotoUrl(dynasty.heroImage))" />
-              <div class="shanggu-figure-text">
-                <h4 class="shanggu-figure-title">伏羲</h4>
-                <p class="shanggu-figure-desc">制九针，创针灸之始。伏羲与神农并称上古医药传说的重要代表，九针为后世针具与针灸理论之滥觞，与神农本草共同构成上古医药的双翼。</p>
-              </div>
-            </div>
-          </div>
-          <div class="shanggu-book-wrap">
-            <div class="shanggu-book" :class="{ 'shanggu-book--open': bookOpen }">
-              <div v-if="!bookOpen" class="shanggu-book-cover" @click="openBook">
-                <span class="shanggu-book-cover__title">《神农本草经》</span>
-                <span class="shanggu-book-cover__hint">点击翻阅</span>
-              </div>
-              <div v-else class="shanggu-book-spread" @click="onBookClick">
-                <span class="shanggu-book-spread-hint">点击左侧往前翻，右侧往后翻</span>
-                <div class="shanggu-book-spread-row">
-                  <button type="button" class="shanggu-book-turn shanggu-book-turn--prev" :disabled="!canTurnPrev()" @click.stop="turnBookLeft" aria-label="上一页">
-                    <ChevronLeft :size="24" />
-                  </button>
-                  <div class="shanggu-book-inner">
-                  <div class="shanggu-book-half shanggu-book-half--left">
-                    <template v-if="leftPageContent()">
-                      <h5 class="shanggu-book-page__title">{{ leftPageContent().title }}</h5>
-                      <p class="shanggu-book-page__body">{{ leftPageContent().body }}</p>
-                      <p class="shanggu-book-page__meta">第 {{ bookSpreadIndex * 2 + 1 }} 页</p>
-                    </template>
-                  </div>
-                  <div class="shanggu-book-spine"></div>
-                  <div class="shanggu-book-half shanggu-book-half--right">
-                    <template v-if="rightPageContent()">
-                      <h5 class="shanggu-book-page__title">{{ rightPageContent().title }}</h5>
-                      <p class="shanggu-book-page__body">{{ rightPageContent().body }}</p>
-                      <p class="shanggu-book-page__meta">第 {{ bookSpreadIndex * 2 + 2 }} 页</p>
-                    </template>
-                  </div>
+        <!-- 第三页：100vh 视口，内部可二次滚动（人物+典籍+成就），背景为朝代背景1.jpg -->
+        <section class="shanggu-screen shanggu-screen-3 shanggu-figures-dark" :style="{ backgroundImage: `url(${getPhotoUrl('朝代背景1.jpg')})` }">
+          <div class="shanggu-third-inner">
+            <div class="shanggu-figures-row">
+              <div class="shanggu-figure-cell shanggu-figure-cell--left">
+                <img :src="getPhotoUrl('神农.jpg')" alt="神农" class="shanggu-figure-img" @error="($e) => ($e.target.src = getPhotoUrl(dynasty.heroImage))" />
+                <div class="shanggu-figure-text">
+                  <h4 class="shanggu-figure-title">神农氏</h4>
+                  <p class="shanggu-figure-desc">尝百草，辨药性，奠定中药学基础。传说神农氏为辨明草木性味，亲尝百草，一日而遇七十毒，从而区分可食、可药与有毒之物，被尊为药学与农业之祖。</p>
                 </div>
-                  <button type="button" class="shanggu-book-turn shanggu-book-turn--next" :disabled="!canTurnNext()" @click.stop="turnBookRight" aria-label="下一页">
-                    <ChevronRight :size="24" />
-                  </button>
+              </div>
+              <div class="shanggu-figures__gap"></div>
+              <div class="shanggu-figure-cell shanggu-figure-cell--right">
+                <img :src="getPhotoUrl('伏羲.jpg')" alt="伏羲" class="shanggu-figure-img" @error="($e) => ($e.target.src = getPhotoUrl(dynasty.heroImage))" />
+                <div class="shanggu-figure-text">
+                  <h4 class="shanggu-figure-title">伏羲</h4>
+                  <p class="shanggu-figure-desc">制九针，创针灸之始。伏羲与神农并称上古医药传说的重要代表，九针为后世针具与针灸理论之滥觞，与神农本草共同构成上古医药的双翼。</p>
                 </div>
               </div>
             </div>
+            <div class="shanggu-book-wrap">
+              <div class="shanggu-book" :class="{ 'shanggu-book--open': bookOpen }">
+                <div v-if="!bookOpen" class="shanggu-book-cover" @click="openBook">
+                  <span class="shanggu-book-cover__title">《神农本草经》</span>
+                  <span class="shanggu-book-cover__hint">点击翻阅</span>
+                </div>
+                <div v-else class="shanggu-book-spread" @click="onBookClick">
+                  <span class="shanggu-book-spread-hint">点击左侧往前翻，右侧往后翻</span>
+                  <div class="shanggu-book-spread-row">
+                    <button type="button" class="shanggu-book-turn shanggu-book-turn--prev" :disabled="!canTurnPrev()" @click.stop="turnBookLeft" aria-label="上一页">
+                      <ChevronLeft :size="24" />
+                    </button>
+                    <div class="shanggu-book-inner">
+                      <div class="shanggu-book-half shanggu-book-half--left">
+                        <template v-if="leftPageContent()">
+                          <h5 class="shanggu-book-page__title">{{ leftPageContent().title }}</h5>
+                          <p class="shanggu-book-page__body">{{ leftPageContent().body }}</p>
+                          <p class="shanggu-book-page__meta">第 {{ bookSpreadIndex * 2 + 1 }} 页</p>
+                        </template>
+                      </div>
+                      <div class="shanggu-book-spine"></div>
+                      <div class="shanggu-book-half shanggu-book-half--right">
+                        <template v-if="rightPageContent()">
+                          <h5 class="shanggu-book-page__title">{{ rightPageContent().title }}</h5>
+                          <p class="shanggu-book-page__body">{{ rightPageContent().body }}</p>
+                          <p class="shanggu-book-page__meta">第 {{ bookSpreadIndex * 2 + 2 }} 页</p>
+                        </template>
+                      </div>
+                    </div>
+                    <button type="button" class="shanggu-book-turn shanggu-book-turn--next" :disabled="!canTurnNext()" @click.stop="turnBookRight" aria-label="下一页">
+                      <ChevronRight :size="24" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- 成就区放入第三页内部，与人物、典籍一起可滚动 -->
+            <section class="shanggu-achievements-bar">
+              <div class="shanggu-achievements-bar__row">
+                <div class="shanggu-achievements-bar__main">
+                  <h3 class="shanggu-achievements-bar__title">主要成就</h3>
+                  <div class="shanggu-achievements-bar__grid">
+                    <div v-for="(item, idx) in dynasty.achievements" :key="idx" class="shanggu-achievement-item">
+                      <span class="shanggu-achievement-item__year">{{ item.year }}</span>
+                      <h4 class="shanggu-achievement-item__title">{{ item.title }}</h4>
+                      <p class="shanggu-achievement-item__desc">{{ item.description }}</p>
+                    </div>
+                  </div>
+                </div>
+                <div class="shanggu-achievements-bar__nav">
+                  <button v-if="adjacent.prev" class="shanggu-nav-btn" @click="emit('go-to-dynasty', adjacent.prev.id)">
+                    <ArrowLeft :size="18" />
+                    <span>{{ adjacent.prev.name }}</span>
+                  </button>
+                  <button v-if="adjacent.next" class="shanggu-nav-btn" @click="emit('go-to-dynasty', adjacent.next.id)">
+                    <span>{{ adjacent.next.name }}</span>
+                    <ArrowRight :size="18" />
+                  </button>
+                </div>
+              </div>
+            </section>
           </div>
         </section>
       </div>
     </div>
-
-    <!-- 底栏：成就 + 右侧跳转按钮，风格与第三页统一 -->
-    <section class="shanggu-achievements-bar">
-      <div class="shanggu-achievements-bar__row">
-        <div class="shanggu-achievements-bar__main">
-          <h3 class="shanggu-achievements-bar__title">主要成就</h3>
-          <div class="shanggu-achievements-bar__grid">
-            <div v-for="(item, idx) in dynasty.achievements" :key="idx" class="shanggu-achievement-item">
-              <span class="shanggu-achievement-item__year">{{ item.year }}</span>
-              <h4 class="shanggu-achievement-item__title">{{ item.title }}</h4>
-              <p class="shanggu-achievement-item__desc">{{ item.description }}</p>
-            </div>
-          </div>
-        </div>
-        <div class="shanggu-achievements-bar__nav">
-          <button v-if="adjacent.next" class="shanggu-nav-btn" @click="emit('go-to-dynasty', adjacent.next.id)">
-            <span>{{ adjacent.next.name }}</span>
-            <ArrowRight :size="18" />
-          </button>
-        </div>
-      </div>
-    </section>
   </div>
 </template>
 
 <style scoped>
 .shanggu-root {
   height: 100vh;
-  overflow-y: auto;
+  overflow: hidden;
   overflow-x: hidden;
   overscroll-behavior: none;
 }
-/* 第一、二页时严格一屏，禁止拖动滚动条 */
 .shanggu-root--fullscreen {
-  overflow: hidden;
   height: 100vh;
 }
 
@@ -318,6 +341,36 @@ onBeforeUnmount(() => {
   filter: brightness(0.82) saturate(0.9);
 }
 
+/* 悬浮返回按钮：不占顶栏，达成全屏 */
+.shanggu-back-float {
+  position: fixed;
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-radius: 24px;
+  border: 1px solid rgba(255,255,255,0.25);
+  background: rgba(28, 24, 22, 0.6);
+  backdrop-filter: blur(8px);
+  color: rgba(255,255,255,0.95);
+  font-size: 0.9rem;
+  font-family: inherit;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+}
+.shanggu-back-float:hover {
+  background: rgba(28, 24, 22, 0.85);
+  transform: translateY(-50%) translateX(-2px);
+}
+.shanggu-back-float__icon {
+  transform: rotate(180deg);
+}
+
 .shanggu-flip-viewport {
   position: relative;
   z-index: 1;
@@ -326,37 +379,41 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
 }
 .shanggu-scroll-container {
-  height: 100%;
   width: 100%;
+  height: 300vh;
   will-change: transform;
+  display: flex;
+  flex-direction: column;
 }
-.shanggu-page {
+/* 每页严格 100vh，与首页一致；flex 保证第三页滑入时顶端对齐视口 */
+.shanggu-screen {
   width: 100%;
-  height: 100vh;
-  flex-shrink: 0;
+  flex: 0 0 100vh;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
 }
 
-/* 帷幕：第一屏 100vh（渐变+标题+简介）+ 杂志 70vh，总高 170vh，整体上移形成拉幕 */
-.shanggu-curtain {
-  position: relative;
-  width: 100%;
-  height: 170vh;
-  flex-shrink: 0;
-  overflow: hidden;
+/* 第一页：标题+简介，一屏内 */
+.shanggu-screen-1 {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
 }
 .shanggu-curtain__gradient {
   position: absolute;
   left: 0;
   right: 0;
   top: 0;
-  height: 100vh;
+  height: 100%;
   background: linear-gradient(to top, rgba(28, 24, 22, 0.92) 0%, rgba(45, 38, 35, 0.5) 45%, transparent 100%);
   pointer-events: none;
 }
 .shanggu-curtain__center {
   position: absolute;
   left: 50%;
-  top: 42vh;
+  top: 38vh;
   transform: translate(-50%, -50%);
   text-align: center;
   z-index: 2;
@@ -387,8 +444,7 @@ onBeforeUnmount(() => {
   position: absolute;
   left: 0;
   right: 0;
-  top: 75vh;
-  height: 25vh;
+  bottom: 12vh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -404,20 +460,21 @@ onBeforeUnmount(() => {
   text-align: center;
   max-width: 720px;
 }
-.shanggu-curtain__magazine {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 100vh;
-  height: 70vh;
-  min-height: 400px;
+
+/* 第二页：杂志区严格 100vh，一屏内不二次滚动 */
+.shanggu-screen-2 {
   background: var(--bg);
+}
+.shanggu-magazine {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
   display: grid;
   grid-template-columns: 1fr 1px 1fr;
   gap: 0;
   align-items: start;
-  padding: 28px 6vw 40px;
-  overflow-y: auto;
+  padding: 6vh 6vw 5vh;
+  overflow: hidden;
   box-sizing: border-box;
 }
 .hero-line { width: 36px; height: 1px; background: rgba(255,255,255,0.6); }
@@ -431,23 +488,45 @@ onBeforeUnmount(() => {
   margin: 0 0 1.2em;
   text-align: justify;
 }
-.shanggu-magazine__p:last-child { margin-bottom: 0; }
+.shanggu-magazine__p:last-of-type { margin-bottom: 0; }
+.shanggu-magazine__img {
+  width: 100%;
+  max-width: 100%;
+  margin-top: 1em;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  object-fit: cover;
+  display: block;
+}
 .shanggu-magazine__divider {
   width: 1px;
   min-height: 120px;
   background: rgba(139, 94, 60, 0.2);
 }
 
-/* 第三页：人物区缩小，左神农右伏羲，文字与图对应；典籍半屏翻书（木质更浅背景） */
+/* 第三页：100vh 视口，内容从顶部开始全屏；内部可二次滚动 */
 .shanggu-figures-dark {
-  height: 100vh;
   box-sizing: border-box;
-  background: linear-gradient(180deg, #7a6b5a 0%, #6b5d4d 50%, #756858 100%);
-  padding: 16px 4vw 12px;
+  background-color: #6b5d4d;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  padding: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: flex-start;
   overflow: hidden;
+}
+.shanggu-third-inner {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px 4vw 24px;
+  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
 }
 .shanggu-figures-row {
   display: flex;
@@ -525,7 +604,7 @@ onBeforeUnmount(() => {
   cursor: pointer;
   width: clamp(140px, 18vw, 200px);
   height: clamp(200px, 26vw, 280px);
-  background: linear-gradient(145deg, #3d3228 0%, #2a231c 100%);
+  background: linear-gradient(145deg, #9c8d7a 0%, #857665 100%);
   border: 1px solid rgba(255,255,255,0.12);
   border-radius: 6px;
   box-shadow: 0 16px 48px rgba(0,0,0,0.5);
@@ -646,13 +725,21 @@ onBeforeUnmount(() => {
   text-align: right;
 }
 
-/* 底栏：浅色木质风格，成就+右侧跳转按钮 */
+/* 成就区（在第三页内部，与人物、典籍一起可滚动） */
 .shanggu-achievements-bar {
-  min-height: 22vh;
-  padding: 28px 6vw 24px;
-  background: linear-gradient(180deg, #ebe5dc 0%, #e0d8cc 100%);
-  border-top: 1px solid rgba(139, 94, 60, 0.18);
+  margin-top: 24px;
+  padding: 28px 0 24px;
+  background: linear-gradient(180deg, rgba(235, 229, 220, 0.92) 0%, rgba(224, 216, 204, 0.95) 100%);
+  border-radius: 12px;
+  border: 1px solid rgba(139, 94, 60, 0.18);
   flex-shrink: 0;
+}
+.shanggu-screen-3 .shanggu-achievements-bar {
+  padding-left: 6vw;
+  padding-right: 6vw;
+  margin-left: -2vw;
+  margin-right: -2vw;
+  border-radius: 0;
 }
 .shanggu-achievements-bar__row {
   display: flex;
@@ -716,6 +803,8 @@ onBeforeUnmount(() => {
 }
 .shanggu-achievements-bar__nav {
   flex-shrink: 0;
+  display: flex;
+  gap: 12px;
 }
 .shanggu-nav-btn {
   display: flex;
@@ -740,17 +829,18 @@ onBeforeUnmount(() => {
 
 @media (max-width: 640px) {
   .shanggu-curtain__overview { padding: 20px 6vw 36px; }
-  .shanggu-curtain__magazine {
+  .shanggu-magazine {
     grid-template-columns: 1fr;
     padding: 24px 5vw 32px;
   }
-  .shanggu-curtain__magazine .shanggu-magazine__divider {
+  .shanggu-magazine .shanggu-magazine__divider {
     width: 100%;
     height: 1px;
     min-height: 0;
     margin: 8px 0;
   }
-  .shanggu-curtain__magazine .shanggu-magazine__col { padding: 0 0.5rem; }
+  .shanggu-magazine .shanggu-magazine__col { padding: 0 0.5rem; }
+  .shanggu-back-float { left: 12px; padding: 8px 12px; font-size: 0.85rem; }
   .shanggu-figures-row {
     flex-direction: column;
     align-items: center;
