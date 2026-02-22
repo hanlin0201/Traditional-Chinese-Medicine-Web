@@ -16,20 +16,56 @@ export const SOLAR_TERMS_LOOKUP = [
     { name: '大雪', month: 12, day: 6 }, { name: '冬至', month: 12, day: 21 }
   ];
   
+  const DAY_MS = 86400000;
+
+  function dateAt(y, month, day) {
+    const d = new Date(y, month - 1, day);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  function daysDiff(termDate, today) {
+    return Math.round((termDate - today) / DAY_MS);
+  }
+
+  /**
+   * 返回距离当日最近的节气（按日历天数差最小）。
+   * daysDiff: 已过为负（已过 N 天），未到为正（还有 N 天），0 为当天。
+   */
+  export function getNearestSolarTerm() {
+    const now = new Date();
+    const y = now.getFullYear();
+    const today = dateAt(y, now.getMonth() + 1, now.getDate());
+
+    let nearest = null;
+    let minAbs = Infinity;
+
+    for (const term of SOLAR_TERMS_LOOKUP) {
+      const thisYear = dateAt(y, term.month, term.day);
+      const nextYear = dateAt(y + 1, term.month, term.day);
+      const dThis = daysDiff(thisYear, today);
+      const dNext = daysDiff(nextYear, today);
+      const useThis = Math.abs(dThis) <= Math.abs(dNext);
+      const d = useThis ? dThis : dNext;
+      if (Math.abs(d) < minAbs) {
+        minAbs = Math.abs(d);
+        nearest = { ...term, daysDiff: d };
+      }
+    }
+    return nearest;
+  }
+
   export function getCurrentSolarTerm() {
     const now = new Date();
     const month = now.getMonth() + 1;
     const day = now.getDate();
-    
-    // 简单的查找逻辑：找到当前日期之前的最后一个节气
-    // 1. 排序
-    const sorted = SOLAR_TERMS_LOOKUP.sort((a, b) => {
+
+    const sorted = [...SOLAR_TERMS_LOOKUP].sort((a, b) => {
       if (a.month !== b.month) return a.month - b.month;
       return a.day - b.day;
     });
-  
-    // 2. 倒序查找
-    let current = sorted[sorted.length - 1]; 
+
+    let current = sorted[sorted.length - 1];
     for (let i = sorted.length - 1; i >= 0; i--) {
       const term = sorted[i];
       if (month > term.month || (month === term.month && day >= term.day)) {
@@ -37,5 +73,5 @@ export const SOLAR_TERMS_LOOKUP = [
         break;
       }
     }
-    return current; // 返回对象 { name: '立春', ... }
+    return current;
   }

@@ -4,10 +4,10 @@ import { useRouter, useRoute } from 'vue-router'
 import gsap from 'gsap'
 import { Sun, Soup, ArrowRight, BookOpen, Utensils, ScrollText, ChevronDown, ArrowUp } from 'lucide-vue-next'
 
-// --- 组件引入 ---
 import TcmHistorySection from '@/components/TcmHistorySection.vue'
 import HerbalPairing from '@/components/home/HerbalPairing.vue'
 import MythBuster from '@/components/home/MythBuster.vue'
+import { getNearestSolarTerm } from '@/constants/solarTerms'
 import { supabase } from '@/supabaseClient'
 
 const router = useRouter()
@@ -18,8 +18,12 @@ const currentTermName = ref('')
 const termInfo = ref(null)
 const seasonalRecipes = ref([])
 const loading = ref(true)
-const nearestDaysDiff = ref(0) // 倒计时天数
-const todayLabel = ref('')     // 今日日期显示
+const nearestDaysDiff = ref(0)
+
+const todayLabel = (() => {
+  const d = new Date()
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
+})()
 
 // --- 核心翻页逻辑 ---
 const activeIndex = ref(0)
@@ -86,7 +90,7 @@ function goToHerbs() { router.push('/herbs') }
 function goToRecipes() { router.push('/recipes') }
 function goToRecipeDetail(id) { router.push({ path: '/recipes', query: { open_id: id } }) }
 
-// --- UI 控制逻辑 ---
+// --- UI 控制逻辑（来自 main）---
 watch(activeIndex, (newVal) => {
   if (newVal > 0) document.body.classList.add('hide-global-nav')
   else document.body.classList.remove('hide-global-nav')
@@ -100,89 +104,14 @@ watch(
   { immediate: true }
 )
 
-// ==========================================
-// 核心修复：本地计算节气倒计时与日期
-// ==========================================
-const SOLAR_TERMS_LOOKUP = [
-  { name: '小寒', month: 1, day: 5 }, { name: '大寒', month: 1, day: 20 },
-  { name: '立春', month: 2, day: 3 }, { name: '雨水', month: 2, day: 18 },
-  { name: '惊蛰', month: 3, day: 5 }, { name: '春分', month: 3, day: 20 },
-  { name: '清明', month: 4, day: 4 }, { name: '谷雨', month: 4, day: 19 },
-  { name: '立夏', month: 5, day: 5 }, { name: '小满', month: 5, day: 20 },
-  { name: '芒种', month: 6, day: 5 }, { name: '夏至', month: 6, day: 21 },
-  { name: '小暑', month: 7, day: 6 }, { name: '大暑', month: 7, day: 22 },
-  { name: '立秋', month: 8, day: 7 }, { name: '处暑', month: 8, day: 22 },
-  { name: '白露', month: 9, day: 7 }, { name: '秋分', month: 9, day: 22 },
-  { name: '寒露', month: 10, day: 8 }, { name: '霜降', month: 10, day: 23 },
-  { name: '立冬', month: 11, day: 7 }, { name: '小雪', month: 11, day: 22 },
-  { name: '大雪', month: 12, day: 6 }, { name: '冬至', month: 12, day: 21 }
-];
-
-// 计算当前状态（日期、节气、倒计时）
-const calculateSeasonalState = () => {
-  const now = new Date()
-  
-  // 1. 设置今日日期显示
-  todayLabel.value = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`
-
-  const month = now.getMonth() + 1
-  const day = now.getDate()
-  
-  // 2. 查找当前已进入的节气
-  // 按照月份和日期排序确保顺序正确
-  const sorted = [...SOLAR_TERMS_LOOKUP].sort((a, b) => a.month !== b.month ? a.month - b.month : a.day - b.day)
-  
-  let active = sorted[sorted.length - 1]
-  for (let i = sorted.length - 1; i >= 0; i--) {
-    if (month > sorted[i].month || (month === sorted[i].month && day >= sorted[i].day)) {
-      active = sorted[i]
-      break
-    }
-  }
-  
-  // 3. 查找下一个节气并计算倒计时
-  let nextTerm = null
-  let nextYear = now.getFullYear()
-  
-  // 在今年剩下的节气里找
-  for (let i = 0; i < sorted.length; i++) {
-    if (sorted[i].month > month || (sorted[i].month === month && sorted[i].day > day)) {
-      nextTerm = sorted[i]
-      break
-    }
-  }
-  // 如果今年没找到，就是明年的第一个节气（小寒）
-  if (!nextTerm) {
-    nextTerm = sorted[0]
-    nextYear += 1
-  }
-
-  // 计算天数差
-  const targetDate = new Date(nextYear, nextTerm.month - 1, nextTerm.day)
-  const todayReset = new Date(now.getFullYear(), now.getMonth(), now.getDate()) // 清除时分秒
-  const diffTime = targetDate - todayReset
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-
-  // 更新状态
-  currentTermName.value = active.name
-  nearestDaysDiff.value = diffDays
-  
-  return active.name
-}
-
+// --- 数据获取：getNearestSolarTerm + Supabase ---
 const fetchSeasonalData = async () => {
   loading.value = true
-  
-  // 执行本地计算，不再依赖外部 import
-  const termName = calculateSeasonalState()
-  
+  const term = getNearestSolarTerm()
+  currentTermName.value = term.name
+  nearestDaysDiff.value = term.daysDiff ?? 0
   const MOCK_DATA = {
-    info: { 
-      name: termName, 
-      principle: '省酸增甘，以养脾气；疏肝理气，顺应春阳。', 
-      recommend_text: '韭菜、香椿、百合', 
-      avoid_text: '酸辣食物、生冷海鲜' 
-    },
+    info: { name: term.name, principle: '省酸增甘，以养脾气；疏肝理气，顺应春阳。', recommend_text: '韭菜、香椿、百合', avoid_text: '酸辣食物、生冷海鲜' },
     recipes: [
       { id: 1, name: '春笋炖排骨', image: 'https://images.unsplash.com/photo-1547592180-85f173990554?q=80&w=2070&auto=format&fit=crop' },
       { id: 2, name: '枸杞菊花茶', image: 'https://images.unsplash.com/photo-1623912852230-e374bb36934c?q=80&w=2070&auto=format&fit=crop' },
@@ -191,9 +120,9 @@ const fetchSeasonalData = async () => {
   }
 
   try {
-    const { data: info } = await supabase.from('solar_terms').select('*').eq('name', termName).single()
+    const { data: info } = await supabase.from('solar_terms').select('*').eq('name', term.name).single()
     termInfo.value = info || MOCK_DATA.info
-    const { data: recipes } = await supabase.from('recipes').select('id, name, image').eq('solar_term', termName).limit(3)
+    const { data: recipes } = await supabase.from('recipes').select('id, name, image').eq('solar_term', term.name).limit(3)
     seasonalRecipes.value = (recipes && recipes.length) ? recipes : MOCK_DATA.recipes
   } catch (e) {
     termInfo.value = MOCK_DATA.info; 
@@ -263,9 +192,7 @@ onUnmounted(() => {
               <h2 class="section-title">四时之序</h2>
               <p class="section-subtitle">顺应天时，调和阴阳</p>
               <div class="seasonal-header-decoration"><span class="line"></span><span class="dot"></span><span class="line"></span></div>
-              
               <p class="today-label"><span class="today-pill">今日：{{ todayLabel }}</span></p>
-            
             </div>
             <div v-if="termInfo" class="seasonal-card seasonal-card-enter">
                <div class="stamp-decoration">节气</div>
@@ -273,7 +200,13 @@ onUnmounted(() => {
                   <div class="term-countdown">
                     <span class="term-countdown-prefix">距离下一个节气日</span>
                     <span class="term-countdown-days">
-                      {{ nearestDaysDiff > 0 ? `还有 ${nearestDaysDiff} 天` : '今天就是节气日' }}
+                      {{
+                        nearestDaysDiff === 0
+                          ? '今天就是节气日'
+                          : nearestDaysDiff > 0
+                            ? `还有 ${nearestDaysDiff} 天`
+                            : `已过 ${Math.abs(nearestDaysDiff)} 天`
+                      }}
                     </span>
                   </div>
                   <h2 class="term-name">{{ termInfo.name }}</h2>
