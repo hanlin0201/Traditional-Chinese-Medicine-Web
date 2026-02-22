@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { HelpCircle, XCircle, RefreshCw } from 'lucide-vue-next'
+import { HelpCircle, XCircle, RefreshCw, Loader2 } from 'lucide-vue-next'
 import { supabase } from '@/supabaseClient'
 
 const bgImage = "https://bpic.588ku.com/back_list_pic/25/01/23/ec0cb9c263b689042869b689494b650e.jpg!/fw/350/quality/95/unsharp/true/compress/true"
@@ -81,7 +81,6 @@ onMounted(() => {
 
 <template>
   <section class="myth-buster-screen" :style="{ backgroundImage: `url(${bgImage})` }">
-
     <div class="bg-overlay"></div>
 
     <div class="content-wrapper">
@@ -97,76 +96,73 @@ onMounted(() => {
       </div>
 
       <div class="myth-list">
-        <div
-          v-for="item in (displayedMyths.length ? displayedMyths : FALLBACK)"
-          :key="item.id"
-          class="myth-item"
-          :class="{ 'is-expanded': expandedId === item.id }"
-          @click="toggle(item.id)"
-        >
-          <div class="myth-question">
-            <span class="emoji" v-if="item.emoji">{{ item.emoji }}</span>
-            <HelpCircle class="icon-q" />
-            <span>{{ item.question }}</span>
-            <span class="indicator">{{ expandedId === item.id ? '收起' : '揭秘' }}</span>
-          </div>
-
-          <div v-show="expandedId === item.id" class="myth-answer animate-slide-down">
-            <div class="answer-badge" :class="item.type">
-              <XCircle class="w-5 h-5 text-red-500" />
-              <span class="font-bold answer-text">{{ item.answer }}</span>
-            </div>
-            <p class="detail" v-html="item.detail"></p>
-          </div>
+        <div v-if="loading" class="loading-state">
+          <Loader2 class="w-8 h-8 animate-spin text-brown-600" />
+          <p>正在搜罗养生秘籍...</p>
         </div>
+        <template v-else>
+          <div
+            v-for="item in (displayedMyths.length ? displayedMyths : FALLBACK)"
+            :key="item.id"
+            class="myth-item"
+            :class="{ 'is-expanded': expandedId === item.id }"
+            @click="toggle(item.id)"
+          >
+            <div class="myth-question">
+              <span class="emoji" v-if="item.emoji">{{ item.emoji }}</span>
+              <HelpCircle class="icon-q" />
+              <span>{{ item.question }}</span>
+              <span class="indicator">{{ expandedId === item.id ? '收起' : '揭秘' }}</span>
+            </div>
+
+            <div v-show="expandedId === item.id" class="myth-answer animate-slide-down">
+              <div class="answer-badge" :class="item.type">
+                <XCircle class="w-5 h-5 text-red-500" />
+                <span class="font-bold answer-text">{{ item.answer }}</span>
+              </div>
+              <p class="detail" v-html="item.detail"></p>
+            </div>
+          </div>
+        </template>
       </div>
     </div>
   </section>
 </template>
 
 <style scoped>
-/* --- 核心布局：全屏 & 吸附 --- */
 .myth-buster-screen {
   position: relative;
   width: 100%;
-  height: 100vh; /* 强制全屏高度 */
-
-  /* 关键属性：告诉父容器，滚动到这里时要对齐顶部 */
+  height: 100vh;
   scroll-snap-align: start;
-  scroll-snap-stop: always; /* 强制停止，防止飞速划过 */
-
+  scroll-snap-stop: always;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden; /* 防止内容溢出破坏全屏感 */
+  overflow: hidden;
 }
 
-/* 背景遮罩 */
 .bg-overlay {
   position: absolute;
   top: 0; left: 0; width: 100%; height: 100%;
-  background: rgba(0, 0, 0, 0.3); /* 深色遮罩，根据背景图明暗调整 */
+  background: rgba(0, 0, 0, 0.4);
   z-index: 0;
 }
 
-/* 内容包装器 */
 .content-wrapper {
   position: relative;
   z-index: 1;
   width: 100%;
   max-width: 800px;
   padding: 40px;
-  background: rgba(255, 255, 255, 0.9); /* 强毛玻璃效果 */
-  backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(16px);
   border-radius: 24px;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   border: 1px solid rgba(255, 255, 255, 0.5);
-
-  /* 防止小屏下列变太长超出屏幕 */
   max-height: 90vh;
   overflow-y: auto;
 }
@@ -212,7 +208,12 @@ onMounted(() => {
   text-transform: uppercase;
 }
 
-.myth-list { display: flex; flex-direction: column; gap: 16px; }
+.myth-list { display: flex; flex-direction: column; gap: 16px; min-height: 300px; }
+
+.loading-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  height: 200px; color: #8B5E3C; gap: 10px;
+}
 
 .myth-item {
   background: white;
@@ -252,7 +253,7 @@ onMounted(() => {
 .myth-item:hover .indicator { background: #C44D36; color: white; }
 
 .myth-answer {
-  background: #FFF5F2; /* 淡淡的红底，警示感 */
+  background: #FFF5F2;
   padding: 15px 24px 24px 58px;
   border-top: 1px dashed rgba(196, 77, 54, 0.2);
 }
@@ -266,17 +267,14 @@ onMounted(() => {
 .detail :deep(.warning) { color: #E65100; font-weight: 500; }
 .detail :deep(.safe) { color: #2E7D32; font-weight: 500; }
 
-/* 动画 */
 .animate-slide-down { animation: slideDown 0.3s cubic-bezier(0.25, 0.8, 0.5, 1); }
 @keyframes slideDown {
   from { opacity: 0; transform: translateY(-10px); height: 0; }
   to { opacity: 1; transform: translateY(0); height: auto; }
 }
 
-/* 移动端适配 */
 @media (max-width: 768px) {
-  .content-wrapper { padding: 24px; width: 90%; }
-  .title { font-size: 1.8rem; }
-  .myth-question { font-size: 1rem; padding: 16px; }
+  .content-wrapper { padding: 20px; width: 95%; }
+  .title { font-size: 1.5rem; }
 }
 </style>

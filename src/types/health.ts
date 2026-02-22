@@ -8,4 +8,3 @@ export interface UserHealthProfile {
   active: HealthTag[]; // 当前生效的标签
   history: any[];      // 历史归档（前端暂时只读不展示）
 }
-

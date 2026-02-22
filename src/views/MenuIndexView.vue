@@ -1,15 +1,17 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import gsap from 'gsap'
+import { Sun, Soup, ArrowRight, BookOpen, Utensils, ScrollText, ChevronDown, ArrowUp } from 'lucide-vue-next'
+
 import TcmHistorySection from '@/components/TcmHistorySection.vue'
-import { supabase } from '@/supabaseClient'
 import HerbalPairing from '@/components/home/HerbalPairing.vue'
 import MythBuster from '@/components/home/MythBuster.vue'
-import { Sun, Soup, ArrowRight, BookOpen, Utensils, ScrollText, ChevronDown } from 'lucide-vue-next'
 import { getNearestSolarTerm } from '@/constants/solarTerms'
+import { supabase } from '@/supabaseClient'
 
 const router = useRouter()
+const route = useRoute()
 
 // --- 数据状态 ---
 const currentTermName = ref('')
@@ -23,71 +25,58 @@ const todayLabel = (() => {
   return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
 })()
 
-// --- 核心翻页逻辑 (精准防抖版) ---
+// --- 核心翻页逻辑 ---
 const activeIndex = ref(0)
 const isAnimating = ref(false)
 const totalSections = 5 
 
+// --- 底部指引文案 ---
+const nextSectionLabels = [
+  { text: '四时之序 · 查看节气', target: 1 },
+  { text: '草本智慧 · 药食同源', target: 2 },
+  { text: '去伪存真 · 养生避雷', target: 3 },
+  { text: '千年医道 · 中医历史', target: 4 },
+  { text: '', target: -1 }
+]
+
+const currentNextLabel = computed(() => {
+  return nextSectionLabels[activeIndex.value] || { text: '', target: -1 }
+})
+
+// --- 动画跳转逻辑 ---
 const moveTo = (index) => {
   if (index < 0 || index >= totalSections) return
-  
-  // 这里的锁非常重要，防止动画还没做完就触发下一次
   if (isAnimating.value) return
 
   isAnimating.value = true
   activeIndex.value = index
 
-  // GSAP 动画控制
   gsap.to('.scroll-container', {
     y: `-${index * 100}%`, 
-    
-    // 视觉动画时长 1.0秒，保持优雅
-    duration: 1.0,         
-    
-    // 强力缓出曲线，起步快，刹车稳
+    duration: 1.0,          
     ease: "power2.out", 
-    
-    // 允许新动画覆盖旧动画
     overwrite: true 
   })
 
-  // 【核心修改】冷却时间设为 800ms
-  // 这个时间足以过滤掉触摸板“划一下”产生的惯性尾巴
-  // 意味着：你划一下，页面动；如果你想动第二下，至少要等 0.8秒
   setTimeout(() => {
     isAnimating.value = false
   }, 800)
 }
 
-// 鼠标/触摸板 滚轮监听
 const handleWheel = (e) => {
   e.preventDefault() 
-  
-  // 锁定期间，任何信号都忽略
   if (isAnimating.value) return 
-  
-  // 【核心修改】增加触发阈值到 20
-  // 只有比较明显的滑动才会被判定为“翻页”
-  // 触摸板惯性滑动的数值通常很小，会被这里过滤掉
   if (Math.abs(e.deltaY) < 20) return 
-  
-  if (e.deltaY > 0) {
-    moveTo(activeIndex.value + 1)
-  } else {
-    moveTo(activeIndex.value - 1)
-  }
+  if (e.deltaY > 0) moveTo(activeIndex.value + 1)
+  else moveTo(activeIndex.value - 1)
 }
 
-// 手机触摸屏监听
 let touchStartY = 0
 const handleTouchStart = (e) => { touchStartY = e.touches[0].clientY }
 const handleTouchEnd = (e) => {
   if (isAnimating.value) return
   const touchEndY = e.changedTouches[0].clientY
   const diff = touchStartY - touchEndY
-  
-  // 【核心修改】手机端阈值设为 50
-  // 防止手指只是轻轻碰了一下屏幕就翻页
   if (Math.abs(diff) > 50) {
     if (diff > 0) moveTo(activeIndex.value + 1)
     else moveTo(activeIndex.value - 1)
@@ -96,13 +85,26 @@ const handleTouchEnd = (e) => {
 
 // --- 业务跳转 ---
 function goToHistory() { moveTo(4) }
-function scrollToSeasonal() { moveTo(1) }
 function handleMainPanelClick() { router.push('/acupoints') }
 function goToHerbs() { router.push('/herbs') }
 function goToRecipes() { router.push('/recipes') }
 function goToRecipeDetail(id) { router.push({ path: '/recipes', query: { open_id: id } }) }
 
-// --- 数据获取 ---
+// --- UI 控制逻辑（来自 main）---
+watch(activeIndex, (newVal) => {
+  if (newVal > 0) document.body.classList.add('hide-global-nav')
+  else document.body.classList.remove('hide-global-nav')
+})
+
+watch(
+  () => ({ path: route.path, history: route.query.history }),
+  (curr) => {
+    if (curr.path === '/' && curr.history === 'open') nextTick(() => moveTo(4))
+  },
+  { immediate: true }
+)
+
+// --- 数据获取：getNearestSolarTerm + Supabase ---
 const fetchSeasonalData = async () => {
   loading.value = true
   const term = getNearestSolarTerm()
@@ -116,14 +118,18 @@ const fetchSeasonalData = async () => {
       { id: 3, name: '香椿炒鸡蛋', image: 'https://plus.unsplash.com/premium_photo-1661775179532-6ae372740922?q=80&w=2070&auto=format&fit=crop' }
     ]
   }
+
   try {
     const { data: info } = await supabase.from('solar_terms').select('*').eq('name', term.name).single()
     termInfo.value = info || MOCK_DATA.info
     const { data: recipes } = await supabase.from('recipes').select('id, name, image').eq('solar_term', term.name).limit(3)
     seasonalRecipes.value = (recipes && recipes.length) ? recipes : MOCK_DATA.recipes
   } catch (e) {
-    termInfo.value = MOCK_DATA.info; seasonalRecipes.value = MOCK_DATA.recipes
-  } finally { loading.value = false }
+    termInfo.value = MOCK_DATA.info; 
+    seasonalRecipes.value = MOCK_DATA.recipes
+  } finally { 
+    loading.value = false 
+  }
 }
 
 onMounted(() => { 
@@ -137,6 +143,7 @@ onUnmounted(() => {
   window.removeEventListener('wheel', handleWheel)
   window.removeEventListener('touchstart', handleTouchStart)
   window.removeEventListener('touchend', handleTouchEnd)
+  document.body.classList.remove('hide-global-nav')
 })
 </script>
 
@@ -175,7 +182,6 @@ onUnmounted(() => {
               </div>
             </div>
           </div>
-          <div class="scroll-hint" @click="scrollToSeasonal"><span>今日节气</span><ChevronDown class="animate-bounce w-6 h-6" /></div>
         </section>
       </div>
 
@@ -206,17 +212,17 @@ onUnmounted(() => {
                   <h2 class="term-name">{{ termInfo.name }}</h2>
                   <div class="term-principle">{{ termInfo.principle }}</div>
                   <div class="advice-tags">
-                     <div class="advice-row"><span class="tag-label good">宜</span><span class="tag-text">{{ termInfo.recommend_text }}</span></div>
-                     <div class="advice-row"><span class="tag-label bad">忌</span><span class="tag-text">{{ termInfo.avoid_text }}</span></div>
+                      <div class="advice-row"><span class="tag-label good">宜</span><span class="tag-text">{{ termInfo.recommend_text }}</span></div>
+                      <div class="advice-row"><span class="tag-label bad">忌</span><span class="tag-text">{{ termInfo.avoid_text }}</span></div>
                   </div>
                </div>
                <div class="card-divider"></div>
                <div class="card-right">
                   <div class="right-title"><Soup class="w-4 h-4 text-primary" /><span>当季甄选</span></div>
                   <div class="mini-recipe-grid">
-                     <div v-for="recipe in seasonalRecipes" :key="recipe.id" class="mini-recipe" @click="goToRecipeDetail(recipe.id)">
-                        <img :src="recipe.image" class="recipe-thumb" /><div class="recipe-overlay"><span class="recipe-name">{{ recipe.name }}</span></div>
-                     </div>
+                      <div v-for="recipe in seasonalRecipes" :key="recipe.id" class="mini-recipe" @click="goToRecipeDetail(recipe.id)">
+                         <img :src="recipe.image" class="recipe-thumb" /><div class="recipe-overlay"><span class="recipe-name">{{ recipe.name }}</span></div>
+                      </div>
                   </div>
                </div>
             </div>
@@ -225,7 +231,9 @@ onUnmounted(() => {
       </div>
 
       <div class="page-section"><HerbalPairing /></div>
+      
       <div class="page-section"><MythBuster /></div>
+      
       <div class="page-section"><TcmHistorySection /></div>
 
     </div>
@@ -239,6 +247,26 @@ onUnmounted(() => {
         @click="moveTo(index)"
       ></div>
     </div>
+
+    <transition name="slide-fade">
+      <div v-if="activeIndex > 0" class="sidebar-nav">
+        <div class="sidebar-btn" @click="moveTo(0)" title="回到顶部">
+          <ArrowUp class="w-5 h-5" />
+          <span class="btn-text">顶部</span>
+        </div>
+      </div>
+    </transition>
+
+    <transition name="fade">
+      <div 
+        v-if="currentNextLabel.text" 
+        class="next-page-hint" 
+        @click="moveTo(currentNextLabel.target)"
+      >
+        <span class="hint-text">{{ currentNextLabel.text }}</span>
+        <ChevronDown class="animate-bounce w-5 h-5" />
+      </div>
+    </transition>
 
   </div>
 </template>
@@ -258,7 +286,6 @@ onUnmounted(() => {
 
 .scroll-container {
   width: 100%; height: 100%;
-  /* GSAP 接管 transform，无需 CSS transition */
 }
 
 .page-section { width: 100%; height: 100vh; }
@@ -269,7 +296,111 @@ onUnmounted(() => {
 .dot-indicator.active { background: #8B5E3C; transform: scale(1.4); }
 
 /* =========================================
-   2. 内容样式 (保持原样)
+   侧边隐藏式导航条
+   ========================================= */
+.sidebar-nav {
+  position: fixed;
+  right: 0;
+  top: 70%;
+  transform: translateY(-50%) translateX(60%);
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  opacity: 0.6;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.sidebar-nav:hover {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+
+.sidebar-btn {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(5px);
+  padding: 10px 12px 10px 18px;
+  border-radius: 30px 0 0 30px;
+  box-shadow: -4px 4px 15px rgba(0,0,0,0.1);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--primary);
+  border: 1px solid rgba(139, 94, 60, 0.15);
+  border-right: none;
+  transition: all 0.3s;
+}
+
+.sidebar-btn:hover {
+  background: var(--primary);
+  color: white;
+  padding-right: 20px;
+}
+
+.sidebar-btn .btn-text {
+  font-size: 0.85rem;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.slide-fade-enter-active,
+.slide-fade-leave-active {
+  transition: all 0.5s ease;
+}
+
+.slide-fade-enter-from,
+.slide-fade-leave-to {
+  transform: translateY(-50%) translateX(100%);
+  opacity: 0;
+}
+
+/* 底部动态指引 */
+.next-page-hint {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  z-index: 999;
+  cursor: pointer;
+  color: var(--primary);
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+  font-weight: bold;
+  background: transparent;
+  backdrop-filter: none;
+  border: none;
+  padding: 0;
+  transition: all 0.3s;
+  opacity: 0.8;
+}
+
+.next-page-hint:hover {
+  opacity: 1;
+  transform: translateX(-50%) translateY(-5px);
+}
+
+.hint-text {
+  font-size: 0.95rem;
+  letter-spacing: 0.15em;
+  font-family: 'Noto Serif SC', serif;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.5s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* =========================================
+   2. 内容样式
    ========================================= */
 .main-scroll-container { --primary: #8B5E3C; --primary-dark: #5D4037; --accent: #C44D36; font-family: 'Noto Serif SC', serif; }
 .tcm-section { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
@@ -331,7 +462,6 @@ onUnmounted(() => {
 .recipe-overlay { position: absolute; bottom: 0; width: 100%; background: linear-gradient(transparent, rgba(0,0,0,0.5), rgba(0,0,0,0.75)); padding: 8px; color: white; text-align: center; }
 .recipe-name { font-size: 0.85rem; font-weight: 500; }
 .bg-overlay-noise { position: absolute; inset: 0; background-image: url("data:image/svg+xml,%3Csvg width='200' height='200' viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E"); z-index: 1; pointer-events: none; }
-.scroll-hint { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; color: var(--primary); cursor: pointer; opacity: 0.6; }
 .title-decoration { display: flex; align-items: center; gap: 10px; margin: 10px 0; opacity: 0.6; }
 .title-decoration .line { width: 40px; height: 1px; background: var(--primary); }
 .title-decoration .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }

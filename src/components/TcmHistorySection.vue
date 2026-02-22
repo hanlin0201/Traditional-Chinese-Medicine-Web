@@ -1,8 +1,9 @@
 <script setup>
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, watch, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 
 const router = useRouter()
+const route = useRoute()
 const historyBgUrl = '/photo/历史模块背景.jpg'
 
 function getPhotoUrl(name) {
@@ -10,6 +11,16 @@ function getPhotoUrl(name) {
 }
 
 const unfolded = ref(false)
+
+// 从朝代详情页返回时通过 query 恢复卷轴展开状态
+watch(
+  () => route.query.history,
+  (val) => { if (val === 'open') unfolded.value = true },
+  { immediate: true }
+)
+onMounted(() => {
+  if (route.query.history === 'open') unfolded.value = true
+})
 
 // 卷轴展开宽度
 const PAPER_WIDTH = 'min(calc(96vw - 56px), 1600px)'
@@ -70,6 +81,50 @@ function goToDynasty(card) {
   if (!unfolded.value || !card.dynastyId) return
   router.push({ name: 'DynastyDetail', params: { id: card.dynastyId } })
 }
+
+// 触摸/双指水平拖动卷轴内容
+const paperInnerRef = ref(null)
+let touchStartX = 0
+let touchStartScrollLeft = 0
+
+function onPaperTouchStart(e) {
+  if (!paperInnerRef.value) return
+  touchStartX = e.touches[0].clientX
+  touchStartScrollLeft = paperInnerRef.value.scrollLeft
+}
+
+function onPaperTouchMove(e) {
+  if (!paperInnerRef.value || e.touches.length === 0) return
+  const dx = e.touches[0].clientX - touchStartX
+  const newScroll = touchStartScrollLeft - dx
+  const maxScroll = paperInnerRef.value.scrollWidth - paperInnerRef.value.clientWidth
+  const clamped = Math.max(0, Math.min(maxScroll, newScroll))
+  paperInnerRef.value.scrollLeft = clamped
+  if (Math.abs(dx) > 5) {
+    e.preventDefault()
+    touchStartX = e.touches[0].clientX
+    touchStartScrollLeft = clamped
+  }
+}
+
+function onPaperTouchEnd() {
+  touchStartX = 0
+  touchStartScrollLeft = 0
+}
+
+// 触摸板水平滑动：监听 wheel 的 deltaX，在卷轴内容区横向滚动
+function onPaperWheel(e) {
+  if (!paperInnerRef.value || !unfolded.value) return
+  const dx = e.deltaX
+  if (Math.abs(dx) < 2) return
+  const el = paperInnerRef.value
+  const maxScroll = el.scrollWidth - el.clientWidth
+  if (maxScroll <= 0) return
+  const next = el.scrollLeft + dx
+  el.scrollLeft = Math.max(0, Math.min(maxScroll, next))
+  e.preventDefault()
+  e.stopPropagation()
+}
 </script>
 
 <template>
@@ -98,7 +153,14 @@ function goToDynasty(card) {
             class="tcm-scroll-paper"
             :style="{ width: scrollContentWidth }"
           >
-            <div class="tcm-paper-inner">
+            <div
+              ref="paperInnerRef"
+              class="tcm-paper-inner"
+              @touchstart.passive="onPaperTouchStart"
+              @touchmove="onPaperTouchMove"
+              @touchend="onPaperTouchEnd"
+              @wheel.prevent="onPaperWheel"
+            >
               <div v-show="unfolded" class="tcm-history-cards">
                 <div
                   v-for="(card, index) in historyCards"
