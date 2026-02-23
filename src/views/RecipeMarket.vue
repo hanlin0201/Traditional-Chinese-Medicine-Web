@@ -6,9 +6,12 @@ import { useRouter, useRoute } from 'vue-router'
 import { 
   Clock, UserCheck, Sparkles, Leaf, X, Soup, ListOrdered, 
   Star, Heart, Camera, Send, Loader2, Image as ImageIcon,
-  MessageCircle, ThumbsUp, Tag, ChevronLeft, MoreHorizontal
+  MessageCircle, ThumbsUp, Tag, ChevronLeft, MoreHorizontal,
+  Search, Filter, ChevronDown
 } from 'lucide-vue-next'
-import { supabase } from '@/supabaseClient' 
+import { supabase } from '@/supabaseClient'
+import { SOLAR_TERMS_LOOKUP } from '@/constants/solarTerms'
+import { BODY_TYPES, EFFICACY_OPTIONS, TIME_RANGES, parseTimeToMinutes } from '@/constants/recipeFilters'
 
 const router = useRouter()
 const route = useRoute()
@@ -18,6 +21,82 @@ const recipes = ref([])
 const loading = ref(true)
 const selectedRecipe = ref(null) 
 const currentUser = ref(null)
+
+// --- 搜索与筛选 ---
+const searchKeyword = ref('')
+const bodyTypeFilter = ref('')
+const solarTermFilter = ref('')
+const efficacyFilters = ref([])   // 多选：选中的功效标签
+const timeRangeFilter = ref('')
+const showFilterPanel = ref(false)
+
+// 节气选项（筛选用）
+const solarTermOptions = [{ value: '', label: '全部节气' }, ...SOLAR_TERMS_LOOKUP.map(t => ({ value: t.name, label: t.name }))]
+
+/** 关键词综合匹配：名称 / 功效任一项 / 食材名称任一项 包含关键词 */
+function matchKeyword(recipe, kw) {
+  if (!kw || !kw.trim()) return true
+  const k = kw.trim().toLowerCase()
+  const nameMatch = recipe.name && String(recipe.name).toLowerCase().includes(k)
+  const efficacyMatch = Array.isArray(recipe.efficacy) && recipe.efficacy.some(e => String(e).toLowerCase().includes(k))
+  const ingredientMatch = Array.isArray(recipe.ingredients) && recipe.ingredients.some(i => i && String(i.name || '').toLowerCase().includes(k))
+  return nameMatch || efficacyMatch || ingredientMatch
+}
+
+/** 功效多选：食谱需包含任意一个选中的功效 */
+function matchEfficacy(recipe, selected) {
+  if (!selected || selected.length === 0) return true
+  const eff = recipe.efficacy || []
+  return selected.some(s => eff.some(e => String(e).includes(s) || e === s))
+}
+
+/** 烹饪时间区间：解析 time 后与 timeRangeFilter 比较 */
+function matchTimeRange(recipe, rangeValue) {
+  if (!rangeValue) return true
+  const mins = parseTimeToMinutes(recipe.time)
+  if (mins == null) return true
+  const v = parseInt(rangeValue, 10)
+  if (v === 121) return mins > 120
+  return mins <= v
+}
+
+const filteredRecipes = computed(() => {
+  let list = recipes.value
+  const kw = searchKeyword.value
+  const body = bodyTypeFilter.value
+  const term = solarTermFilter.value
+  const eff = efficacyFilters.value
+  const timeRange = timeRangeFilter.value
+
+  list = list.filter(r => matchKeyword(r, kw))
+  if (body) list = list.filter(r => (r.body_type || r.bodyType) === body)
+  if (term) list = list.filter(r => r.solar_term === term)
+  list = list.filter(r => matchEfficacy(r, eff))
+  list = list.filter(r => matchTimeRange(r, timeRange))
+  return list
+})
+
+function toggleEfficacy(eff) {
+  const i = efficacyFilters.value.indexOf(eff)
+  if (i === -1) efficacyFilters.value = [...efficacyFilters.value, eff]
+  else efficacyFilters.value = efficacyFilters.value.filter((_, j) => j !== i)
+}
+
+function hasActiveFilters() {
+  return searchKeyword.value.trim() ||
+    bodyTypeFilter.value ||
+    solarTermFilter.value ||
+    efficacyFilters.value.length > 0 ||
+    timeRangeFilter.value
+}
+
+function clearAllFilters() {
+  searchKeyword.value = ''
+  bodyTypeFilter.value = ''
+  solarTermFilter.value = ''
+  efficacyFilters.value = []
+  timeRangeFilter.value = ''
+}
 
 // 互动数据
 const comments = ref([]) 
@@ -283,14 +362,124 @@ onActivated(() => {
 
 <template>
   <div class="min-h-screen bg-stone-50 text-stone-800 p-6 pt-15 pb-24">
-    <header class="mb-8">
+    <header class="mb-6">
       <h1 class="text-3xl font-bold text-stone-900 mb-2">🌿 养生膳食广场</h1>
       <p class="text-stone-500">根据您的体质推荐的精准食疗方案</p>
     </header>
 
+    <!-- 搜索条：用户自主输入，综合匹配名称/功效/食材 -->
+    <div class="mb-4 flex flex-col sm:flex-row gap-3">
+      <div class="relative flex-1">
+        <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" />
+        <input
+          v-model="searchKeyword"
+          type="search"
+          placeholder="输入食谱名、食材或功效…"
+          class="w-full pl-10 pr-10 py-2.5 rounded-xl border border-stone-200 bg-white text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-300 transition"
+        />
+        <button
+          v-if="searchKeyword"
+          type="button"
+          @click="searchKeyword = ''"
+          class="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-stone-100 text-stone-400 hover:text-stone-600"
+          aria-label="清空"
+        >
+          <X class="w-4 h-4" />
+        </button>
+      </div>
+      <button
+        type="button"
+        @click="showFilterPanel = !showFilterPanel"
+        class="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 transition shrink-0"
+        :class="{ 'ring-2 ring-emerald-200 border-emerald-300': showFilterPanel }"
+      >
+        <Filter class="w-4 h-4" />
+        <span>筛选</span>
+        <ChevronDown class="w-4 h-4 transition-transform" :class="{ 'rotate-180': showFilterPanel }" />
+      </button>
+    </div>
+
+    <!-- 可折叠筛选区 -->
+    <Transition
+      enter-active-class="transition duration-200 ease-out"
+      enter-from-class="opacity-0 -translate-y-2"
+      enter-to-class="opacity-100 translate-y-0"
+      leave-active-class="transition duration-150 ease-in"
+      leave-from-class="opacity-100 translate-y-0"
+      leave-to-class="opacity-0 -translate-y-2"
+    >
+      <div v-show="showFilterPanel" class="mb-6 p-4 rounded-2xl border border-stone-100 bg-white shadow-sm space-y-4">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-sm font-medium text-stone-500 shrink-0">体质</span>
+          <select
+            v-model="bodyTypeFilter"
+            class="rounded-lg border border-stone-200 px-3 py-1.5 text-sm text-stone-700 bg-white focus:ring-2 focus:ring-emerald-100 focus:border-emerald-300"
+          >
+            <option v-for="opt in BODY_TYPES" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          </select>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-sm font-medium text-stone-500 shrink-0">节气</span>
+          <select
+            v-model="solarTermFilter"
+            class="rounded-lg border border-stone-200 px-3 py-1.5 text-sm text-stone-700 bg-white focus:ring-2 focus:ring-emerald-100 focus:border-emerald-300"
+          >
+            <option v-for="opt in solarTermOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          </select>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-sm font-medium text-stone-500 shrink-0">功效</span>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="eff in EFFICACY_OPTIONS"
+              :key="eff"
+              type="button"
+              @click="toggleEfficacy(eff)"
+              class="px-3 py-1 rounded-full text-sm transition"
+              :class="efficacyFilters.includes(eff)
+                ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                : 'bg-stone-50 text-stone-600 border border-stone-150 hover:bg-stone-100'"
+            >
+              {{ eff }}
+            </button>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-sm font-medium text-stone-500 shrink-0">时长</span>
+          <select
+            v-model="timeRangeFilter"
+            class="rounded-lg border border-stone-200 px-3 py-1.5 text-sm text-stone-700 bg-white focus:ring-2 focus:ring-emerald-100 focus:border-emerald-300"
+          >
+            <option v-for="opt in TIME_RANGES" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          </select>
+        </div>
+        <div v-if="hasActiveFilters()" class="pt-2 border-t border-stone-100">
+          <button
+            type="button"
+            @click="clearAllFilters()"
+            class="text-sm text-stone-500 hover:text-emerald-600 transition"
+          >
+            清空条件
+          </button>
+        </div>
+      </div>
+    </Transition>
+
     <div v-if="loading" class="text-center py-20 text-stone-500">⏳ 正在获取食谱...</div>
-    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <div v-for="recipe in recipes" :key="recipe.id" @click="openRecipe(recipe)"
+    <template v-else>
+      <div v-if="filteredRecipes.length === 0" class="text-center py-16 px-4">
+        <p class="text-stone-500 mb-4">未找到符合条件的食谱</p>
+        <button
+          v-if="hasActiveFilters()"
+          type="button"
+          @click="clearAllFilters(); showFilterPanel = true"
+          class="text-emerald-600 hover:text-emerald-700 font-medium"
+        >
+          清空条件后重试
+        </button>
+      </div>
+      <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div v-for="recipe in filteredRecipes" :key="recipe.id" @click="openRecipe(recipe)"
         class="group bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden border border-stone-100 flex flex-col relative">
         <div class="relative h-48 overflow-hidden">
           <img :src="recipe.image" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
@@ -312,6 +501,7 @@ onActivated(() => {
         </div>
       </div>
     </div>
+    </template>
 
     <Transition
       enter-active-class="transition duration-300 ease-out"
