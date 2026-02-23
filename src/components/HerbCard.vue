@@ -43,6 +43,7 @@ const handleImageError = (e) => {
           :src="imgSrc"
           :alt="herb.name"
           loading="lazy"
+          decoding="async"
           class="drawer-peek-img"
           @error="handleImageError"
         />

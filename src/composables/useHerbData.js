@@ -6,8 +6,18 @@
  * 若 herbs 表用 created_at 等排序，可将 .order('id', …) 改为 .order('created_at', { ascending: true })
  */
 
-import { ref } from 'vue'
+import { ref, shallowRef } from 'vue'
+import { pinyin } from 'pinyin-pro'
 import { supabase } from '@/supabaseClient'
+
+function getFirstLetter(name) {
+  if (!name) return '#'
+  const firstChar = name.charAt(0)
+  if (/[A-Za-z]/.test(firstChar)) return firstChar.toUpperCase()
+  const py = pinyin(firstChar, { toneType: 'none', type: 'array' })
+  if (py && py[0]) return py[0].charAt(0).toUpperCase()
+  return '#'
+}
 
 const TTL_MS = 5 * 60 * 1000
 const PAGE_SIZE = 20
@@ -41,7 +51,11 @@ function normalizeTags(tags) {
 }
 
 function normalizeHerbs(arr) {
-  return (arr || []).map(h => ({ ...h, tags: normalizeTags(h.tags) }))
+  return (arr || []).map(h => ({
+    ...h,
+    tags: normalizeTags(h.tags),
+    firstLetter: h.firstLetter != null ? h.firstLetter : getFirstLetter(h.name),
+  }))
 }
 
 /**
@@ -49,7 +63,7 @@ function normalizeHerbs(arr) {
  * @returns {{ herbs, loading, error, load, loadMore, hasMore, loadingMore }}
  */
 export function useHerbList() {
-  const herbs = ref([])
+  const herbs = shallowRef([])
   const loading = ref(false)
   const error = ref(null)
   const hasMore = ref(true)

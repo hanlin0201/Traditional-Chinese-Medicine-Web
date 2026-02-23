@@ -2,7 +2,6 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search, Loader2, ArrowLeft } from 'lucide-vue-next'
-import { pinyin } from 'pinyin-pro'
 import HerbCard from '@/components/HerbCard.vue'
 import { useHerbList } from '@/composables/useHerbData'
 
@@ -14,16 +13,6 @@ const router = useRouter()
 
 const CATEGORY_TAGS = ['全部', '根茎类', '果实/种子类', '全草类', '花类', '藤木类', '动物类', '枝叶/树皮类', '菌藻类', '矿物类', '其他']
 const LETTER_TAGS = ['全部', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'W', 'X', 'Y', 'Z']
-
-// 获取首字母逻辑（使用 pinyin-pro 自动转换，支持所有汉字）
-function getFirstLetter(name) {
-  if (!name) return '#'
-  const firstChar = name.charAt(0)
-  if (/[A-Za-z]/.test(firstChar)) return firstChar.toUpperCase()
-  const py = pinyin(firstChar, { toneType: 'none', type: 'array' })
-  if (py && py[0]) return py[0].charAt(0).toUpperCase()
-  return '#'
-}
 
 // ==========================================
 // 2. 核心逻辑
@@ -51,15 +40,15 @@ const filteredHerbs = computed(() => {
       (h.tags || []).some(t => String(t).toLowerCase().includes(k))
     )
   }
-  // 2. 标签过滤
+  // 2. 标签过滤（首字母已在数据层预计算，避免重复 pinyin 调用）
   if (activeTag.value !== '全部') {
     if (filterMode.value === 'category') {
-      list = list.filter(h => 
-        (h.tags || []).includes(activeTag.value) || 
+      list = list.filter(h =>
+        (h.tags || []).includes(activeTag.value) ||
         (h.classification || '').includes(activeTag.value)
       )
     } else {
-      list = list.filter(h => getFirstLetter(h.name) === activeTag.value)
+      list = list.filter(h => (h.firstLetter || '#') === activeTag.value)
     }
   }
   return list
@@ -204,11 +193,12 @@ onUnmounted(() => {
         <span class="text-sm font-serif">加载出错了，请刷新重试</span>
       </div>
 
-      <!-- 药柜网格 -->
+      <!-- 药柜网格：v-memo 仅在被点击项动画时重渲染，减少整表重绘 -->
       <div v-else class="herb-cabinet">
         <div
           v-for="herb in filteredHerbs"
           :key="herb.name"
+          v-memo="[herb.name, openingHerb === herb.name]"
           @click="goToDetail(herb)"
         >
           <HerbCard

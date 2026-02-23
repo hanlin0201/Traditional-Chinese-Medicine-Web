@@ -39,57 +39,88 @@ const favoriteHerbs = ref([])
 const myWorks = ref([])        
 const myRecipes = ref([])      
 
+// 会话缓存：再次进入个人中心时先展示上次数据，调理/收藏/作品数不闪 0
+const _profileCache = { userId: null, payload: null }
+function applyProfilePayload(payload) {
+  if (!payload) return
+  profile.value = payload.profile
+  username.value = payload.username ?? ''
+  avatar_url.value = payload.avatar_url ?? ''
+  bio.value = payload.bio ?? ''
+  privacySettings.value = { ...payload.privacySettings }
+  carePlans.value = payload.carePlans ?? []
+  favoriteHerbs.value = payload.favoriteHerbs ?? []
+  savedRecipes.value = payload.savedRecipes ?? []
+  myWorks.value = payload.myWorks ?? []
+  myRecipes.value = payload.myRecipes ?? []
+}
+function saveProfilePayload() {
+  if (!user.value) return
+  _profileCache.userId = user.value.id
+  _profileCache.payload = {
+    profile: profile.value,
+    username: username.value,
+    avatar_url: avatar_url.value,
+    bio: bio.value,
+    privacySettings: { ...privacySettings.value },
+    carePlans: [...carePlans.value],
+    favoriteHerbs: [...favoriteHerbs.value],
+    savedRecipes: [...savedRecipes.value],
+    myWorks: [...myWorks.value],
+    myRecipes: [...myRecipes.value],
+  }
+}
+
 // 辅助：切换展开/收起
 function toggleFold(uniqueKey) {
   foldedStates.value[uniqueKey] = !foldedStates.value[uniqueKey]
 }
 
-// --- 1. 获取数据 (双源合并版) ---
+// --- 1. 获取数据：5 个请求并行 + 双源合并 ---
 async function getProfile() {
+  if (!user.value) return
+  const uid = user.value.id
+  const isRevalidate = loading.value === false && _profileCache.userId === uid
+  if (!isRevalidate) loading.value = true
   try {
-    loading.value = true
-    if (!user.value) return
-    
-    // A. 获取 Profile 基础信息 + AI 存的旧食谱
-    const { data } = await supabase.from('profiles').select('*').eq('id', user.value.id).single()
-    
-    let aiRecipes = [] // 存放 AI 生成的旧食谱
+    const [
+      { data: profileData },
+      { data: herbsData },
+      { data: favRecipesData },
+      { data: worksData },
+      { data: myRecipesData },
+    ] = await Promise.all([
+      supabase.from('profiles').select('*').eq('id', uid).single(),
+      supabase.from('favorite_herbs').select('*, herb:herbs(*)').eq('user_id', uid).order('created_at', { ascending: false }),
+      supabase.from('favorite_recipes').select('*, recipe:recipes(*)').eq('user_id', uid).order('created_at', { ascending: false }),
+      supabase.from('homeworks').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
+      supabase.from('recipes').select('*').eq('author_id', uid).order('created_at', { ascending: false }),
+    ])
 
-    if (data) {
-      profile.value = data
-      username.value = data.username || ''
-      avatar_url.value = data.avatar_url || ''
-      bio.value = data.bio || ''
-      
+    let aiRecipes = []
+    if (profileData) {
+      profile.value = profileData
+      username.value = profileData.username || ''
+      avatar_url.value = profileData.avatar_url || ''
+      bio.value = profileData.bio || ''
       privacySettings.value = {
-        plans: data.is_plans_private ?? true,
-        recipes: data.is_saved_private ?? false,
-        herbs: data.is_herbs_private ?? false
+        plans: profileData.is_plans_private ?? true,
+        recipes: profileData.is_saved_private ?? false,
+        herbs: profileData.is_herbs_private ?? false
       }
-
-      carePlans.value = (data.care_plans || []).sort((a, b) => new Date(b.saved_at) - new Date(a.saved_at))
-      
-      // 🌟 提取 AI 食谱 (旧数据)
-      if (data.saved_recipes && Array.isArray(data.saved_recipes)) {
-        aiRecipes = data.saved_recipes.map(r => ({
+      carePlans.value = (profileData.care_plans || []).sort((a, b) => new Date(b.saved_at) - new Date(a.saved_at))
+      if (profileData.saved_recipes && Array.isArray(profileData.saved_recipes)) {
+        aiRecipes = profileData.saved_recipes.map(r => ({
           ...r,
-          id: r.id || `ai-${Date.now()}-${Math.random()}`, // 确保有 ID
-          is_ai: true, // 标记为 AI 食谱
+          id: r.id || `ai-${Date.now()}-${Math.random()}`,
+          is_ai: true,
           saved_at: r.saved_at || new Date().toISOString(),
-          // 确保字段存在
           ingredients: r.ingredients || [],
           steps: r.steps || [],
           tags: r.tags || ['AI推荐']
         }))
       }
     }
-
-    // B. 获取收藏药材
-    const { data: herbsData } = await supabase
-      .from('favorite_herbs')
-      .select('*, herb:herbs(*)')
-      .eq('user_id', user.value.id)
-      .order('created_at', { ascending: false })
 
     if (herbsData) {
       favoriteHerbs.value = herbsData.map(item => ({
@@ -99,49 +130,28 @@ async function getProfile() {
       }))
     }
 
-    // C. 获取广场收藏的食谱 (新数据)
     let marketRecipes = []
-    const { data: favRecipesData } = await supabase
-      .from('favorite_recipes')
-      .select('*, recipe:recipes(*)')
-      .eq('user_id', user.value.id)
-      .order('created_at', { ascending: false })
-
     if (favRecipesData) {
       marketRecipes = favRecipesData.map(item => ({
         ...item.recipe,
-        favorite_id: item.id, // 收藏表的主键
+        favorite_id: item.id,
         saved_at: item.created_at,
-        is_ai: false, // 标记为市场食谱
-        tags: item.recipe.tags || ['广场精选']
+        is_ai: false,
+        tags: item.recipe?.tags || ['广场精选']
       }))
     }
-
-    // 🌟 核心修复：合并两路数据并按时间排序
-    savedRecipes.value = [...marketRecipes, ...aiRecipes].sort((a, b) => 
+    savedRecipes.value = [...marketRecipes, ...aiRecipes].sort((a, b) =>
       new Date(b.saved_at) - new Date(a.saved_at)
     )
 
-    // D. 获取我的作品
-    const { data: worksData } = await supabase
-      .from('homeworks')
-      .select('*')
-      .eq('user_id', user.value.id)
-      .order('created_at', { ascending: false })
     if (worksData) myWorks.value = worksData
-
-    // E. 获取我的原创菜谱
-    const { data: myRecipesData } = await supabase
-      .from('recipes')
-      .select('*')
-      .eq('author_id', user.value.id)
-      .order('created_at', { ascending: false })
     if (myRecipesData) myRecipes.value = myRecipesData
 
-  } catch (error) { 
-    console.error('获取个人信息失败:', error) 
-  } finally { 
-    loading.value = false 
+    saveProfilePayload()
+  } catch (error) {
+    console.error('获取个人信息失败:', error)
+  } finally {
+    loading.value = false
   }
 }
 
@@ -238,7 +248,13 @@ function formatDate(isoString) {
 }
 
 onMounted(() => {
-  getProfile()
+  if (user.value && _profileCache.userId === user.value.id && _profileCache.payload) {
+    applyProfilePayload(_profileCache.payload)
+    loading.value = false
+    getProfile() // 后台刷新，不阻塞界面
+  } else {
+    getProfile()
+  }
   window.addEventListener('profile-updated', getProfile)
 })
 onUnmounted(() => {
@@ -323,11 +339,7 @@ onUnmounted(() => {
         </button>
       </div>
 
-      <div v-if="loading" class="flex justify-center py-20 text-sandalwood">
-        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-current"></div>
-      </div>
-
-      <div v-else class="min-h-[300px]">
+      <div class="min-h-[300px]">
         
         <div v-if="activeTab === 'plans'" class="animate-in slide-in-from-bottom-4 duration-500">
           <div class="flex justify-between items-center mb-4 px-2">

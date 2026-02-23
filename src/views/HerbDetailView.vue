@@ -16,8 +16,10 @@ const router = useRouter()
 
 // 定义状态
 const herb = ref(null)
+const herbEasy = ref(null) // 通俗版数据，来自 herbseasy 表
 const loading = ref(true)
 const error = ref(null)
+const detailMode = ref('professional') // 'professional' | 'easy' 专业 / 简单易懂
 
 // --- 新增：收藏相关状态 ---
 const isFavorite = ref(false) // 是否已收藏
@@ -51,36 +53,34 @@ const fetchHerbByName = async () => {
 
   if (preloadData && preloadData.name === herbName) {
     herb.value = preloadData
-    loading.value = false 
-    
+    herbEasy.value = null
+    loading.value = false
     try {
-      const { data } = await supabase
-        .from('herbs')
-        .select('*')
-        .eq('name', herbName)
-        .single()
-      
-      if (data) {
-        herb.value = data
-      }
+      const [resHerb, resEasy] = await Promise.all([
+        supabase.from('herbs').select('*').eq('name', herbName).single(),
+        supabase.from('herbseasy').select('*').eq('name', herbName).maybeSingle(),
+      ])
+      if (resHerb.data) herb.value = resHerb.data
+      if (resEasy.data) herbEasy.value = resEasy.data
     } catch (e) {
       console.warn('后台更新数据失败，但不影响展示', e)
     }
-    return 
+    return
   }
 
   try {
     loading.value = true
     error.value = null
+    herbEasy.value = null
 
-    const { data, error: err } = await supabase
-      .from('herbs')
-      .select('*')
-      .eq('name', herbName)
-      .single()
+    const [resHerb, resEasy] = await Promise.all([
+      supabase.from('herbs').select('*').eq('name', herbName).single(),
+      supabase.from('herbseasy').select('*').eq('name', herbName).maybeSingle(),
+    ])
 
-    if (err) throw err
-    herb.value = data
+    if (resHerb.error) throw resHerb.error
+    herb.value = resHerb.data
+    if (resEasy.data) herbEasy.value = resEasy.data
   } catch (err) {
     console.error('查询药材失败:', err)
     error.value = err
@@ -175,8 +175,10 @@ watch(() => [herb.value, currentUser.value], ([newHerb, newUser]) => {
 // 监听路由变化
 watch(() => route.params.name, (newName) => {
   if (newName) {
-    herb.value = null // 清空旧数据
-    isFavorite.value = false // 重置收藏状态
+    herb.value = null
+    herbEasy.value = null
+    isFavorite.value = false
+    detailMode.value = 'professional'
     fetchHerbByName()
   }
 })
@@ -208,17 +210,18 @@ function goBack() {
         </h1>
       </div>
 
-      <button 
-        v-if="!loading && herb"
-        @click="toggleFavorite"
-        :disabled="isToggling"
-        class="p-2 rounded-full transition-all active:scale-90 hover:bg-red-50"
-      >
-        <Heart 
-          :size="24" 
-          :class="isFavorite ? 'fill-red-500 text-red-500' : 'text-sandalwood/60'"
-        />
-      </button>
+      <div v-if="!loading && herb" class="flex items-center gap-2">
+        <button
+          @click="toggleFavorite"
+          :disabled="isToggling"
+          class="p-2 rounded-full transition-all active:scale-90 hover:bg-red-50"
+        >
+          <Heart 
+            :size="24" 
+            :class="isFavorite ? 'fill-red-500 text-red-500' : 'text-sandalwood/60'"
+          />
+        </button>
+      </div>
     </header>
 
     <template v-if="loading">
@@ -253,66 +256,165 @@ function goBack() {
 
       <main class="flex-1 px-4 py-6 max-w-2xl mx-auto w-full space-y-5 animate-fade-in-up">
         
-        <div class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
-          <h2 class="text-cinnabar font-serif font-semibold text-base mb-3 flex items-center gap-2">
-            <span class="w-1 h-4 bg-cinnabar rounded" /> 基本信息
-          </h2>
-          <div class="space-y-2 text-sm">
-            <div class="flex" v-if="herb.classification">
-              <span class="text-sandalwood/60 w-20 shrink-0">药材类别</span>
-              <span class="text-sandalwood/90">{{ herb.classification }}</span>
-            </div>
-            <div class="flex" v-if="herb.alias">
-              <span class="text-sandalwood/60 w-20 shrink-0">别名</span>
-              <span class="text-sandalwood/90">{{ herb.alias }}</span>
-            </div>
+        <div class="flex justify-center mb-2">
+          <div class="flex p-1 rounded-xl bg-sandalwood/5 border border-sandalwood/10 w-full max-w-xs shadow-inner">
+            <button
+              type="button"
+              :class="[
+                'flex-1 py-2.5 rounded-lg text-sm font-medium font-serif transition-all duration-300',
+                detailMode === 'easy'
+                  ? 'bg-white text-sandalwood shadow-sm ring-1 ring-black/5 scale-100'
+                  : 'text-sandalwood/50 hover:text-sandalwood scale-95'
+              ]"
+              @click="detailMode = 'easy'"
+            >
+              通俗解说
+            </button>
+            <button
+              type="button"
+              :class="[
+                'flex-1 py-2.5 rounded-lg text-sm font-medium font-serif transition-all duration-300',
+                detailMode === 'professional'
+                  ? 'bg-white text-sandalwood shadow-sm ring-1 ring-black/5 scale-100'
+                  : 'text-sandalwood/50 hover:text-sandalwood scale-95'
+              ]"
+              @click="detailMode = 'professional'"
+            >
+              专业典籍
+            </button>
           </div>
         </div>
+          
+        <!-- 专业模式：原有 herbs 表内容 -->
+        <template v-if="detailMode === 'professional'">
+          <div class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
+            <h2 class="text-cinnabar font-serif font-semibold text-base mb-3 flex items-center gap-2">
+              <span class="w-1 h-4 bg-cinnabar rounded" /> 基本信息
+            </h2>
+            <div class="space-y-2 text-sm">
+              <div class="flex" v-if="herb.classification">
+                <span class="text-sandalwood/60 w-20 shrink-0">药材类别</span>
+                <span class="text-sandalwood/90">{{ herb.classification }}</span>
+              </div>
+              <div class="flex" v-if="herb.alias">
+                <span class="text-sandalwood/60 w-20 shrink-0">别名</span>
+                <span class="text-sandalwood/90">{{ herb.alias }}</span>
+              </div>
+            </div>
+          </div>
 
-        <div class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
-          <h2 class="text-cinnabar font-serif font-semibold text-base mb-2 flex items-center gap-2">
-            <span class="w-1 h-4 bg-cinnabar rounded" /> 性味归经
-          </h2>
-          <p class="text-sandalwood/90 text-sm leading-relaxed text-justify">
-            {{ herb.nature }}；{{ herb.channel }}
-            {{ herb.taste ? '；' + herb.taste : '' }}
-          </p>
-        </div>
+          <div class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
+            <h2 class="text-cinnabar font-serif font-semibold text-base mb-2 flex items-center gap-2">
+              <span class="w-1 h-4 bg-cinnabar rounded" /> 性味归经
+            </h2>
+            <p class="text-sandalwood/90 text-sm leading-relaxed text-justify">
+              {{ herb.nature }}；{{ herb.channel }}
+              {{ herb.taste ? '；' + herb.taste : '' }}
+            </p>
+          </div>
 
-        <div class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
-          <h2 class="text-cinnabar font-serif font-semibold text-base mb-2 flex items-center gap-2">
-            <span class="w-1 h-4 bg-cinnabar rounded" /> 功效与作用
-          </h2>
-          <p v-if="herb.efficacy" class="text-sandalwood/90 text-sm leading-relaxed text-justify mb-2 font-medium">
-            {{ herb.efficacy }}
-          </p>
-          <div 
-            v-if="herb.effect"
-            class="text-sandalwood/90 text-sm leading-relaxed text-justify formatted-content"
-            v-html="formatNumberedText(herb.effect)"
-          ></div>
-        </div>
+          <div class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
+            <h2 class="text-cinnabar font-serif font-semibold text-base mb-2 flex items-center gap-2">
+              <span class="w-1 h-4 bg-cinnabar rounded" /> 功效与作用
+            </h2>
+            <p v-if="herb.efficacy" class="text-sandalwood/90 text-sm leading-relaxed text-justify mb-2 font-medium">
+              {{ herb.efficacy }}
+            </p>
+            <div 
+              v-if="herb.effect"
+              class="text-sandalwood/90 text-sm leading-relaxed text-justify formatted-content"
+              v-html="formatNumberedText(herb.effect)"
+            ></div>
+          </div>
 
-        <div class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
-          <h2 class="text-bamboo font-serif font-semibold text-base mb-2 flex items-center gap-2">
-            <span class="w-1 h-4 bg-bamboo rounded" /> 用法用量
-          </h2>
-          <div 
-            class="text-sandalwood/90 text-sm leading-relaxed text-justify formatted-content"
-            v-html="formatNumberedText(herb.usage)"
-          ></div>
-        </div>
+          <div class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
+            <h2 class="text-bamboo font-serif font-semibold text-base mb-2 flex items-center gap-2">
+              <span class="w-1 h-4 bg-bamboo rounded" /> 用法用量
+            </h2>
+            <div 
+              class="text-sandalwood/90 text-sm leading-relaxed text-justify formatted-content"
+              v-html="formatNumberedText(herb.usage)"
+            ></div>
+          </div>
 
-        <div class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
-          <h2 class="text-cinnabar font-serif font-semibold text-base mb-2 flex items-center gap-2">
-            <span class="w-1 h-4 bg-cinnabar rounded" /> 使用禁忌
-          </h2>
-           <div 
-            class="text-sandalwood/90 text-sm leading-relaxed text-justify formatted-content"
-            v-html="formatNumberedText(herb.taboo || herb.tips)"
-          ></div>
-        </div>
+          <div class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
+            <h2 class="text-cinnabar font-serif font-semibold text-base mb-2 flex items-center gap-2">
+              <span class="w-1 h-4 bg-cinnabar rounded" /> 使用禁忌
+            </h2>
+            <div 
+              class="text-sandalwood/90 text-sm leading-relaxed text-justify formatted-content"
+              v-html="formatNumberedText(herb.taboo || herb.tips)"
+            ></div>
+          </div>
+        </template>
 
+        <!-- 简单易懂模式：herbseasy 表内容 -->
+       <template v-else-if="detailMode === 'easy'">
+          <div v-if="!herbEasy" class="rounded-xl bg-paper-card shadow-paper p-8 border border-sandalwood/10 text-center text-sandalwood/60 text-sm font-serif">
+            暂无该药材的通俗版介绍，请切换至「专业」模式查看。
+          </div>
+          <template v-else>
+            <div v-if="herbEasy.identity_tag" class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
+              <h2 class="text-cinnabar font-serif font-semibold text-base mb-2 flex items-center gap-2">
+                <span class="w-1 h-4 bg-cinnabar rounded" /> 功效概括
+              </h2>
+              <p class="text-sandalwood/90 text-sm leading-relaxed text-justify">{{ herbEasy.identity_tag }}</p>
+            </div>
+
+            <div v-if="herbEasy.modern_scene != null && (Array.isArray(herbEasy.modern_scene) ? herbEasy.modern_scene.length : true)" class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
+              <h2 class="text-bamboo font-serif font-semibold text-base mb-2 flex items-center gap-2">
+                <span class="w-1 h-4 bg-bamboo rounded" /> 日常应用场景
+              </h2>
+              <p v-if="Array.isArray(herbEasy.modern_scene)" class="text-sandalwood/90 text-sm leading-relaxed text-justify">
+                {{ herbEasy.modern_scene.join('；') }}
+              </p>
+              <p v-else-if="typeof herbEasy.modern_scene === 'string'" class="text-sandalwood/90 text-sm leading-relaxed text-justify">
+                {{ herbEasy.modern_scene }}
+              </p>
+              <p v-else class="text-sandalwood/90 text-sm leading-relaxed text-justify">
+                {{ JSON.stringify(herbEasy.modern_scene) }}
+              </p>
+            </div>
+
+            <div v-if="herbEasy.friendly_explanation" class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
+              <h2 class="text-cinnabar font-serif font-semibold text-base mb-2 flex items-center gap-2">
+                <span class="w-1 h-4 bg-cinnabar rounded" /> 作用通俗解说
+              </h2>
+              <p class="text-sandalwood/90 text-sm leading-relaxed text-justify">{{ herbEasy.friendly_explanation }}</p>
+            </div>
+
+            <div v-if="herbEasy.nature_logic" class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
+              <h2 class="text-bamboo font-serif font-semibold text-base mb-2 flex items-center gap-2">
+                <span class="w-1 h-4 bg-bamboo rounded" /> 性味原理解析
+              </h2>
+              <p class="text-sandalwood/90 text-sm leading-relaxed text-justify">{{ herbEasy.nature_logic }}</p>
+            </div>
+
+            <div v-if="herbEasy.easy_usage" class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
+              <h2 class="text-bamboo font-serif font-semibold text-base mb-2 flex items-center gap-2">
+                <span class="w-1 h-4 bg-bamboo rounded" /> 实用搭配指南
+              </h2>
+              <p class="text-sandalwood/90 text-sm leading-relaxed text-justify">{{ herbEasy.easy_usage }}</p>
+            </div>
+
+            <div v-if="herbEasy.safety_alarm || herbEasy.is_safe_for_pregnant !== null" class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10 space-y-3">
+              <h2 class="text-cinnabar font-serif font-semibold text-base flex items-center gap-2">
+                <span class="w-1 h-4 bg-cinnabar rounded" /> 注意事项与禁忌
+              </h2>
+              
+              <p v-if="herbEasy.safety_alarm" class="text-sandalwood/90 text-sm leading-relaxed text-justify">
+                {{ herbEasy.safety_alarm }}
+              </p>
+              
+              <div v-if="herbEasy.is_safe_for_pregnant !== null" :class="{'pt-3 border-t border-sandalwood/10': herbEasy.safety_alarm}" class="flex items-center gap-2">
+                <span class="text-sandalwood/60 text-sm shrink-0">孕产妇说明：</span>
+                <span :class="herbEasy.is_safe_for_pregnant ? 'text-green-600' : 'text-cinnabar'" class="text-sm font-medium">
+                  {{ herbEasy.is_safe_for_pregnant ? '安全可用' : '慎用或禁用' }}
+                </span>
+              </div>
+            </div>
+          </template>
+        </template>
       </main>
     </template>
   </div>
