@@ -64,30 +64,65 @@ const getPartTagClass = (text) => {
   return 'border-sandalwood/20 bg-sandalwood/5 text-sandalwood/90'
 }
 
-// 具体功效标签颜色（21 类）
+// 具体功效标签颜色（严格对应表格中的 21 类）
 const getDetailEffectClass = (text) => {
   if (!text) return ''
-  if (text.includes('健脾') || text.includes('补气') || text.includes('增强免疫') || text.includes('升阳')) {
+
+  // 补益 / 固表 / 消食类：消食化积、滋阴养血、收敛固涩、温补肾阳、益气固表
+  if (
+    ['消食化积', '滋阴养血', '收敛固涩', '温补肾阳', '益气固表'].some((k) =>
+      text.includes(k)
+    )
+  ) {
     return 'border-amber-200 bg-amber-50 text-amber-800'
   }
-  if (text.includes('清热') || text.includes('降火') || text.includes('利水') || text.includes('泻下')) {
+
+  // 清热 / 利水 / 泻下类：清热解毒、清热泻火、利水通淋、泻下通便
+  if (
+    ['清热解毒', '清热泻火', '利水通淋', '泻下通便'].some((k) =>
+      text.includes(k)
+    )
+  ) {
     return 'border-sky-200 bg-sky-50 text-sky-700'
   }
-  if (text.includes('润肺') || text.includes('滋阴') || text.includes('养肝明目')) {
+
+  // 化痰止咳 & 芳香化湿
+  if (
+    ['化痰止咳平喘', '芳香化湿'].some((k) =>
+      text.includes(k)
+    )
+  ) {
     return 'border-emerald-200 bg-emerald-50 text-emerald-700'
   }
-  if (text.includes('活血') || text.includes('祛风湿') || text.includes('散寒') || text.includes('止痛')) {
+
+  // 行气活血 / 祛风散寒类：活血化瘀、祛风除湿、解表散风、温里散寒
+  if (
+    ['活血化瘀', '祛风除湿', '解表散风', '温里散寒'].some((k) =>
+      text.includes(k)
+    )
+  ) {
     return 'border-cinnabar/20 bg-cinnabar/5 text-cinnabar'
   }
-  if (text.includes('养心安神')) {
+
+  // 安神 & 平肝息风 & 开窍：宁心安神、平肝息风、开窍醒神
+  if (
+    ['宁心安神', '平肝息风', '开窍醒神'].some((k) =>
+      text.includes(k)
+    )
+  ) {
     return 'border-violet-200 bg-violet-50 text-violet-700'
   }
-  if (text.includes('驱虫')) {
+
+  // 驱虫止痒
+  if (text.includes('驱虫止痒')) {
     return 'border-slate-300 bg-slate-50 text-slate-700'
   }
-  if (text.includes('收敛止血')) {
+
+  // 止血类：温经止血、凉血止血
+  if (['温经止血', '凉血止血'].some((k) => text.includes(k))) {
     return 'border-rose-200 bg-rose-50 text-rose-700'
   }
+
   return 'border-sandalwood/20 bg-paper text-sandalwood/90'
 }
 
