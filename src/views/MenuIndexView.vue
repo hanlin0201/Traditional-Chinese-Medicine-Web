@@ -7,7 +7,7 @@ import { Sun, Soup, ArrowRight, BookOpen, Utensils, ScrollText, ChevronDown, Arr
 import TcmHistorySection from '@/components/TcmHistorySection.vue'
 import HerbalPairing from '@/components/home/HerbalPairing.vue'
 import MythBuster from '@/components/home/MythBuster.vue'
-import { getNearestSolarTerm } from '@/constants/solarTerms'
+// 注意：移除了 getNearestSolarTerm 的引入
 import { supabase } from '@/supabaseClient'
 
 const router = useRouter()
@@ -104,14 +104,67 @@ watch(
   { immediate: true }
 )
 
-// --- 数据获取：getNearestSolarTerm + Supabase ---
+// ==========================================
+// 核心修改：增加本地节气计算逻辑，永远指向下一个节气
+// ==========================================
+const SOLAR_TERMS_LOOKUP = [
+  { name: '小寒', month: 1, day: 5 }, { name: '大寒', month: 1, day: 20 },
+  { name: '立春', month: 2, day: 3 }, { name: '雨水', month: 2, day: 18 },
+  { name: '惊蛰', month: 3, day: 5 }, { name: '春分', month: 3, day: 20 },
+  { name: '清明', month: 4, day: 4 }, { name: '谷雨', month: 4, day: 19 },
+  { name: '立夏', month: 5, day: 5 }, { name: '小满', month: 5, day: 20 },
+  { name: '芒种', month: 6, day: 5 }, { name: '夏至', month: 6, day: 21 },
+  { name: '小暑', month: 7, day: 6 }, { name: '大暑', month: 7, day: 22 },
+  { name: '立秋', month: 8, day: 7 }, { name: '处暑', month: 8, day: 22 },
+  { name: '白露', month: 9, day: 7 }, { name: '秋分', month: 9, day: 22 },
+  { name: '寒露', month: 10, day: 8 }, { name: '霜降', month: 10, day: 23 },
+  { name: '立冬', month: 11, day: 7 }, { name: '小雪', month: 11, day: 22 },
+  { name: '大雪', month: 12, day: 6 }, { name: '冬至', month: 12, day: 21 }
+]
+
+const calculateSeasonalState = () => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth() + 1
+  const day = now.getDate()
+  
+  const sorted = [...SOLAR_TERMS_LOOKUP].sort((a, b) => a.month !== b.month ? a.month - b.month : a.day - b.day)
+  
+  // 查找当前所处的节气
+  let activeTerm = sorted[sorted.length - 1]
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    if (month > sorted[i].month || (month === sorted[i].month && day >= sorted[i].day)) {
+      activeTerm = sorted[i]
+      break
+    }
+  }
+  
+  // 查找下一个节气并计算倒计时
+  let nextTerm = sorted.find(t => t.month > month || (t.month === month && t.day > day))
+  let targetYear = year
+  if (!nextTerm) {
+    nextTerm = sorted[0]
+    targetYear += 1
+  }
+
+  const todayReset = new Date(year, now.getMonth(), day) 
+  const targetDate = new Date(targetYear, nextTerm.month - 1, nextTerm.day)
+  const diffDays = Math.ceil((targetDate - todayReset) / (1000 * 60 * 60 * 24))
+
+  nearestDaysDiff.value = diffDays
+  return activeTerm.name
+}
+
+// --- 数据获取：Supabase ---
 const fetchSeasonalData = async () => {
   loading.value = true
-  const term = getNearestSolarTerm()
-  currentTermName.value = term.name
-  nearestDaysDiff.value = term.daysDiff ?? 0
+  
+  // 使用本地计算函数获取节气名称
+  const termName = calculateSeasonalState()
+  currentTermName.value = termName
+
   const MOCK_DATA = {
-    info: { name: term.name, principle: '省酸增甘，以养脾气；疏肝理气，顺应春阳。', recommend_text: '韭菜、香椿、百合', avoid_text: '酸辣食物、生冷海鲜' },
+    info: { name: termName, principle: '省酸增甘，以养脾气；疏肝理气，顺应春阳。', recommend_text: '韭菜、香椿、百合', avoid_text: '酸辣食物、生冷海鲜' },
     recipes: [
       { id: 1, name: '春笋炖排骨', image: 'https://images.unsplash.com/photo-1547592180-85f173990554?q=80&w=2070&auto=format&fit=crop' },
       { id: 2, name: '枸杞菊花茶', image: 'https://images.unsplash.com/photo-1623912852230-e374bb36934c?q=80&w=2070&auto=format&fit=crop' },
@@ -120,9 +173,9 @@ const fetchSeasonalData = async () => {
   }
 
   try {
-    const { data: info } = await supabase.from('solar_terms').select('*').eq('name', term.name).single()
+    const { data: info } = await supabase.from('solar_terms').select('*').eq('name', termName).single()
     termInfo.value = info || MOCK_DATA.info
-    const { data: recipes } = await supabase.from('recipes').select('id, name, image').eq('solar_term', term.name).limit(3)
+    const { data: recipes } = await supabase.from('recipes').select('id, name, image').eq('solar_term', termName).limit(3)
     seasonalRecipes.value = (recipes && recipes.length) ? recipes : MOCK_DATA.recipes
   } catch (e) {
     termInfo.value = MOCK_DATA.info; 
@@ -200,13 +253,7 @@ onUnmounted(() => {
                   <div class="term-countdown">
                     <span class="term-countdown-prefix">距离下一个节气日</span>
                     <span class="term-countdown-days">
-                      {{
-                        nearestDaysDiff === 0
-                          ? '今天就是节气日'
-                          : nearestDaysDiff > 0
-                            ? `还有 ${nearestDaysDiff} 天`
-                            : `已过 ${Math.abs(nearestDaysDiff)} 天`
-                      }}
+  {{ nearestDaysDiff > 0 ? `还有 ${nearestDaysDiff} 天` : '今天就是节气日' }}
                     </span>
                   </div>
                   <h2 class="term-name">{{ termInfo.name }}</h2>

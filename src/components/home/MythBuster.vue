@@ -26,7 +26,7 @@ function hasValidItems(list) {
   return Array.isArray(list) && list.length > 0 && list.some(item => item && String(item.question || '').trim() !== '')
 }
 
-const BATCH_SIZE = 5
+const BATCH_SIZE = 3
 
 function pickRandomBatch() {
   const list = fullMyths.value
@@ -44,7 +44,7 @@ async function loadMyths() {
   fullMyths.value = []
   displayedMyths.value = []
   try {
-    const { data, error } = await supabase.from('myth').select('*')
+    const { data, error } = await supabase.from('myths').select('*')
     if (error) {
       console.warn('[养生避雷针] Supabase error:', error.message)
       fullMyths.value = [...FALLBACK]
@@ -208,7 +208,7 @@ onMounted(() => {
   text-transform: uppercase;
 }
 
-.myth-list { display: flex; flex-direction: column; gap: 16px; min-height: 300px; }
+.myth-list { display: flex; flex-direction: column; gap: 16px; min-height: 200px; }
 
 .loading-state {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
