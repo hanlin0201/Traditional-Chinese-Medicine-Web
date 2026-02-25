@@ -354,64 +354,73 @@ function goBack() {
             暂无该药材的通俗版介绍，请切换至「专业」模式查看。
           </div>
           <template v-else>
-            <div v-if="herbEasy.identity_tag" class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
-              <h2 class="text-cinnabar font-serif font-semibold text-base mb-2 flex items-center gap-2">
-                <span class="w-1 h-4 bg-cinnabar rounded" /> 功效概括
-              </h2>
-              <p class="text-sandalwood/90 text-sm leading-relaxed text-justify">{{ herbEasy.identity_tag }}</p>
-            </div>
-
-            <div v-if="herbEasy.modern_scene != null && (Array.isArray(herbEasy.modern_scene) ? herbEasy.modern_scene.length : true)" class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
-              <h2 class="text-bamboo font-serif font-semibold text-base mb-2 flex items-center gap-2">
-                <span class="w-1 h-4 bg-bamboo rounded" /> 日常应用场景
-              </h2>
-              <p v-if="Array.isArray(herbEasy.modern_scene)" class="text-sandalwood/90 text-sm leading-relaxed text-justify">
-                {{ herbEasy.modern_scene.join('；') }}
-              </p>
-              <p v-else-if="typeof herbEasy.modern_scene === 'string'" class="text-sandalwood/90 text-sm leading-relaxed text-justify">
-                {{ herbEasy.modern_scene }}
-              </p>
-              <p v-else class="text-sandalwood/90 text-sm leading-relaxed text-justify">
-                {{ JSON.stringify(herbEasy.modern_scene) }}
-              </p>
-            </div>
-
-            <div v-if="herbEasy.friendly_explanation" class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
-              <h2 class="text-cinnabar font-serif font-semibold text-base mb-2 flex items-center gap-2">
-                <span class="w-1 h-4 bg-cinnabar rounded" /> 作用通俗解说
-              </h2>
-              <p class="text-sandalwood/90 text-sm leading-relaxed text-justify">{{ herbEasy.friendly_explanation }}</p>
-            </div>
-
-            <div v-if="herbEasy.nature_logic" class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
-              <h2 class="text-bamboo font-serif font-semibold text-base mb-2 flex items-center gap-2">
-                <span class="w-1 h-4 bg-bamboo rounded" /> 性味原理解析
-              </h2>
-              <p class="text-sandalwood/90 text-sm leading-relaxed text-justify">{{ herbEasy.nature_logic }}</p>
-            </div>
-
-            <div v-if="herbEasy.easy_usage" class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
-              <h2 class="text-bamboo font-serif font-semibold text-base mb-2 flex items-center gap-2">
-                <span class="w-1 h-4 bg-bamboo rounded" /> 实用搭配指南
-              </h2>
-              <p class="text-sandalwood/90 text-sm leading-relaxed text-justify">{{ herbEasy.easy_usage }}</p>
-            </div>
-
-            <div v-if="herbEasy.safety_alarm || herbEasy.is_safe_for_pregnant !== null" class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10 space-y-3">
-              <h2 class="text-cinnabar font-serif font-semibold text-base flex items-center gap-2">
-                <span class="w-1 h-4 bg-cinnabar rounded" /> 注意事项与禁忌
-              </h2>
+            <div class="space-y-4">
               
-              <p v-if="herbEasy.safety_alarm" class="text-sandalwood/90 text-sm leading-relaxed text-justify">
-                {{ herbEasy.safety_alarm }}
-              </p>
-              
-              <div v-if="herbEasy.is_safe_for_pregnant !== null" :class="{'pt-3 border-t border-sandalwood/10': herbEasy.safety_alarm}" class="flex items-center gap-2">
-                <span class="text-sandalwood/60 text-sm shrink-0">孕产妇说明：</span>
-                <span :class="herbEasy.is_safe_for_pregnant ? 'text-green-600' : 'text-cinnabar'" class="text-sm font-medium">
-                  {{ herbEasy.is_safe_for_pregnant ? '安全可用' : '慎用或禁用' }}
-                </span>
+              <div v-if="herbEasy.identity_tag" class="rounded-xl bg-sandalwood/5 border border-sandalwood/10 p-5 relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-1 h-full bg-cinnabar"></div>
+                <h2 class="text-cinnabar font-serif font-semibold text-base mb-2">
+                  核心概括
+                </h2>
+                <p class="text-sandalwood/90 text-base font-medium leading-relaxed text-justify">{{ herbEasy.identity_tag }}</p>
               </div>
+
+              <div class="rounded-xl bg-paper-card shadow-paper border border-sandalwood/10 divide-y divide-sandalwood/10">
+                
+                <div v-if="herbEasy.friendly_explanation" class="p-5">
+                  <h2 class="text-cinnabar font-serif font-semibold text-base mb-2 flex items-center gap-2">
+                    <span class="w-1 h-4 bg-cinnabar rounded" /> 作用效果
+                  </h2>
+                  <p class="text-sandalwood/90 text-sm leading-relaxed text-justify">{{ herbEasy.friendly_explanation }}</p>
+                </div>
+
+                <div v-if="herbEasy.modern_scene != null && (Array.isArray(herbEasy.modern_scene) ? herbEasy.modern_scene.length : true)" class="p-5">
+                  <h2 class="text-bamboo font-serif font-semibold text-base mb-2 flex items-center gap-2">
+                    <span class="w-1 h-4 bg-bamboo rounded" /> 应用场景
+                  </h2>
+                  <p v-if="Array.isArray(herbEasy.modern_scene)" class="text-sandalwood/90 text-sm leading-relaxed text-justify">
+                    {{ herbEasy.modern_scene.join('；') }}
+                  </p>
+                  <p v-else-if="typeof herbEasy.modern_scene === 'string'" class="text-sandalwood/90 text-sm leading-relaxed text-justify">
+                    {{ herbEasy.modern_scene }}
+                  </p>
+                  <p v-else class="text-sandalwood/90 text-sm leading-relaxed text-justify">
+                    {{ JSON.stringify(herbEasy.modern_scene) }}
+                  </p>
+                </div>
+
+                <div v-if="herbEasy.nature_logic" class="p-5">
+                  <h2 class="text-bamboo font-serif font-semibold text-base mb-2 flex items-center gap-2">
+                    <span class="w-1 h-4 bg-bamboo rounded" /> 性味原理
+                  </h2>
+                  <p class="text-sandalwood/90 text-sm leading-relaxed text-justify">{{ herbEasy.nature_logic }}</p>
+                </div>
+
+                <div v-if="herbEasy.easy_usage" class="p-5">
+                  <h2 class="text-bamboo font-serif font-semibold text-base mb-2 flex items-center gap-2">
+                    <span class="w-1 h-4 bg-bamboo rounded" /> 实用搭配
+                  </h2>
+                  <p class="text-sandalwood/90 text-sm leading-relaxed text-justify">{{ herbEasy.easy_usage }}</p>
+                </div>
+
+              </div>
+
+              <div v-if="herbEasy.safety_alarm || herbEasy.is_safe_for_pregnant !== null" class="rounded-xl bg-red-50/40 shadow-paper p-5 border border-red-100 space-y-3">
+                <h2 class="text-cinnabar font-serif font-semibold text-base flex items-center gap-2">
+                  <span class="w-1 h-4 bg-cinnabar rounded" /> 注意事项
+                </h2>
+                
+                <p v-if="herbEasy.safety_alarm" class="text-sandalwood/90 text-sm leading-relaxed text-justify">
+                  {{ herbEasy.safety_alarm }}
+                </p>
+                
+                <div v-if="herbEasy.is_safe_for_pregnant !== null" :class="{'pt-3 border-t border-red-100': herbEasy.safety_alarm}" class="flex items-center gap-2">
+                  <span class="text-sandalwood/70 text-sm shrink-0 font-medium">孕产妇说明：</span>
+                  <span :class="herbEasy.is_safe_for_pregnant ? 'text-green-600' : 'text-cinnabar'" class="text-sm font-semibold">
+                    {{ herbEasy.is_safe_for_pregnant ? '安全可用' : '慎用或禁用' }}
+                  </span>
+                </div>
+              </div>
+
             </div>
           </template>
         </template>
