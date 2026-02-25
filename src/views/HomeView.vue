@@ -5,6 +5,7 @@ import { Search, Loader2, ArrowLeft, Filter, ChevronDown, X } from 'lucide-vue-n
 import { pinyin } from 'pinyin-pro'
 import HerbCard from '@/components/HerbCard.vue'
 import { useHerbList } from '@/composables/useHerbData'
+import { ALL_DETAIL_EFFECTS } from '@/composables/useHerbTags'
 
 const router = useRouter()
 
@@ -14,6 +15,7 @@ const router = useRouter()
 
 const CATEGORY_TAGS = ['全部', '根茎类', '果实/种子类', '全草类', '花类', '藤木类', '动物类', '枝叶/树皮类', '菌藻类', '矿物类', '其他']
 const LETTER_TAGS = ['全部', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'W', 'X', 'Y', 'Z']
+const EFFECT_TAGS = ['全部', ...ALL_DETAIL_EFFECTS]
 
 // ==========================================
 // 2. 核心逻辑
@@ -22,21 +24,31 @@ const LETTER_TAGS = ['全部', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K',
 const { herbs, loading, error, load, loadMore, hasMore, loadingMore, loadAll } = useHerbList()
 
 const keyword = ref('')
-const activeTag = ref('全部')
-const filterMode = ref('category') // 'category' | 'letter'
+const activeTag = ref('全部')              // 类别 / A-Z 使用
+const activeEffectTags = ref([])           // 功效多选
+const filterMode = ref('category') // 'category' | 'letter' | 'effect'
 const showFilterPanel = ref(false)
 const sentinelRef = ref(null)
 let _observer = null
 
-const currentTags = computed(() => filterMode.value === 'category' ? CATEGORY_TAGS : LETTER_TAGS)
+const currentTags = computed(() => {
+  if (filterMode.value === 'category') return CATEGORY_TAGS
+  if (filterMode.value === 'letter') return LETTER_TAGS
+  return EFFECT_TAGS
+})
 
 function hasActiveFilters() {
-  return keyword.value.trim() !== '' || activeTag.value !== '全部'
+  return (
+    keyword.value.trim() !== '' ||
+    activeTag.value !== '全部' ||
+    (filterMode.value === 'effect' && activeEffectTags.value.length > 0)
+  )
 }
 
 function clearAllFilters() {
   keyword.value = ''
   activeTag.value = '全部'
+  activeEffectTags.value = []
   showFilterPanel.value = true
 }
 
@@ -53,15 +65,20 @@ const filteredHerbs = computed(() => {
     )
   }
   // 2. 标签过滤（首字母已在数据层预计算，避免重复 pinyin 调用）
-  if (activeTag.value !== '全部') {
-    if (filterMode.value === 'category') {
-      list = list.filter(h =>
-        (h.tags || []).includes(activeTag.value) ||
-        (h.classification || '').includes(activeTag.value)
-      )
-    } else {
-      list = list.filter(h => (h.firstLetter || '#') === activeTag.value)
-    }
+  if (filterMode.value === 'category' && activeTag.value !== '全部') {
+    list = list.filter(h =>
+      (h.tags || []).includes(activeTag.value) ||
+      (h.classification || '').includes(activeTag.value)
+    )
+  } else if (filterMode.value === 'letter' && activeTag.value !== '全部') {
+    list = list.filter(h => (h.firstLetter || '#') === activeTag.value)
+  } else if (filterMode.value === 'effect' && activeEffectTags.value.length) {
+    const selected = activeEffectTags.value
+    list = list.filter(h => {
+      const effects = h.detailEffects || []
+      // 叠加条件：需同时包含所有已选功效
+      return selected.every(t => effects.includes(t))
+    })
   }
   return list
 })
@@ -70,6 +87,22 @@ function switchFilterMode(mode) {
   if (filterMode.value === mode) return
   filterMode.value = mode
   activeTag.value = '全部' // 切换模式重置选中
+  if (mode !== 'effect') {
+    activeEffectTags.value = []
+  }
+}
+
+function toggleEffectTag(tag) {
+  if (tag === '全部') {
+    activeEffectTags.value = []
+    return
+  }
+  const current = activeEffectTags.value
+  if (current.includes(tag)) {
+    activeEffectTags.value = current.filter(t => t !== tag)
+  } else {
+    activeEffectTags.value = [...current, tag]
+  }
 }
 
 // ==========================================
@@ -96,9 +129,9 @@ const goToDetail = (herb) => {
   }, 450)
 }
 
-// 当切换到 A-Z 模式或输入搜索关键词时，自动加载全量数据
+// 当切换到 A-Z / 功效 模式或输入搜索关键词时，自动加载全量数据
 watch([filterMode, keyword], ([mode, kw]) => {
-  if (mode === 'letter' || kw.trim()) {
+  if (mode === 'letter' || mode === 'effect' || kw.trim()) {
     loadAll()
   }
 })
@@ -176,9 +209,9 @@ onUnmounted(() => {
           <div v-show="showFilterPanel" class="p-4 rounded-2xl border border-sandalwood/10 bg-white/80 shadow-sm space-y-4">
             <div class="flex flex-wrap items-center gap-2">
               <span class="text-sm font-medium text-sandalwood/60 shrink-0">筛选方式</span>
-              <div class="bg-sandalwood/5 p-1 rounded-xl flex items-center">
+              <div class="bg-sandalwood/5 p-1 rounded-xl flex items-center flex-wrap gap-1">
                 <button
-                  v-for="mode in ['category', 'letter']"
+                  v-for="mode in ['category', 'letter', 'effect']"
                   :key="mode"
                   type="button"
                   @click="switchFilterMode(mode)"
@@ -189,7 +222,7 @@ onUnmounted(() => {
                       : 'text-sandalwood/60 hover:text-sandalwood'
                   ]"
                 >
-                  {{ mode === 'category' ? '按类别' : '按 A-Z' }}
+                  {{ mode === 'category' ? '按类别' : mode === 'letter' ? '按 A-Z' : '按功效' }}
                 </button>
               </div>
             </div>
@@ -198,11 +231,18 @@ onUnmounted(() => {
                 <button
                   v-for="tag in currentTags"
                   :key="tag"
-                  @click="activeTag = tag"
+                  @click="filterMode === 'effect' ? toggleEffectTag(tag) : (activeTag = tag)"
                   :class="[
                     'rounded-full text-xs font-medium transition-all duration-200 border shrink-0',
                     filterMode === 'letter' ? 'px-2.5 py-1' : 'px-3.5 py-1',
-                    activeTag === tag
+                    filterMode === 'effect'
+                      ? (
+                          (tag === '全部' && activeEffectTags.length === 0) ||
+                          (tag !== '全部' && activeEffectTags.includes(tag))
+                        )
+                        ? 'bg-cinnabar text-white border-cinnabar shadow-sm'
+                        : 'bg-white text-sandalwood/70 border-sandalwood/10 hover:border-sandalwood/30 hover:text-sandalwood'
+                      : activeTag === tag
                       ? 'bg-cinnabar text-white border-cinnabar shadow-sm'
                       : 'bg-white text-sandalwood/70 border-sandalwood/10 hover:border-sandalwood/30 hover:text-sandalwood'
                   ]"
@@ -300,18 +340,17 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
   gap: 12px;
-  /* 药柜背景 */
+  /* 药柜背景：整体颜色更浅，突出单个抽屉 */
   background:
-    linear-gradient(145deg, #3E2723 0%, #4A3228 50%, #3E2723 100%);
-  background-image:
-    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.05'/%3E%3C/svg%3E"),
-    linear-gradient(145deg, #3E2723 0%, #4A3228 50%, #3E2723 100%);
-  border-radius: 10px;
-  padding: 16px;
-  border: 2px solid #2E1B11;
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.12), transparent 55%),
+    radial-gradient(circle at bottom right, rgba(0, 0, 0, 0.12), transparent 55%),
+    linear-gradient(145deg, #6F4B3A 0%, #5A4034 45%, #4A3228 100%);
+  border-radius: 12px;
+  padding: 18px;
+  border: 1px solid rgba(55, 36, 24, 0.75);
   box-shadow:
-    inset 0 2px 6px rgba(0, 0, 0, 0.3),
-    0 4px 16px rgba(62, 39, 35, 0.25);
+    inset 0 1px 4px rgba(0, 0, 0, 0.25),
+    0 6px 18px rgba(62, 39, 35, 0.22);
 }
 
 @media (min-width: 640px) {
