@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 // 1. 引入 Heart 图标
 import { ArrowLeft, Heart } from 'lucide-vue-next'
@@ -10,6 +10,8 @@ import { OrbitControls } from '@tresjs/cientos'
 import Herb3DScene from '@/components/Herb3DScene.vue'
 // 引入 Supabase 客户端
 import { supabase } from '@/supabaseClient' 
+// 引入药材标签数据
+import { getHerbTagDisplayByName } from '@/composables/useHerbTags'
 
 const route = useRoute()
 const router = useRouter()
@@ -25,6 +27,69 @@ const detailMode = ref('professional') // 'professional' | 'easy' 专业 / 简�
 const isFavorite = ref(false) // 是否已收藏
 const isToggling = ref(false) // 是否正在交互中(防止连点)
 const currentUser = ref(null) // 当前登录用户
+
+// 药材多维标签（基于 CSV）
+const herbTagInfo = computed(() => {
+  if (!herb.value || !herb.value.name) return null
+  return getHerbTagDisplayByName(herb.value.name) || null
+})
+
+// 根据药性文本返回颜色样式：凉→蓝，平→绿，温→橙
+const getNatureTagClass = (text) => {
+  if (!text) return ''
+  if (text.includes('凉') || text.includes('寒')) {
+    return 'border-sky-200 bg-sky-50 text-sky-700'
+  }
+  if (text.includes('平')) {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+  }
+  if (text.includes('温') || text.includes('热')) {
+    return 'border-amber-200 bg-amber-50 text-amber-700'
+  }
+  return 'border-sandalwood/20 bg-sandalwood/5 text-sandalwood/90'
+}
+
+// 根据入药部位分类返回颜色样式
+const getPartTagClass = (text) => {
+  if (!text) return ''
+  if (text.includes('根茎')) return 'border-sandalwood/20 bg-sandalwood/10 text-sandalwood/90'
+  if (text.includes('果实') || text.includes('种子')) return 'border-amber-200 bg-amber-50 text-amber-800'
+  if (text.includes('全草')) return 'border-bamboo/25 bg-bamboo/10 text-bamboo'
+  if (text.includes('花')) return 'border-rose-200 bg-rose-50 text-rose-700'
+  if (text.includes('枝叶') || text.includes('树皮')) return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+  if (text.includes('动物')) return 'border-cinnabar/20 bg-cinnabar/5 text-cinnabar'
+  if (text.includes('矿物')) return 'border-slate-200 bg-slate-50 text-slate-700'
+  if (text.includes('菌藻')) return 'border-sky-200 bg-sky-50 text-sky-700'
+  if (text.includes('其他')) return 'border-sandalwood/15 bg-paper text-sandalwood'
+  return 'border-sandalwood/20 bg-sandalwood/5 text-sandalwood/90'
+}
+
+// 具体功效标签颜色（21 类）
+const getDetailEffectClass = (text) => {
+  if (!text) return ''
+  if (text.includes('健脾') || text.includes('补气') || text.includes('增强免疫') || text.includes('升阳')) {
+    return 'border-amber-200 bg-amber-50 text-amber-800'
+  }
+  if (text.includes('清热') || text.includes('降火') || text.includes('利水') || text.includes('泻下')) {
+    return 'border-sky-200 bg-sky-50 text-sky-700'
+  }
+  if (text.includes('润肺') || text.includes('滋阴') || text.includes('养肝明目')) {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+  }
+  if (text.includes('活血') || text.includes('祛风湿') || text.includes('散寒') || text.includes('止痛')) {
+    return 'border-cinnabar/20 bg-cinnabar/5 text-cinnabar'
+  }
+  if (text.includes('养心安神')) {
+    return 'border-violet-200 bg-violet-50 text-violet-700'
+  }
+  if (text.includes('驱虫')) {
+    return 'border-slate-300 bg-slate-50 text-slate-700'
+  }
+  if (text.includes('收敛止血')) {
+    return 'border-rose-200 bg-rose-50 text-rose-700'
+  }
+  return 'border-sandalwood/20 bg-paper text-sandalwood/90'
+}
 
 /**
  * 核心功能 1：文本美化
@@ -284,7 +349,57 @@ function goBack() {
             </button>
           </div>
         </div>
-          
+        
+        <!-- 药材多维标签：位于模式切换下方、具体介绍上方 -->
+        <div v-if="herbTagInfo" class="space-y-1.5">
+          <div class="flex flex-wrap gap-2 text-xs sm:text-sm">
+            <span
+              v-if="herbTagInfo.efficacyCategory"
+              class="px-3 py-1 rounded-full border bg-paper text-sandalwood/90 border-sandalwood/30 font-semibold"
+            >
+              {{ herbTagInfo.efficacyCategory }}
+            </span>
+            <span
+              v-if="herbTagInfo.nature"
+              :class="['px-3 py-1 rounded-full border font-semibold', getNatureTagClass(herbTagInfo.nature)]"
+            >
+              {{ herbTagInfo.nature }}
+            </span>
+            <span
+              v-if="herbTagInfo.taste"
+              class="px-3 py-1 rounded-full border border-amber-100 bg-amber-50 text-amber-700 font-semibold"
+            >
+              {{ herbTagInfo.taste }}
+            </span>
+            <span
+              v-if="herbTagInfo.part"
+              :class="['px-3 py-1 rounded-full border font-semibold', getPartTagClass(herbTagInfo.part)]"
+            >
+              {{ herbTagInfo.part }}
+            </span>
+            <span
+              v-if="herbTagInfo.meridian"
+              class="px-3 py-1 rounded-full border border-cinnabar/15 bg-cinnabar/5 text-cinnabar font-semibold"
+            >
+              {{ herbTagInfo.meridian }}
+            </span>
+          </div>
+
+          <!-- 具体功效标签 -->
+          <div
+            v-if="herbTagInfo.detailEffects && herbTagInfo.detailEffects.length"
+            class="flex flex-wrap gap-1.5 pt-0.5"
+          >
+            <span
+              v-for="effect in herbTagInfo.detailEffects"
+              :key="effect"
+              :class="['px-2.5 py-1 rounded-full border text-[11px] sm:text-xs font-medium', getDetailEffectClass(effect)]"
+            >
+              {{ effect }}
+            </span>
+          </div>
+        </div>
+        
         <!-- 专业模式：原有 herbs 表内容 -->
         <template v-if="detailMode === 'professional'">
           <div class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">

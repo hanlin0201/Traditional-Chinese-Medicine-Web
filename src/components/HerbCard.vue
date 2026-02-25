@@ -98,13 +98,13 @@ const handleImageError = (e) => {
   position: relative;
   overflow: hidden;
   border-radius: 6px;
-  /* 木色渐变：深胡桃 -> 栗壳棕 */
-  background: linear-gradient(
-    170deg,
-    #6B4C3B 0%,
-    #5C3D2E 40%,
-    #4A3228 100%
-  );
+  /* 背景贴图：药材柜纹理 */
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.35)),
+    url('/photo/药材背景.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   /* 内凹边框效果 */
   box-shadow:
     inset 0 2px 4px rgba(0, 0, 0, 0.3),
@@ -199,14 +199,15 @@ const handleImageError = (e) => {
   border-radius: 3px;
   font-size: 0.65rem;
   font-weight: 500;
-  background: rgba(245, 240, 232, 0.15);
-  color: #D4C5A9;
-  border: 1px solid rgba(212, 197, 169, 0.25);
+  /* 柔和的黄宣纸色系，降低饱和度 */
+  background: linear-gradient(135deg, #F7EBDD 0%, #F3E1C5 40%, #E9D3AD 100%);
+  color: #5A3B1A;
+  border: 1px solid rgba(184, 150, 104, 0.6);
   letter-spacing: 0.5px;
 }
 
-/* ========== 铜拉手 ========== */
-.drawer-handle {
+/* ========== 铜拉手（已隐藏，仅保留结构以防以后复用） ========== */
+/* .drawer-handle {
   position: absolute;
   bottom: 10px;
   left: 50%;
@@ -219,7 +220,7 @@ const handleImageError = (e) => {
   height: 14px;
   border-radius: 7px;
   /* 金属光泽渐变 */
-  background: linear-gradient(
+  /* background: linear-gradient(
     180deg,
     #DAA520 0%,
     #B8860B 40%,
@@ -238,5 +239,5 @@ const handleImageError = (e) => {
     0 3px 6px rgba(0, 0, 0, 0.35),
     inset 0 1px 2px rgba(255, 255, 255, 0.4),
     0 0 8px rgba(218, 165, 32, 0.3);
-}
+    } */
 </style>

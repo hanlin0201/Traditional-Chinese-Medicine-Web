@@ -9,6 +9,7 @@
 import { ref, shallowRef } from 'vue'
 import { pinyin } from 'pinyin-pro'
 import { supabase } from '@/supabaseClient'
+import { getHerbDetailEffectsByName } from '@/composables/useHerbTags'
 
 function getFirstLetter(name) {
   if (!name) return '#'
@@ -54,6 +55,7 @@ function normalizeHerbs(arr) {
   return (arr || []).map(h => ({
     ...h,
     tags: normalizeTags(h.tags),
+    detailEffects: getHerbDetailEffectsByName(h.name),
     firstLetter: h.firstLetter != null ? h.firstLetter : getFirstLetter(h.name),
   }))
 }
