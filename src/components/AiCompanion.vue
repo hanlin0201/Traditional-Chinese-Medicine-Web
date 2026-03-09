@@ -12,68 +12,75 @@ const messagesContainer = ref(null)
 const favorited = ref(new Set())   
 const foldedStates = ref({})       
 
-// 👇 硅基流动 Key
-const SILICON_FLOW_KEY = 'sk-jdxdncsbxuaarzlasizgjsllivylwwwjrgvrmotmqxaeonid' 
+/*const userTurnCount = ref(0)*/
+const pendingPrescription = ref(null)
+const prescriptionLoading = ref(false)
 
-// ==========================================
-// 👇 System Prompt 保持不变
-// ==========================================
-const SYSTEM_PROMPT = `
-你是一位精通《黄帝内经》、《本草纲目》与《伤寒论》的资深中医专家。
-你需要智能识别用户意图，在“问诊开方”和“知识解答”两种模式间自动切换。
-如果是问诊开方模式，那么你的目标是进行“深度辩证”，通过 3-4 轮由浅入深的提问，精准锁定用户体质，最后才开方。
+// 👇 Supabase Edge Function 地址（API Key 安全存储在服务端，前端无需暴露）
+const TCM_CHAT_URL = 'https://htrtcaswqydnfvgwernh.supabase.co/functions/v1/tcm-chat'
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0cnRjYXN3cXlkbmZ2Z3dlcm5oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2MDYyNDgsImV4cCI6MjA4NTE4MjI0OH0.N9NEwFKZHtiEITimRsaMEQ4hS-rZ2XdR2pLWSG4GC68'
 
-【问诊状态机 (State Machine)】：
+const CONFIRM_KEYWORDS = ['没有了', '确认', '就这些', '可以开方', '没了', '开方吧', '可以了', '没有其他', '请开方', '没有其他症状', '没有其他症状了', '无其他症状', '直接开方', '帮我开方', '帮我开个方']
 
-1. **状态一：初步接触/闲聊**
-   - 触发：用户打招呼、询问身份、或输入无关内容（如“你好”）。
-   - 动作：返回 "type": "text"。
-   - **关键**：Content 必须包含具体的欢迎语或回应，不能从上一次回复中复制。
+// 知识类/日常问题关键词：用户问这些时直接回答，不追问症状
+const GENERAL_QUESTION_PATTERNS = ['是什么', '为什么', '什么原因', '怎么引起的', '作用', '功效', '怎么用', '怎么吃', '能吃吗', '适合', '禁忌', '注意事项']
 
-2.**状态二：知识解答 (Knowledge Q&A)**
-   - 触发：用户询问中药功效、穴位作用、病理名词解释等（如“当归有什么用？”、“什么是肝火旺？”）。
-   - 动作：返回 "type": "text"。
-   - **要求**：直接用通俗易懂的语言解答，引用经典，**不要**进入问诊流程，**不要**开方。
+// 用户表示一切良好：停止追问，简短祝福即可
+const ALL_FINE_KEYWORDS = ['好多了', '谢谢', '没什么不舒服', '一切都挺好', '没什么问题', '挺好的', '谢谢诊断', '好多了谢谢', '没什么了', '都挺好', '没问题了', '已经好了']
 
-3. **状态三：多轮问诊 (Inquiry Loop)**
-   - 触发：用户描述了主诉，或者正在回答你的问题。
-   - **核心逻辑**：
-     - 从【寒热、汗液、头身、二便、饮食、睡眠、情志、妇女】挑选维度追问。
-     - **停止条件**：已进行 3-4 轮交互 OR 用户选“无其他症状”。
-   - **选项强制规范**：
-     - 选项 N-1: { "label": "以上都不是", "value": "none" }
-     - 选项 N:   { "label": "无其他症状，请开方", "value": "finish" }
-
-4. **状态四：最终开方 (Prescription)**
-   - 触发：满足停止条件。
-   - 动作：返回 "type": "prescription"。
-   - **暖心过渡**：在开方前，必须生成一段话（warm_words），例如“已详细了解您的症状，结合...理论，为您制定如下方案”。
-   - **食谱要求**：包含 [简易茶饮]、[家常食疗]、[经典方剂] 3 种方案，且必须有《本草》理论依据。
-   - **穴位要求**：必须提供具体的按揉方法（method），如“用拇指按揉2分钟，有酸胀感”。
-- 触发：满足停止条件。
-   - 动作：返回 "type": "prescription"。
-   - **暖心过渡**：在开方前，必须生成一段话（warm_words），例如“已详细了解您的症状，结合...理论，为您制定如下方案”。
-   - **食谱要求**：包含 [简易茶饮]、[家常食疗]、[经典方剂] 3 种方案，且必须有《本草》理论依据。
-   - **穴位要求**：必须提供具体的按揉方法（method），如“用拇指按揉2分钟，有酸胀感”。
----
-【JSON 格式规范 (纯 JSON，无 Markdown)】：
-
-格式 A（闲聊）：
-{ "role": "assistant", "type": "text", "content": "..." }
-
-格式 B（问诊）：
-{ "role": "assistant", "type": "inquiry", "text": "...", "options": [...] }
-
-格式 C（处方）：
-{
-  "role": "assistant", "type": "prescription", 
-  "warm_words": "...", "diagnosis_result": "...", "summary": "...",
-  "recipes": [
-    { "category": "tea", "name": "...", "tags": [], "ingredients": ["..."], "steps": ["..."], "rationale": "..." }
-  ],
-  "acupoints": [ ... ],
-  "lifestyle": [...]
+// 模糊表述：需多轮追问才能开方（累、没劲、不舒服等）
+const VAGUE_SYMPTOM_PATTERNS = ['累', '没劲', '没精神', '浑身无力', '不舒服', '说不清', '总觉得', '不太舒服', '有点虚', '乏力', '疲倦', '疲惫']
+function isVagueSymptomText(text = '') {
+  return VAGUE_SYMPTOM_PATTERNS.some(k => text.includes(k))
 }
+
+// 用户明确请求调理/食疗方案
+const PLAN_REQUEST_PATTERNS = ['调理方案', '食疗方案', '食疗', '治疗方案', '开方', '开个方', '给个方子', '帮我调理', '帮我开', '生成方案', '帮我生成']
+function isPlanRequestText(text = '') {
+  return PLAN_REQUEST_PATTERNS.some(k => text.includes(k))
+}
+
+const SYSTEM_PROMPT = `你是一位经验丰富的中医专家（AI TCM Tutor），像一位和蔼的老中医和用户自然对话。
+
+【简单 vs 模糊 问题区分】
+- **简单明确问题**（如痘痘、白头发、嘴唇干、失眠）：可 1-2 轮了解后给出方案。
+- **模糊表述**（如「我很累」「浑身没劲」「总觉得不舒服」）：**必须**从睡眠、饮食、情绪、二便、舌苔、怕冷怕热等多维度追问，至少 3-4 轮后再给方案，不要急于开方。
+
+【核心规则】
+1. **绝对服从问诊节奏**
+  我会通过对话末尾的【系统提示】告诉你当前该“继续追问”还是“出具处方”。请你必须严格遵从提示的指令。如果提示不允许开方，绝对不能输出处方 JSON。
+
+2. **处方卡片 JSON 格式要求**
+  当【系统提示】允许你出具处方时，你的回复必须包含 \`\`\`json 代码块，且其中必须有 type: "prescription" 的完整 JSON。格式必须包含：warm_words、diagnosis_result、summary、recipes（至少 tea/meal/classic 三类）、acupoints（无则写[{"name":"无","location":"无","method":"无"}]）、lifestyle。
+
+3. **追问选项卡片 JSON 格式要求**
+  当【系统提示】要求你继续追问时，每次回复末尾**必须**附带 type: "inquiry" 的 JSON 选项卡片，让用户点击。options 需包含 4-6 个相关选项 + 「以上都不是」 + 「无其他症状，请开方」。
+
+4. **分点作答时每点换行**
+  当回复涉及 1、2、3 点或分条说明时，每条单独成行，不要挤在一行。
+
+【inquiry 格式】追问时在末尾附带：
+\`\`\`json
+{ "type": "inquiry", "text": "你的问诊问题", "options":[{"label": "选项1", "value": "v1"}, {"label": "选项2", "value": "v2"}, {"label": "以上都不是", "value": "none"}, {"label": "无其他症状，请开方", "value": "finish"}] }
+\`\`\`
+
+【prescription 格式】给调理方案时输出：
+\`\`\`json
+{
+  "type": "prescription",
+  "warm_words": "暖心过渡语",
+  "diagnosis_result": "辩证结果",
+  "summary": "简要总结",
+  "recipes":[
+    { "category": "tea", "name": "方剂名", "tags": ["标签"], "ingredients": ["药材1", "药材2"], "steps": ["步骤1"], "rationale": "医理依据" },
+    { "category": "meal", "name": "食疗方", "tags": ["标签"], "ingredients": ["食材1"], "steps": ["步骤1"], "rationale": "医理依据" },
+    { "category": "classic", "name": "经典方剂", "tags":["标签"], "ingredients": ["药材1"], "steps": ["用法"], "rationale": "医理依据" }
+  ],
+  "acupoints":[{ "name": "穴位名", "location": "位置", "method": "按揉方法" }],
+  "lifestyle":["禁忌1", "禁忌2"]
+}
+\`\`\`
+recipes 需含 tea、meal、classic 三类。acupoints 无合适时可写[{"name": "无", "location": "无", "method": "无"}]。
 `
 
 const messages = ref([
@@ -84,52 +91,222 @@ function toggle() { open.value = !open.value; if(open.value) scrollToBottom() }
 function scrollToBottom() { nextTick(() => { if (messagesContainer.value) messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight }) }
 watch(messages, scrollToBottom, { deep: true })
 
-async function callDeepSeek(userText) {
-  if (!SILICON_FLOW_KEY || SILICON_FLOW_KEY.includes('在这里填入')) {
-    alert('请配置 API Key')
-    throw new Error('Key missing')
+/*function isNewConversationAfterPrescription() {
+  const list = messages.value.filter(m => m.type !== 'streaming')
+  if (list.length < 2) return false
+  const last = list[list.length - 1]
+  if (last.role !== 'user') return false
+  // 只要历史中曾出现过处方，且用户发了新消息，就视为新对话，清除旧记忆
+  const hasPrescription = list.some(m => m.type === 'prescription')
+  return hasPrescription
+}*/
+
+async function callSiliconFlowStream(onChunk, userInputText = '') {
+  let apiMessages =[]
+  const list = messages.value.filter(m => m.type !== 'streaming')
+
+  // 🚀 1. 找到历史对话中，最后一次成功开方的位置
+  let lastPrescriptionIdx = -1
+  for (let i = list.length - 1; i >= 0; i--) {
+    if (list[i].type === 'prescription') {
+      lastPrescriptionIdx = i
+      break
+    }
   }
 
-  const inquiryCount = messages.value.filter(m => m.type === 'inquiry').length
-  const roundInfo = `【系统提示：当前已进行了 ${inquiryCount} 轮问诊。如果信息不足请继续追问，如果用户选了 finish 或已满 4 轮请开方】`
+  // 🚀 2. 核心修复：只截取最后一次开方【之后】的新对话
+  // 这样既能忘掉第一轮的“长痘白发”，又不会忘掉第二轮刚说的“胃胀气/头疼”
+  const startIndex = lastPrescriptionIdx >= 0 ? lastPrescriptionIdx + 1 : 0
+  
+  for (let i = startIndex; i < list.length; i++) {
+    const m = list[i]
+    const role = m.role === 'user' ? 'user' : 'assistant'
+    let content = ''
+    if (m.type === 'inquiry') content = m.text || ''
+    else content = m.content || ''
+    if (!content) continue
+    apiMessages.push({ role, content })
+  }
 
-  const response = await fetch('https://api.siliconflow.cn/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SILICON_FLOW_KEY}` },
-    body: JSON.stringify({
-      model: 'deepseek-ai/DeepSeek-V3',
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        ...messages.value.map(m => {
-           if (m.type === 'prescription') return { role: m.role, content: `已开方：${m.diagnosis_result}` }
-           if (m.type === 'inquiry') return { role: m.role, content: `AI 问：${m.text}` }
-           return { role: m.role, content: m.content || '' }
-        }),
-        { role: 'system', content: roundInfo }, 
-        { role: 'user', content: userText }
-      ],
-      stream: false,
-      response_format: { type: 'json_object' }
+  // 🚀 3. 如果是开方后的新一轮问诊，我们在开头悄悄塞一句话，让 AI 彻底忘掉上一个病人
+  if (lastPrescriptionIdx >= 0 && apiMessages.length > 0) {
+    apiMessages.unshift({ 
+      role: 'assistant', 
+      content: '【系统提示】上一轮问诊已结束并出具了处方。现在用户开始了全新的咨询，请务必忘掉前面的症状，只根据接下来的对话重新进行独立诊断。' 
     })
+  }
+
+  // 🚀 4. 动态计算这轮新问诊中，用户说了几句话（精准统计轮数）
+  const currentTurnCount = apiMessages.filter(m => m.role === 'user').length
+
+  // 发送请求给后端
+  const response = await fetch(TCM_CHAT_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+    },
+    body: JSON.stringify({
+      messages: apiMessages,
+      systemPrompt: SYSTEM_PROMPT,
+      userTurnCount: currentTurnCount, // 使用刚算出来的精准轮数
+      userJustConfirmed: CONFIRM_KEYWORDS.some(k => userInputText.includes(k)),
+      conversationResetAfterPrescription: lastPrescriptionIdx >= 0,
+      isGeneralQuestion: GENERAL_QUESTION_PATTERNS.some(k => userInputText.includes(k)),
+      userSaysAllFine: ALL_FINE_KEYWORDS.some(k => userInputText.includes(k)),
+      userNeedsPlanCard: isPlanRequestText(userInputText),
+      isVagueSymptom: isVagueSymptomText(userInputText),
+    }),
   })
 
-  if (!response.ok) throw new Error('API请求失败')
-  const data = await response.json()
-  let content = data.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim()
-  return JSON.parse(content)
+  if (!response.ok) {
+    const errText = await response.text().catch(() => '')
+    throw new Error(`请求失败(${response.status}): ${errText}`)
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let sseBuffer = ''
+  let fullText = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+
+    sseBuffer += decoder.decode(value, { stream: true })
+    const lines = sseBuffer.split('\n')
+    sseBuffer = lines.pop() || ''
+
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (!trimmed || !trimmed.startsWith('data: ')) continue
+      const jsonStr = trimmed.slice(6)
+      if (jsonStr === '[DONE]') continue
+
+      try {
+        const parsed = JSON.parse(jsonStr)
+        // 标准 OpenAI 兼容格式：choices[0].delta.content
+        const chunk = parsed.choices?.[0]?.delta?.content || ''
+        if (chunk) {
+          fullText += chunk
+          onChunk(chunk, fullText)
+        }
+      } catch {}
+    }
+  }
+
+  return fullText
 }
 
-// 🛡️ 核心修复 1：更强健的数据清洗，防止空白
+function extractJSON(text, preferType = null) {
+  const tryParse = (str) => {
+    try {
+      const s = String(str).replace(/,\s*([}\]])/g, '$1').trim()
+      return JSON.parse(s)
+    } catch { return null }
+  }
+  const codeBlocks = text.match(/```(?:json)?\s*([\s\S]*?)```/g) || []
+  for (const block of codeBlocks) {
+    const inner = block.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '').trim()
+    const parsed = tryParse(inner)
+    if (parsed && parsed.type && (!preferType || parsed.type === preferType)) return parsed
+  }
+  const rx = preferType === 'prescription' ? /"type"\s*:\s*"prescription"/ : /"type"\s*:\s*"(?:prescription|inquiry)"/
+  const idx = text.search(rx)
+  if (idx >= 0) {
+    let start = text.lastIndexOf('{', idx)
+    if (start < 0) start = text.indexOf('{')
+    if (start >= 0) {
+      let depth = 0
+      for (let i = start; i < text.length; i++) {
+        if (text[i] === '{') depth++
+        else if (text[i] === '}') depth--
+        if (depth === 0) {
+          const parsed = tryParse(text.slice(start, i + 1))
+          if (parsed && parsed.type && (!preferType || parsed.type === preferType)) return parsed
+          break
+        }
+      }
+    }
+  }
+  const startIdx = text.indexOf('{')
+  if (startIdx === -1) return null
+  let depth = 0
+  for (let i = startIdx; i < text.length; i++) {
+    if (text[i] === '{') depth++
+    else if (text[i] === '}') depth--
+    if (depth === 0) {
+      const parsed = tryParse(text.slice(startIdx, i + 1))
+      if (parsed && parsed.type) return parsed
+      break
+    }
+  }
+  return null
+}
+
+function stripJsonFromText(text) {
+  let result = text.replace(/```json[\s\S]*?```/g, '').replace(/```[\s\S]*?```/g, '')
+
+  const startIdx = result.indexOf('{')
+  if (startIdx >= 0) {
+    let depth = 0
+    for (let i = startIdx; i < result.length; i++) {
+      if (result[i] === '{') depth++
+      else if (result[i] === '}') depth--
+      if (depth === 0) {
+        try {
+          const parsed = JSON.parse(result.slice(startIdx, i + 1))
+          if (parsed && parsed.type) {
+            result = result.slice(0, startIdx) + result.slice(i + 1)
+          }
+        } catch {}
+        break
+      }
+    }
+  }
+  // 移除泄露到界面的内部标识（type: "inquiry" 等）
+  result = result.replace(/\s*type\s*:\s*["']?(?:inquiry|prescription)["']?\s*/gi, '').trim()
+  return result.trim()
+}
+
+function cleanDisplayContent(content) {
+  if (!content) return content
+  let s = String(content).replace(/\s*type\s*:\s*["']?(?:inquiry|prescription)["']?\s*/gi, '').trim()
+  // 分点作答时每条换行：1. xxx 2. xxx -> 1. xxx\n2. xxx
+  s = s.replace(/([^\n])\s*(\d+)[\.、]\s+/g, '$1\n$2. ')
+  return s
+}
+
 function ensureArray(val) {
   if (!val) return []
   if (Array.isArray(val)) return val
   if (typeof val === 'string') {
-    // 尝试识别分隔符
     if (val.includes('\n')) return val.split('\n').filter(s => s.trim())
     if (val.includes('、')) return val.split('、').filter(s => s.trim())
     return [val]
   }
   return [] 
+}
+
+function cleanPrescription(jsonData) {
+  const aiResponse = { ...jsonData, role: 'assistant' }
+  if (!Array.isArray(aiResponse.recipes)) {
+    aiResponse.recipes = Array.isArray(jsonData.recipe) ? jsonData.recipe : (jsonData.recipes ? [jsonData.recipes].flat() : [])
+  }
+  aiResponse.recipes = aiResponse.recipes.map(r => (typeof r === 'string' ? { name: r, category: 'meal', ingredients: [], steps: [], tags: [] } : {
+    ...r,
+    id: 'r_' + Math.random().toString(36).substr(2, 9),
+    name: r.name || '调理食谱',
+    category: r.category || 'meal',
+    ingredients: ensureArray(r.ingredients),
+    steps: ensureArray(r.steps),
+    tags: ensureArray(r.tags)
+  })).filter(Boolean)
+  aiResponse.lifestyle = ensureArray(aiResponse.lifestyle)
+  if (!Array.isArray(aiResponse.acupoints)) aiResponse.acupoints = []
+  if (!aiResponse.warm_words) aiResponse.warm_words = '根据您的描述，为您辩证分析如下：'
+  return aiResponse
 }
 
 async function send() {
@@ -138,95 +315,118 @@ async function send() {
 
   messages.value.push({ role: 'user', content: text })
   input.value = ''
-  
-  const lastMsg = messages.value[messages.value.length - 2] 
-  const isAnsweringInquiry = lastMsg && lastMsg.type === 'inquiry'
-  const hasMedicalKeywords = /痛|痒|晕|酸|胀|麻|失眠|便秘|感冒|发烧|虚|热|寒|胃|头|气|血/.test(text) && text.length > 1
-  
-  const isMedicalContext = isAnsweringInquiry || hasMedicalKeywords
 
-  if (isMedicalContext) {
-    loadingStatus.value = 'AI 正在把脉...'
-    const timer = setInterval(() => {
-      if (loadingStatus.value === 'AI 正在把脉...') loadingStatus.value = '辩证思考...'
-      else if (loadingStatus.value === '辩证思考...') loadingStatus.value = '斟酌药方...'
-    }, 1500)
-    window._loadingTimer = timer
+  /*if (isNewConversationAfterPrescription()) {
+    userTurnCount.value = 1
   } else {
-    loadingStatus.value = 'AI 思考中...'
-  }
+    userTurnCount.value++
+  }*/
+
+ /* if (pendingPrescription.value) {
+    const isConfirming = CONFIRM_KEYWORDS.some(k => text.includes(k))
+    if (isConfirming) {
+      messages.value.push(pendingPrescription.value)
+      pendingPrescription.value = null
+      return
+    }
+    pendingPrescription.value = null
+  }*/
+
+  loadingStatus.value = 'AI 思考中...'
+  const streamMsg = { role: 'assistant', type: 'streaming', content: '' }
+  messages.value.push(streamMsg)
+  const streamIdx = messages.value.length - 1
 
   try {
-    const aiResponse = await callDeepSeek(text)
-    
-    // 🛡️ 数据清洗
-    if (aiResponse.type === 'prescription') {
-      if (!Array.isArray(aiResponse.recipes)) aiResponse.recipes = []
-      
-      aiResponse.recipes = aiResponse.recipes.map(r => {
-        const rId = 'r_' + Math.random().toString(36).substr(2, 9)
-        // 🌟 修改 4：删除了自动展开的代码，现在默认是折叠的
-        
-        return {
-          ...r, 
-          id: rId,
-          name: r.name || '调理食谱', 
-          category: r.category || 'meal',
-          ingredients: ensureArray(r.ingredients),
-          steps: ensureArray(r.steps),
-          tags: ensureArray(r.tags)
+    const fullText = await callSiliconFlowStream((chunk, accumulated) => {
+      if (loadingStatus.value) loadingStatus.value = ''
+      if (prescriptionLoading.value) return
+
+      const codeBlockIdx = accumulated.indexOf('```json')
+      if (codeBlockIdx >= 0) {
+        messages.value[streamIdx].content = accumulated.slice(0, codeBlockIdx).trim()
+        if (accumulated.includes('"prescription"')) {
+          prescriptionLoading.value = true
         }
-      })
+        return
+      }
+
+      const textLines = accumulated.split('\n')
+      for (let i = 0; i < textLines.length; i++) {
+        const tl = textLines[i].trim()
+        if (tl.startsWith('{') && (tl.includes('"type"') || tl.includes('"prescription"'))) {
+          messages.value[streamIdx].content = textLines.slice(0, i).join('\n').trim()
+          if (accumulated.includes('"prescription"')) {
+            prescriptionLoading.value = true
+          }
+          return
+        }
+      }
+
+      messages.value[streamIdx].content = accumulated
+    }, text)
+
+    prescriptionLoading.value = false
+    const jsonData = extractJSON(fullText, null)
+
+   if (jsonData && jsonData.type === 'prescription') {
+      // 🚀 修复：去除拦截逻辑，只要解析到了处方卡片，直接在界面上渲染
+      const cleaned = cleanPrescription(jsonData)
+      const warmText = stripJsonFromText(fullText)
       
-      aiResponse.lifestyle = ensureArray(aiResponse.lifestyle)
-      if (!Array.isArray(aiResponse.acupoints)) aiResponse.acupoints = []
-      
-      if (!aiResponse.warm_words) aiResponse.warm_words = "根据您的描述，为您辩证分析如下："
-    } else if (aiResponse.type === 'inquiry') {
-      // 🌟 修改 2：为问诊消息增加本地状态，支持多选
-      aiResponse.selectedOptions = [] // 初始化空选择数组
+      if (warmText) {
+        messages.value[streamIdx] = { role: 'assistant', type: 'text', content: warmText }
+        messages.value.push(cleaned)
+      } else {
+        messages.value[streamIdx] = cleaned
+      }
+    } else if (jsonData && jsonData.type === 'inquiry')  {
+      const textBefore = stripJsonFromText(fullText)
+      const inquiryMsg = { ...jsonData, role: 'assistant', selectedOptions: [] }
+      if (textBefore) {
+        messages.value[streamIdx] = { role: 'assistant', type: 'text', content: textBefore }
+        messages.value.push(inquiryMsg)
+      } else {
+        messages.value[streamIdx] = inquiryMsg
+      }
+    } else {
+      messages.value[streamIdx] = { role: 'assistant', type: 'text', content: stripJsonFromText(fullText) || '...' }
     }
-    
-    if (aiResponse.type === 'text' && !aiResponse.content) {
-      aiResponse.content = "收到，请您继续描述。"
-    }
-    
-    messages.value.push(aiResponse)
   } catch (err) {
     console.error(err)
-    messages.value.push({ role: 'assistant', type: 'text', content: '连接波动，请重试。' })
+    prescriptionLoading.value = false
+    const existing = messages.value[streamIdx]
+    if (existing && existing.content) {
+      messages.value[streamIdx] = { role: 'assistant', type: 'text', content: existing.content }
+    } else {
+      messages.value[streamIdx] = { role: 'assistant', type: 'text', content: '连接波动，请重试。' }
+    }
   } finally {
-    if (window._loadingTimer) clearInterval(window._loadingTimer)
     loadingStatus.value = ''
+    prescriptionLoading.value = false
   }
 }
 
-// 🌟 修改 2：实现多选逻辑
-// 切换选项选中状态
 function toggleSelection(msg, opt) {
-  // 特殊选项互斥处理
   if (opt.value === 'none' || opt.value === 'finish') {
-    handleSingleOption(opt) // 直接触发单选逻辑
+    handleSingleOption(opt)
     return
   }
 
-  // 普通症状：支持多选
   const idx = msg.selectedOptions.indexOf(opt.label)
   if (idx > -1) {
-    msg.selectedOptions.splice(idx, 1) // 取消选中
+    msg.selectedOptions.splice(idx, 1)
   } else {
-    msg.selectedOptions.push(opt.label) // 选中
+    msg.selectedOptions.push(opt.label)
   }
 }
 
-// 提交多选结果
 function confirmSelection(msg) {
   if (msg.selectedOptions.length === 0) return
   input.value = `我有以下症状：${msg.selectedOptions.join('、')}`
   send()
 }
 
-// 旧的单选逻辑 (保留给特殊选项用)
 function handleSingleOption(opt) {
   if (opt.value === 'none') {
     input.value = '' 
@@ -235,7 +435,6 @@ function handleSingleOption(opt) {
     input.value = '我没有其他明显症状了，请开方。'
     send()
   } else {
-    // 兼容旧逻辑
     input.value = `我有【${opt.label}】的症状` 
     send()
   }
@@ -256,21 +455,14 @@ async function toggleFavorite(recipe) {
   } catch (err) { alert('操作失败'); console.error(err) }
 }
 
-// 🌟 修改 3：保存计划时，过滤掉未收藏的食谱
 async function handleSavePlan(fullMessage) {
   if (!user.value) { messages.value.push({ role: 'assistant', type: 'text', content: '请登录。' }); return }
 
-  // 1. 深度拷贝消息对象，避免修改原显示
   const planToSave = JSON.parse(JSON.stringify(fullMessage))
   
-  // 2. 核心逻辑：只保留 favorited 里的食谱
-  // 如果 recipes 存在，进行过滤
   if (planToSave.recipes && Array.isArray(planToSave.recipes)) {
     planToSave.recipes = planToSave.recipes.filter(r => favorited.value.has(String(r.id)))
   }
-
-  // 如果过滤完没有食谱了，还是允许保存（保存诊断和穴位），但可以给个提示
-  // 这里不做拦截，直接保存
 
   const newPlan = { ...planToSave, id: Date.now(), saved_at: new Date().toISOString() }
   
@@ -278,7 +470,6 @@ async function handleSavePlan(fullMessage) {
     const { data } = await supabase.from('profiles').select('care_plans').eq('id', user.value.id).single()
     let list = data?.care_plans || []; if(!Array.isArray(list)) list = []
     
-    // 避免重复保存同一条诊断 (用 diagnosis_result 判断)
     if (list.some(p => p.diagnosis_result === newPlan.diagnosis_result)) { 
       messages.value.push({ role: 'assistant', type: 'text', content: '该方案已存在。' }); 
       return 
@@ -311,8 +502,12 @@ function handleKeydown(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDef
         <div ref="messagesContainer" class="flex-1 overflow-y-auto p-4 space-y-4 bg-[#FAF6ED]">
           <div v-for="(m, i) in messages" :key="i">
             
-            <div v-if="m.type === 'text' || !m.type" :class="['max-w-[85%] rounded-lg px-4 py-2.5 text-sm', m.role === 'user' ? 'ml-auto bg-sandalwood/15 text-sandalwood' : 'mr-auto bg-[#F5EDD8] text-sandalwood']">
-               {{ m.content || '...' }}
+            <div v-if="m.type === 'text' || !m.type" :class="['max-w-[85%] rounded-lg px-4 py-2.5 text-sm', m.role === 'user' ? 'ml-auto bg-sandalwood/15 text-sandalwood' : 'mr-auto bg-[#F5EDD8] text-sandalwood whitespace-pre-wrap']">
+               {{ m.role === 'user' ? (m.content || '...') : cleanDisplayContent(m.content) || '...' }}
+            </div>
+
+            <div v-else-if="m.type === 'streaming' && (m.content || !prescriptionLoading)" class="mr-auto bg-[#F5EDD8] text-sandalwood px-4 py-2.5 rounded-lg text-sm max-w-[85%] whitespace-pre-wrap">
+              <span>{{ cleanDisplayContent(m.content) }}</span><span class="inline-block w-0.5 h-3.5 bg-sandalwood/70 ml-0.5 animate-blink align-middle"></span>
             </div>
             
             <div v-else-if="m.type === 'inquiry'" class="mr-auto bg-white border border-sandalwood/20 p-4 rounded-xl shadow-sm w-[90%] animate-slide-up">
@@ -323,7 +518,6 @@ function handleKeydown(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDef
                   @click="toggleSelection(m, opt)" 
                   class="text-left px-3 py-2 text-xs border rounded-lg transition flex items-center justify-between group"
                   :class="[
-                    // 样式逻辑：如果选中了(在数组里)，或者它是完成按钮，显示深色；否则白色
                     (m.selectedOptions && m.selectedOptions.includes(opt.label)) ? 'bg-sandalwood text-white border-sandalwood' : 
                     opt.value === 'finish' ? 'bg-gray-100 text-gray-700 font-bold border-gray-300' : 
                     'bg-white border-sandalwood/30 text-gray-700 hover:bg-sandalwood/5'
@@ -388,11 +582,14 @@ function handleKeydown(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDef
 
                    <div v-if="m.acupoints && m.acupoints.length" class="bg-gray-50 p-2.5 rounded border border-gray-100">
                       <div class="text-xs font-bold text-sandalwood mb-1.5 flex items-center gap-1"><span class="w-1.5 h-1.5 bg-sandalwood rounded-full"></span> 穴位按揉</div>
-                      <div v-for="(a, idx) in m.acupoints" :key="idx" class="text-xs mb-2 last:mb-0 border-b border-gray-200/50 pb-2 last:border-0 last:pb-0">
-                        <div class="font-bold text-gray-800">{{ a.name }}</div>
-                        <div class="text-gray-500 mb-1">📍 {{ a.location }}</div>
-                        <div class="bg-white p-1.5 rounded text-sandalwood/80 border border-sandalwood/5">👉 {{ a.method || '轻柔按压 3-5 分钟' }}</div>
-                      </div>
+                      <div v-if="m.acupoints.length === 1 && m.acupoints[0].name === '无'" class="text-xs text-gray-500">暂无穴位推荐</div>
+                      <template v-else>
+                        <div v-for="(a, idx) in m.acupoints" :key="idx" class="text-xs mb-2 last:mb-0 border-b border-gray-200/50 pb-2 last:border-0 last:pb-0">
+                          <div class="font-bold text-gray-800">{{ a.name }}</div>
+                          <div class="text-gray-500 mb-1">📍 {{ a.location }}</div>
+                          <div class="bg-white p-1.5 rounded text-sandalwood/80 border border-sandalwood/5">👉 {{ a.method || '轻柔按压 3-5 分钟' }}</div>
+                        </div>
+                      </template>
                    </div>
                    
                    <div v-if="m.lifestyle && m.lifestyle.length" class="text-xs text-gray-500 bg-gray-50 p-2 rounded"><span class="font-bold text-sandalwood">🚫 禁忌：</span> {{ (m.lifestyle || []).join('；') }}</div>
@@ -405,6 +602,20 @@ function handleKeydown(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDef
             </div>
           </div>
           <div v-if="loadingStatus" class="mr-auto bg-[#F5EDD8] text-sandalwood px-4 py-2.5 rounded-lg text-sm flex items-center gap-2 animate-pulse"><Loader2 class="w-4 h-4 animate-spin" /><span>{{ loadingStatus }}</span></div>
+          <div v-if="prescriptionLoading" class="mr-auto w-[98%] space-y-2 animate-slide-up">
+            <div class="bg-white border border-sandalwood/20 rounded-xl overflow-hidden shadow-md animate-pulse">
+              <div class="bg-[#FAF6ED] p-3 border-b border-sandalwood/10">
+                <div class="h-4 bg-sandalwood/20 rounded w-3/4 mb-2"></div>
+                <div class="h-3 bg-sandalwood/10 rounded w-1/2"></div>
+              </div>
+              <div class="p-3 space-y-2">
+                <div class="h-8 bg-gray-100 rounded"></div>
+                <div class="h-8 bg-gray-100 rounded"></div>
+                <div class="h-8 bg-gray-100 rounded"></div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 text-sandalwood text-xs"><Loader2 class="w-3.5 h-3.5 animate-spin" />正在生成处方...</div>
+          </div>
         </div>
 
         <div class="p-3 border-t bg-[#FDFBF7] flex gap-2">
@@ -424,5 +635,14 @@ function handleKeydown(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDef
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.animate-blink {
+  animation: blink 0.8s step-end infinite;
 }
 </style>
