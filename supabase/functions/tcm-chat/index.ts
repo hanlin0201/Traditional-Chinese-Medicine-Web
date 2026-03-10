@@ -44,6 +44,7 @@ Deno.serve(async (req: Request) => {
       let hint = ''
       // 💡 提取出开方卡片的严格格式要求，防止代码重复，也防止 AI 忘掉格式
       const FORMAT_PROMPT = '必须包含 ```json 代码块，内容为 {"type":"prescription","warm_words":"...","diagnosis_result":"...","summary":"...","recipes":[{"category":"tea",...},{"category":"meal",...},{"category":"classic",...}],"acupoints":[{"name":"...","location":"...","method":"..."} 或 {"name":"无","location":"无","method":"无"}],"lifestyle":["..."]}。recipes 必须有 tea、meal、classic 三类。严禁只输出纯文字不输出 JSON。'
+      const SAFETY_PROMPT = '【食疗红线】仅推荐食疗食谱，禁止成药（丸、散、可直接购买服用）。严禁附子、乌头、马钱子等有毒药材。'
   
       if (userSaysAllFine) {
         hint = '用户表示一切良好，请停止追问，简短祝福即可。严禁输出 JSON。'
@@ -51,7 +52,7 @@ Deno.serve(async (req: Request) => {
         hint = '用户在问知识类问题，请直接回答，不要追问症状。严禁输出 JSON。'
       } else if (userJustConfirmed) {
         // 绝对指令：用户主动点确认（如"没有其他症状了"），无视轮数，直接开方
-        hint = `用户已确认没有其他症状或要求直接开方，请立即结束问诊，输出详细的处方 JSON 卡片（type: "prescription"）。\n格式要求：${FORMAT_PROMPT}`
+        hint = `用户已确认没有其他症状或要求直接开方，请立即结束问诊，输出详细的处方 JSON 卡片（type: "prescription"）。\n${SAFETY_PROMPT}\n格式要求：${FORMAT_PROMPT}`
       } else {
         // 🚀 核心修复：模糊表述必须多轮追问；用户要方案时也要先问清
         const needMoreRounds = isVagueSymptom ? userTurnCount < 4 : userTurnCount < 3
@@ -66,10 +67,10 @@ Deno.serve(async (req: Request) => {
         } else {
           if (userNeedsPlanCard) {
             // 聊够了，并且用户主动要方案了：立刻给
-            hint = `【进度提示】问诊已进行 ${userTurnCount} 轮，且用户明确请求调理/食疗方案。请立即输出 type: "prescription" 的 JSON 卡片给出完整的调理方案。\n格式要求：${FORMAT_PROMPT}`
+            hint = `【进度提示】问诊已进行 ${userTurnCount} 轮，且用户明确请求调理/食疗方案。请立即输出 type: "prescription" 的 JSON 卡片给出完整的调理方案。\n${SAFETY_PROMPT}\n格式要求：${FORMAT_PROMPT}`
           } else {
             // 聊够了，用户没主动要：AI自行判断
-            hint = `【进度提示】问诊已进行 ${userTurnCount} 轮。请自行判断：如果用户的核心症状、舌象/二便/睡眠等信息已经足够明确，请直接输出 type: "prescription" 的 JSON 卡片给出完整的调理方案（格式要求：${FORMAT_PROMPT}）；如果信息依然很模糊且无法辩证，你可以继续追问并附带 inquiry 卡片。`
+            hint = `【进度提示】问诊已进行 ${userTurnCount} 轮。请自行判断：如果用户的核心症状、舌象/二便/睡眠等信息已经足够明确，请直接输出 type: "prescription" 的 JSON 卡片给出完整的调理方案。\n${SAFETY_PROMPT}\n格式要求：${FORMAT_PROMPT}；如果信息依然很模糊且无法辩证，你可以继续追问并附带 inquiry 卡片。`
           }
         }
       }

@@ -46,6 +46,11 @@ const SYSTEM_PROMPT = `你是一位经验丰富的中医专家（AI TCM Tutor）
 - **简单明确问题**（如痘痘、白头发、嘴唇干、失眠）：可 1-2 轮了解后给出方案。
 - **模糊表述**（如「我很累」「浑身没劲」「总觉得不舒服」）：**必须**从睡眠、饮食、情绪、二便、舌苔、怕冷怕热等多维度追问，至少 3-4 轮后再给方案，不要急于开方。
 
+【食疗定位与安全红线】
+- **本平台只做食疗食谱推荐**，讲究食补，不推荐成药、丸剂、散剂等需购买服用的中成药（如金匮肾气丸、附子理中丸等）。
+- **严禁使用有毒药材**：附子、乌头、马钱子、砒霜、生半夏、生南星等一律禁止。食疗方仅使用药食同源、常见食材及温和药材。
+- recipes 三类含义：tea=茶饮（红枣、枸杞、菊花、陈皮等安全食材）；meal=食疗汤粥/家常菜；classic=可在家制作的经典食疗方，**禁止**成药或含毒药材的方剂。
+
 【核心规则】
 1. **绝对服从问诊节奏**
   我会通过对话末尾的【系统提示】告诉你当前该“继续追问”还是“出具处方”。请你必须严格遵从提示的指令。如果提示不允许开方，绝对不能输出处方 JSON。
@@ -80,7 +85,7 @@ const SYSTEM_PROMPT = `你是一位经验丰富的中医专家（AI TCM Tutor）
   "lifestyle":["禁忌1", "禁忌2"]
 }
 \`\`\`
-recipes 需含 tea、meal、classic 三类。acupoints 无合适时可写[{"name": "无", "location": "无", "method": "无"}]。
+recipes 需含 tea、meal、classic 三类。acupoints 无合适时可写[{"name": "无", "location": "无", "method": "无"}]。lifestyle 需包含必要的慎用提醒（如孕妇、儿童、过敏体质慎用等）。
 `
 
 const messages = ref([
@@ -289,6 +294,16 @@ function ensureArray(val) {
   return [] 
 }
 
+// 安全过滤：含毒药材或成药的方子不展示
+const TOXIC_HERBS = ['附子', '乌头', '马钱子', '砒霜', '生半夏', '生南星']
+function isUnsafeRecipe(r) {
+  const ingStr = ensureArray(r.ingredients).join('、')
+  if (TOXIC_HERBS.some(h => ingStr.includes(h))) return true
+  const stepsStr = ensureArray(r.steps).join(' ') + (r.name || '')
+  if ((r.name?.includes('丸') || r.name?.includes('散')) && (stepsStr.includes('成药') || stepsStr.includes('可直接购买'))) return true
+  return false
+}
+
 function cleanPrescription(jsonData) {
   const aiResponse = { ...jsonData, role: 'assistant' }
   if (!Array.isArray(aiResponse.recipes)) {
@@ -302,8 +317,11 @@ function cleanPrescription(jsonData) {
     ingredients: ensureArray(r.ingredients),
     steps: ensureArray(r.steps),
     tags: ensureArray(r.tags)
-  })).filter(Boolean)
+  })).filter(Boolean).filter(r => !isUnsafeRecipe(r))
   aiResponse.lifestyle = ensureArray(aiResponse.lifestyle)
+  if (aiResponse.recipes.length === 0) {
+    aiResponse.lifestyle = [...aiResponse.lifestyle, '该方案涉及需专业指导的药材，部分方剂已隐藏，建议线下咨询医师。']
+  }
   if (!Array.isArray(aiResponse.acupoints)) aiResponse.acupoints = []
   if (!aiResponse.warm_words) aiResponse.warm_words = '根据您的描述，为您辩证分析如下：'
   return aiResponse
@@ -551,6 +569,7 @@ function handleKeydown(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDef
                   <p class="text-xs text-sandalwood/70 mt-1">{{ m.summary }}</p>
                 </div>
                 <div class="p-3 space-y-3">
+                   <div v-if="!m.recipes || m.recipes.length === 0" class="text-xs text-amber-600 bg-amber-50 p-2 rounded border border-amber-100">该方案涉及需专业指导的药材，部分方剂已隐藏，建议线下咨询医师。</div>
                    <div v-for="r in m.recipes" :key="r.id" class="border border-gray-100 rounded bg-white overflow-hidden">
                       <div @click="foldedStates[r.id] = !foldedStates[r.id]" class="p-2 flex justify-between cursor-pointer hover:bg-gray-50 items-center">
                         <div class="flex items-center gap-2">
