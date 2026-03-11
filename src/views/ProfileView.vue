@@ -7,11 +7,11 @@ import HealthTagManager from '@/components/HealthTagManager.vue'
 import { 
   Trash2, ChevronDown, FileText, ChefHat, User, Edit2, 
   Check, Camera, Calendar, Activity, X, Leaf, 
-  Lock, Unlock, Image as ImageIcon, BookOpen, Utensils
+  Lock, Unlock, Image as ImageIcon, BookOpen, Utensils, Settings, LogOut, UserPlus
 } from 'lucide-vue-next'
 
 const router = useRouter()
-const { user } = useAuth()
+const { user, handleLogout } = useAuth()
 const loading = ref(true)
 const activeTab = ref('plans')
 const foldedStates = ref({}) 
@@ -240,6 +240,16 @@ async function handleFileChange(event) {
 
 function goToHerbDetail(herbName) { router.push(`/herb/${herbName}`) }
 
+async function doLogout() {
+  await handleLogout()
+  router.push('/')
+}
+
+async function doSwitchAccount() {
+  await handleLogout()
+  router.push({ path: '/', query: { login: '1' } })
+}
+
 // 工具函数
 function ensureArray(val) { return (!val) ? [] : (Array.isArray(val) ? val : [val]) }
 function formatDate(isoString) {
@@ -312,12 +322,35 @@ onUnmounted(() => {
              <div><span class="text-white text-lg font-bold block">{{ savedRecipes.length + favoriteHerbs.length }}</span>收藏</div>
              <div><span class="text-white text-lg font-bold block">{{ myWorks.length }}</span>作品</div>
           </div>
+          <div class="mt-4">
+            <router-link to="/profile/edit" class="inline-flex items-center gap-1.5 text-white/90 hover:text-white text-sm font-medium">
+              <Edit2 class="w-4 h-4" /> 编辑资料
+            </router-link>
+          </div>
         </div>
       </div>
     </div>
 
   <div class="-mt-8 px-2 relative z-20 w-full space-y-4 max-w-6xl mx-auto">
       
+      <div class="bg-white rounded-xl shadow-card p-4 border border-sandalwood/5 overflow-hidden">
+        <h3 class="font-bold text-gray-700 mb-3 flex items-center gap-2"><Settings class="w-4 h-4 text-sandalwood" /> 账号与设置</h3>
+        <div class="space-y-1">
+          <router-link to="/profile/edit" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-stone-50 transition-colors">
+            <Edit2 class="w-4 h-4 text-stone-400" />
+            <span>编辑资料</span>
+          </router-link>
+          <button type="button" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-stone-50 transition-colors text-left" @click="doLogout">
+            <LogOut class="w-4 h-4 text-stone-400" />
+            <span>退出登录</span>
+          </button>
+          <button type="button" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-stone-50 transition-colors text-left" @click="doSwitchAccount">
+            <UserPlus class="w-4 h-4 text-stone-400" />
+            <span>切换账号</span>
+          </button>
+        </div>
+      </div>
+
       <div class="bg-white rounded-xl shadow-card p-1 border border-sandalwood/5 overflow-hidden">
          <HealthTagManager />
       </div>

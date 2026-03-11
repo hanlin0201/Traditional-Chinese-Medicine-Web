@@ -10,17 +10,18 @@ import {
   Search, Filter, ChevronDown
 } from 'lucide-vue-next'
 import { supabase } from '@/supabaseClient'
+import { useAuth } from '@/composables/useAuth'
 import { SOLAR_TERMS_LOOKUP } from '@/constants/solarTerms'
 import { BODY_TYPES, EFFICACY_OPTIONS, TIME_RANGES, parseTimeToMinutes } from '@/constants/recipeFilters'
 
 const router = useRouter()
 const route = useRoute()
+const { user: currentUser } = useAuth()
 
 // --- 状态定义 ---
 const recipes = ref([])
 const loading = ref(true)
-const selectedRecipe = ref(null) 
-const currentUser = ref(null)
+const selectedRecipe = ref(null)
 
 // --- 搜索与筛选 ---
 const searchKeyword = ref('')
@@ -124,16 +125,15 @@ const fetchRecipes = async () => {
 
   try {
     loading.value = true
-    const { data: { user } } = await supabase.auth.getUser()
-    currentUser.value = user
+    const uid = currentUser.value?.id
 
     let { data, error } = await supabase.from('recipes').select('*').order('id')
     if (error) throw error
 
-    // 获取收藏状态
+    // 获取收藏状态（仅登录用户）
     let myFavorites = []
-    if (user) {
-      const { data: favs } = await supabase.from('favorite_recipes').select('recipe_id').eq('user_id', user.id)
+    if (uid) {
+      const { data: favs } = await supabase.from('favorite_recipes').select('recipe_id').eq('user_id', uid)
       if (favs) myFavorites = favs.map(f => f.recipe_id)
     }
 
@@ -189,7 +189,7 @@ const submitComment = async () => {
 // --- 4. 收藏/取消收藏 ---
 const toggleFavorite = async (e, recipe) => {
   e?.stopPropagation()
-  if (!currentUser.value) return alert('请先登录后收藏')
+  if (!currentUser.value) return alert('请先登录')
   
   const originalState = recipe.is_favorite
   recipe.is_favorite = !originalState

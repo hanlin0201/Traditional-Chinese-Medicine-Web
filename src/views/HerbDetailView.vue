@@ -10,11 +10,12 @@ import { OrbitControls } from '@tresjs/cientos'
 import Herb3DScene from '@/components/Herb3DScene.vue'
 // 引入 Supabase 客户端
 import { supabase } from '@/supabaseClient' 
-// 引入药材标签数据
+import { useAuth } from '@/composables/useAuth'
 import { getHerbTagDisplayByName } from '@/composables/useHerbTags'
 
 const route = useRoute()
 const router = useRouter()
+const { user: currentUser } = useAuth()
 
 // 定义状态
 const herb = ref(null)
@@ -26,7 +27,6 @@ const detailMode = ref('professional') // 'professional' | 'easy' 专业 / 简�
 // --- 新增：收藏相关状态 ---
 const isFavorite = ref(false) // 是否已收藏
 const isToggling = ref(false) // 是否正在交互中(防止连点)
-const currentUser = ref(null) // 当前登录用户
 
 // 药材多维标签（基于 CSV）
 const herbTagInfo = computed(() => {
@@ -181,7 +181,7 @@ const checkFavoriteStatus = async () => {
 const toggleFavorite = async () => {
   // 1. 检查登录
   if (!currentUser.value) {
-    alert('请先登录后再收藏药材')
+    alert('请先登录')
     return
   }
   
@@ -220,12 +220,7 @@ const toggleFavorite = async () => {
 }
 
 // 首次挂载
-onMounted(async () => {
-  // 1. 先获取当前用户信息
-  const { data: { user } } = await supabase.auth.getUser()
-  currentUser.value = user
-
-  // 2. 获取药材数据
+onMounted(() => {
   fetchHerbByName()
 })
 

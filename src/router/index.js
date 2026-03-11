@@ -38,6 +38,12 @@ const routes = [
     meta: { title: '个人中心', requiresAuth: true },
   },
   {
+    path: '/profile/edit',
+    name: 'ProfileEdit',
+    component: () => import('@/views/ProfileEditView.vue'),
+    meta: { title: '编辑资料', requiresAuth: true },
+  },
+  {
     path: '/recipes', 
     name: 'RecipeMarket',
     component: () => import('@/views/RecipeMarket.vue') // 使用 @ 符号更稳妥
