@@ -300,18 +300,34 @@ function goBack() {
     </template>
 
     <template v-else>
-      <div class="w-full h-[42vh] min-h-[300px] bg-paper/90 border-b border-sandalwood/10 relative">
-        <TresCanvas clear-color="#FDFBF7" alpha>
-          <TresPerspectiveCamera :position="[3, 3, 3]" :look-at="[0, 0, 0]" />
-          <OrbitControls :enable-zoom="false" :auto-rotate="false" /> 
-          <Herb3DScene />
-          <TresAmbientLight :intensity="1.5" />
-          <TresDirectionalLight :position="[5, 5, 5]" :intensity="1" />
-        </TresCanvas>
-        
-        <div class="absolute bottom-2 right-4 text-xs text-sandalwood/40 font-serif pointer-events-none">
-          ⟲ 拖动旋转查看
-        </div>
+      <!-- 顶部封面区域：优先展示真实药材图片，缺图时回退到 3D 占位 -->
+      <div class="w-full h-[42vh] min-h-[300px] bg-paper/90 border-b border-sandalwood/10 relative overflow-hidden">
+        <!-- 有封面图时：展示大图 -->
+        <template v-if="herb?.image_url">
+          <img
+            :src="herb.image_url"
+            alt=""
+            class="w-full h-full object-contain md:object-cover transform scale-105 md:scale-100"
+          />
+          <!-- 顶部和底部做一点渐变，保证标题/内容可读 -->
+          <div class="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-[#FDFBF7] via-[#FDFBF7]/40 to-transparent" />
+          <div class="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#FDFBF7] via-[#FDFBF7]/40 to-transparent" />
+        </template>
+
+        <!-- 无封面图时：保留原来的 3D 场景作为占位 -->
+        <template v-else>
+          <TresCanvas clear-color="#FDFBF7" alpha>
+            <TresPerspectiveCamera :position="[3, 3, 3]" :look-at="[0, 0, 0]" />
+            <OrbitControls :enable-zoom="false" :auto-rotate="false" /> 
+            <Herb3DScene />
+            <TresAmbientLight :intensity="1.5" />
+            <TresDirectionalLight :position="[5, 5, 5]" :intensity="1" />
+          </TresCanvas>
+          
+          <div class="absolute bottom-2 right-4 text-xs text-sandalwood/40 font-serif pointer-events-none">
+            ⟲ 拖动旋转查看
+          </div>
+        </template>
       </div>
 
       <main class="flex-1 px-4 py-6 max-w-2xl mx-auto w-full space-y-5 animate-fade-in-up">
