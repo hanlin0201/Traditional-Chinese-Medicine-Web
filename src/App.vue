@@ -1,15 +1,22 @@
 <script setup>
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { User, Home, BookOpen, UtensilsCrossed, Activity } from 'lucide-vue-next'
 import AiCompanion from '@/components/AiCompanion.vue'
 import LoginOverlay from '@/components/LoginOverlay.vue'
+import OnboardingProfile from '@/components/OnboardingProfile.vue'
 import { useAuth } from '@/composables/useAuth'
 
 const router = useRouter()
-const { user, gatePassed } = useAuth()
+const route = useRoute()
+const { user, profile, gatePassed } = useAuth()
 const forceShowLogin = ref(false)
 const showLoginOverlay = computed(() => !gatePassed.value || forceShowLogin.value)
+const showOnboarding = computed(() => user.value && profile.value != null && !String(profile.value?.username ?? '').trim())
+
+watch(() => route.query.login, (v) => {
+  if (v === '1') forceShowLogin.value = true
+}, { immediate: true })
 
 function openAuthPanel() {
   if (user.value) { router.push('/profile') } else { forceShowLogin.value = true }
@@ -62,6 +69,7 @@ function openAuthPanel() {
 
     <AiCompanion />
     <LoginOverlay v-if="showLoginOverlay" :dismissible="gatePassed" @close="forceShowLogin = false" />
+    <OnboardingProfile v-if="showOnboarding" />
   </div>
 </template>
 
