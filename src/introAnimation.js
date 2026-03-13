@@ -25,6 +25,35 @@ export function runIntroAnimation() {
       return
     }
 
+    let finished = false
+    const cleanup = () => {
+      if (finished) return
+      finished = true
+      try {
+        overlay.remove()
+      } catch (e) {
+        // overlay 已经被移除时忽略错误
+      }
+      sessionStorage.setItem(INTRO_STORAGE_KEY, '1')
+      resolve()
+    }
+
+    // 创建“跳过动画”按钮（居中偏下，大号、显眼）
+    const skipBtn = document.createElement('button')
+    skipBtn.id = 'intro-skip-btn'
+    skipBtn.textContent = '跳过动画，直接进入首页'
+    overlay.appendChild(skipBtn)
+
+    skipBtn.addEventListener('click', () => {
+      // 用户主动跳过：直接淡出遮罩，结束动画
+      overlay.style.transition = 'opacity 0.6s ease-out'
+      overlay.style.opacity = '0'
+      overlay.style.pointerEvents = 'none'
+      setTimeout(() => {
+        cleanup()
+      }, 600)
+    })
+
     INTRO_ITEMS.forEach((name, index) => {
       const img = document.createElement('img')
       img.src = `/photo/${name}.jpg`
@@ -60,9 +89,7 @@ export function runIntroAnimation() {
         overlay.style.pointerEvents = 'none'
 
         setTimeout(() => {
-          overlay.remove()
-          sessionStorage.setItem(INTRO_STORAGE_KEY, '1')
-          resolve()
+          cleanup()
         }, 1200)
       }, 600)
     }, 3800)
