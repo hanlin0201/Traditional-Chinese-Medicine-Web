@@ -1,4 +1,4 @@
-药材名称,功效分类,药性（四气）,五味,入药部位,归经,具体功效
+const h=`药材名称,功效分类,药性（四气）,五味,入药部位,归经,具体功效
 阿魏,消食药,平,辛,其他,肝、脾、胃,消食导滞
 阿胶,补虚药 (补血),平,甘,动物类,肺、肝、肾,化痰止咳、宁血止血、扶正补虚
 安息香,开窍药,温,苦、辛,其他,心、肝、脾,宁心安神
@@ -543,3 +543,4 @@
 珍珠,平肝息风药,寒,甘、咸,动物类,心、肝,宁心安神
 朱砂,安神药,微寒、寒,甘,矿物类,心,宁心安神、宁血止血
 猪苓,利水渗湿药,平,甘、淡,菌藻类,脾、肾、肺、膀胱,利水渗湿
+`,y=(()=>{const e=h.split(/\r?\n/).map(t=>t.trim()).filter(t=>t.length>0),n=new Map;for(let t=1;t<e.length;t++){const r=e[t].split(",");if(r.length<7)continue;const[a,s,l,c,o,u,f]=r.map(g=>g.trim());if(!a)continue;const w=s==="未能自动归类"?"其他":s,d=f&&f.length>0?f.split("、").map(g=>g.trim()).filter(Boolean):[];n.set(a,{efficacyCategory:w,rawNature:l,rawTaste:c,rawPart:o,rawMeridian:u,detailEffects:d})}return n})(),p=(()=>{const e=new Set;for(const n of y.values())Array.isArray(n.detailEffects)&&n.detailEffects.forEach(t=>{t&&e.add(t)});return Array.from(e)})();function E(e){if(!e)return[];const n=y.get(e);return!n||!Array.isArray(n.detailEffects)?[]:n.detailEffects}function m(e){if(!e)return null;const n=y.get(e);if(!n)return null;const{efficacyCategory:t,rawNature:i,rawTaste:r,rawPart:a,rawMeridian:s,detailEffects:l}=n,c=i&&i.length>0?i.startsWith("性")?i:`性${i}`:null,o=r&&r.length>0?r.startsWith("味")?r:`味${r}`:null,u=a&&a.length>0?a.endsWith("类")?a:`${a}类`:null,f=s&&s.length>0?s.startsWith("入")?s:`入${s}`:null;return{efficacyCategory:t||null,nature:c,taste:o,part:u,meridian:f,detailEffects:Array.isArray(l)?l:[]}}export{p as A,m as a,E as g};
