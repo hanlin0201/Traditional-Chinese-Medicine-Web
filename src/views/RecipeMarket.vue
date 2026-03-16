@@ -13,6 +13,7 @@ import { supabase } from '@/supabaseClient'
 import { useAuth } from '@/composables/useAuth'
 import { SOLAR_TERMS_LOOKUP } from '@/constants/solarTerms'
 import { BODY_TYPES, EFFICACY_OPTIONS, TIME_RANGES, parseTimeToMinutes } from '@/constants/recipeFilters'
+import { getRecipeMarketCachedData, setRecipeMarketCachedData } from '@/composables/usePagePreload'
 
 const router = useRouter()
 const route = useRoute()
@@ -119,18 +120,37 @@ const homeworkComments = ref([])
 const newHomeworkComment = ref('') 
 const homeworkIsLiked = ref(false) 
 
+function normalizeRecipe(item, myFavorites = []) {
+  return {
+    ...item,
+    bodyType: item.body_type,
+    efficacy: item.efficacy || [],
+    ingredients: item.ingredients || [],
+    steps: item.steps || [],
+    rating: item.rating || (8.5 + Math.random()).toFixed(1),
+    cooked_count: item.cooked_count || 0,
+    is_favorite: myFavorites.includes(item.id),
+  }
+}
+
 // --- 1. 获取基础食谱数据 ---
 const fetchRecipes = async () => {
-  if (recipes.value.length > 0) return 
+  if (recipes.value.length > 0) return
+
+  const cached = getRecipeMarketCachedData()
+  const hasCachedData = Array.isArray(cached) && cached.length > 0
+  if (hasCachedData) {
+    recipes.value = cached
+    loading.value = false
+  }
 
   try {
-    loading.value = true
+    if (!hasCachedData) loading.value = true
     const uid = currentUser.value?.id
 
     let { data, error } = await supabase.from('recipes').select('*').order('id')
     if (error) throw error
 
-    // 获取收藏状态（仅登录用户）
     let myFavorites = []
     if (uid) {
       const { data: favs } = await supabase.from('favorite_recipes').select('recipe_id').eq('user_id', uid)
@@ -138,16 +158,9 @@ const fetchRecipes = async () => {
     }
 
     if (data) {
-      recipes.value = data.map(item => ({
-        ...item,
-        bodyType: item.body_type, 
-        efficacy: item.efficacy || [],
-        ingredients: item.ingredients || [],
-        steps: item.steps || [],
-        rating: item.rating || (8.5 + Math.random()).toFixed(1),
-        cooked_count: item.cooked_count || 0,
-        is_favorite: myFavorites.includes(item.id)
-      }))
+      const normalized = data.map(item => normalizeRecipe(item, myFavorites))
+      recipes.value = normalized
+      setRecipeMarketCachedData(normalized)
     }
   } catch (error) {
     console.error('获取食谱失败:', error)
