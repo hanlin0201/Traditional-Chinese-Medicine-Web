@@ -38,6 +38,12 @@ const routes = [
     meta: { title: '个人中心', requiresAuth: true },
   },
   {
+    path: '/profile/work/:id',
+    name: 'WorkDetail',
+    component: () => import('@/views/WorkDetailView.vue'),
+    meta: { title: '作业详情', requiresAuth: true },
+  },
+  {
     path: '/profile/edit',
     name: 'ProfileEdit',
     component: () => import('@/views/ProfileEditView.vue'),

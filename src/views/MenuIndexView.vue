@@ -9,6 +9,7 @@ import HerbalPairing from '@/components/home/HerbalPairing.vue'
 import MythBuster from '@/components/home/MythBuster.vue'
 // 注意：移除了 getNearestSolarTerm 的引入
 import { supabase } from '@/supabaseClient'
+import { preloadHomeFeaturePages } from '@/composables/usePagePreload'
 
 const router = useRouter()
 const route = useRoute()
@@ -187,6 +188,12 @@ const fetchSeasonalData = async () => {
 
 onMounted(() => { 
   fetchSeasonalData()
+  // 用户停留首页时，在空闲时段预加载药材页/食谱页代码与首屏数据
+  if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+    window.requestIdleCallback(() => { preloadHomeFeaturePages() }, { timeout: 2000 })
+  } else {
+    setTimeout(() => { preloadHomeFeaturePages() }, 300)
+  }
   window.addEventListener('wheel', handleWheel, { passive: false })
   window.addEventListener('touchstart', handleTouchStart, { passive: true })
   window.addEventListener('touchend', handleTouchEnd, { passive: true })

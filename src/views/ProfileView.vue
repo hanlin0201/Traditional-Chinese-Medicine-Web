@@ -4,10 +4,13 @@ import { useRouter } from 'vue-router'
 import { supabase } from '@/supabaseClient'
 import { useAuth } from '@/composables/useAuth'
 import HealthTagManager from '@/components/HealthTagManager.vue'
+import { SOLAR_TERMS_LOOKUP } from '@/constants/solarTerms'
+import { BODY_TYPES } from '@/constants/recipeFilters'
 import { 
   Trash2, ChevronDown, FileText, ChefHat, User, Edit2, 
   Check, Camera, Calendar, Activity, X, Leaf, 
-  Lock, Unlock, Image as ImageIcon, BookOpen, Utensils, Settings, LogOut, UserPlus
+  Lock, Unlock, Image as ImageIcon, BookOpen, Utensils, Settings, LogOut, UserPlus,
+  UserCheck, Sparkles, Soup, ListOrdered, Clock
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -38,6 +41,198 @@ const savedRecipes = ref([])   // 🌟 混合了 AI 和 广场食谱
 const favoriteHerbs = ref([])  
 const myWorks = ref([])        
 const myRecipes = ref([])      
+
+// --- 我发布的菜谱：发布弹窗状态 ---
+const showNewRecipeModal = ref(false)
+const newRecipeName = ref('')
+const newRecipeDesc = ref('')
+const newRecipeBodyType = ref('')
+const newRecipeSolarTerm = ref('')
+const newRecipeTime = ref('')
+const newRecipeEfficacy = ref('')
+// 结构化食材/步骤输入：支持逐项新增/删除
+const newRecipeIngredients = ref([{ name: '', amount: '' }])
+const newRecipeSteps = ref([''])
+const newRecipeImageFile = ref(null)
+const newRecipeImagePreview = ref('')
+const isPublishingRecipe = ref(false)
+
+const solarTermOptions = computed(() => [
+  { value: '', label: '不按节气' },
+  ...SOLAR_TERMS_LOOKUP.map(t => ({ value: t.name, label: t.name }))
+])
+
+// --- 我发布的食谱：详情弹窗 & 删除 ---
+const selectedMyRecipe = ref(null)
+function openMyRecipe(recipe) {
+  selectedMyRecipe.value = recipe
+}
+function closeMyRecipe() {
+  selectedMyRecipe.value = null
+}
+
+async function deleteMyRecipe(recipeId) {
+  if (!user.value) {
+    alert('请先登录后再操作')
+    return
+  }
+  if (!confirm('确定要删除这条已发布的食谱吗？')) return
+
+  try {
+    const next = myRecipes.value.filter(r => r.id !== recipeId)
+    const { error } = await supabase
+      .from('profiles')
+      .update({ my_recipes: next, updated_at: new Date() })
+      .eq('id', user.value.id)
+    if (error) throw error
+
+    myRecipes.value = next
+    if (selectedMyRecipe.value && selectedMyRecipe.value.id === recipeId) {
+      closeMyRecipe()
+    }
+    saveProfilePayload()
+  } catch (e) {
+    console.error(e)
+    alert('删除失败，请稍后重试')
+  }
+}
+
+function resetNewRecipeForm() {
+  newRecipeName.value = ''
+  newRecipeDesc.value = ''
+  newRecipeBodyType.value = ''
+  newRecipeSolarTerm.value = ''
+  newRecipeTime.value = ''
+  newRecipeEfficacy.value = ''
+  newRecipeIngredients.value = [{ name: '', amount: '' }]
+  newRecipeSteps.value = ['']
+  newRecipeImageFile.value = null
+  newRecipeImagePreview.value = ''
+}
+
+function openNewRecipeModal() {
+  if (!user.value) {
+    alert('请先登录后再发布菜谱')
+    return
+  }
+  resetNewRecipeForm()
+  showNewRecipeModal.value = true
+}
+
+function closeNewRecipeModal() {
+  if (isPublishingRecipe.value) return
+  showNewRecipeModal.value = false
+}
+
+function onNewRecipeImageSelected(event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+  if (file.size > 2 * 1024 * 1024) {
+    alert('图片太大，请选择小于 2MB 的图片')
+    return
+  }
+  newRecipeImageFile.value = file
+  newRecipeImagePreview.value = URL.createObjectURL(file)
+}
+
+async function handlePublishRecipe() {
+  if (!user.value) {
+    alert('请先登录后再发布菜谱')
+    return
+  }
+  if (!newRecipeName.value.trim()) {
+    alert('请填写菜谱名称')
+    return
+  }
+  if (!newRecipeBodyType.value) {
+    alert('请选择适宜体质')
+    return
+  }
+
+  isPublishingRecipe.value = true
+  try {
+    // 1. 先上传图片（如果有）
+    let imageUrl = ''
+    if (newRecipeImageFile.value) {
+      const ext = newRecipeImageFile.value.name.split('.').pop()
+      const fileName = `recipes/${Date.now()}_${Math.floor(Math.random() * 1000)}.${ext}`
+      const { error: uploadError } = await supabase
+        .storage
+        .from('image')
+        .upload(fileName, newRecipeImageFile.value)
+      if (uploadError) throw new Error('图片上传失败，请稍后重试')
+      const { data: publicUrlData } = supabase.storage.from('image').getPublicUrl(fileName)
+      imageUrl = publicUrlData?.publicUrl || ''
+    }
+
+    // 2. 解析表单为结构化字段
+    const efficacyArr = newRecipeEfficacy.value
+      .split(/[,，\s]+/)
+      .map(t => t.trim())
+      .filter(Boolean)
+
+    const ingredientsArr = newRecipeIngredients.value
+      .map(i => ({
+        name: (i.name || '').trim(),
+        amount: (i.amount || '').trim(),
+        isHerb: false
+      }))
+      .filter(i => i.name)
+
+    const stepsArr = newRecipeSteps.value
+      .map(s => (s || '').trim())
+      .filter(Boolean)
+
+    // 3. 当前阶段：不改 recipes 表结构（避免 author_id 不存在的报错）
+    //    直接把“我发布的食谱”存到 profiles.my_recipes（JSON 数组）中，仅当前账号可见。
+    const nowIso = new Date().toISOString()
+    const newRecipe = {
+      id: `my-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      name: newRecipeName.value.trim(),
+      description: newRecipeDesc.value.trim() || null,
+      image: imageUrl || null,
+      body_type: newRecipeBodyType.value,
+      solar_term: newRecipeSolarTerm.value || null,
+      time: newRecipeTime.value.trim() || null,
+      efficacy: efficacyArr,
+      ingredients: ingredientsArr,
+      steps: stepsArr,
+      created_at: nowIso,
+      // 个人上传暂不参与评分，先用 null 占位
+      rating: null,
+      cooked_count: 0
+    }
+
+    const nextMyRecipes = [newRecipe, ...myRecipes.value]
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ my_recipes: nextMyRecipes, updated_at: new Date() })
+      .eq('id', user.value.id)
+    if (updateError) throw updateError
+
+    // 回读校验：确保确实写入账号数据（避免“看似成功但实际没存上”）
+    const { data: verifyProfile, error: verifyError } = await supabase
+      .from('profiles')
+      .select('my_recipes')
+      .eq('id', user.value.id)
+      .single()
+    if (verifyError) throw verifyError
+    if (!verifyProfile?.my_recipes || !Array.isArray(verifyProfile.my_recipes)) {
+      throw new Error('保存失败：账号未返回 my_recipes 字段，请检查 profiles 表结构/权限')
+    }
+
+    myRecipes.value = verifyProfile.my_recipes
+    saveProfilePayload()
+
+    alert('菜谱发布成功！目前仅在“我发布的食谱”中可见')
+    closeNewRecipeModal()
+  } catch (e) {
+    console.error(e)
+    alert(e.message || '发布失败，请稍后重试')
+  } finally {
+    isPublishingRecipe.value = false
+  }
+}
 
 // 会话缓存：再次进入个人中心时先展示上次数据，调理/收藏/作品数不闪 0
 const _profileCache = { userId: null, payload: null }
@@ -88,13 +283,11 @@ async function getProfile() {
       { data: herbsData },
       { data: favRecipesData },
       { data: worksData },
-      { data: myRecipesData },
     ] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', uid).single(),
       supabase.from('favorite_herbs').select('*, herb:herbs(*)').eq('user_id', uid).order('created_at', { ascending: false }),
       supabase.from('favorite_recipes').select('*, recipe:recipes(*)').eq('user_id', uid).order('created_at', { ascending: false }),
       supabase.from('homeworks').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
-      supabase.from('recipes').select('*').eq('author_id', uid).order('created_at', { ascending: false }),
     ])
 
     let aiRecipes = []
@@ -145,7 +338,8 @@ async function getProfile() {
     )
 
     if (worksData) myWorks.value = worksData
-    if (myRecipesData) myRecipes.value = myRecipesData
+    // 我发布的食谱：从 profiles.my_recipes 读取（当前账号私有）
+    myRecipes.value = (profileData?.my_recipes && Array.isArray(profileData.my_recipes)) ? profileData.my_recipes : []
 
     saveProfilePayload()
   } catch (error) {
@@ -223,6 +417,31 @@ async function deleteHerb(favoriteId) {
   if (!error) favoriteHerbs.value = favoriteHerbs.value.filter(h => h.favorite_id !== favoriteId)
 }
 
+// 删除跟做作业
+async function deleteWork(workId) {
+  if (!user.value) {
+    alert('请先登录后再操作')
+    return
+  }
+  if (!confirm('确定要删除这条作业吗？')) return
+
+  try {
+    const { error } = await supabase
+      .from('homeworks')
+      .delete()
+      .eq('id', workId)
+      .eq('user_id', user.value.id)
+
+    if (error) throw error
+
+    myWorks.value = myWorks.value.filter(w => w.id !== workId)
+    saveProfilePayload()
+  } catch (e) {
+    console.error(e)
+    alert('删除失败，请稍后重试')
+  }
+}
+
 // --- 其他 ---
 function triggerFileInput() { fileInput.value.click() }
 async function handleFileChange(event) {
@@ -239,6 +458,15 @@ async function handleFileChange(event) {
 }
 
 function goToHerbDetail(herbName) { router.push(`/herb/${herbName}`) }
+
+// 从「我的作品」跳转到独立的作业详情页
+function goToHomeworkDetail(work) {
+  if (!work) return
+  router.push({
+    name: 'WorkDetail',
+    params: { id: work.id },
+  })
+}
 
 async function doLogout() {
   await handleLogout()
@@ -509,8 +737,20 @@ onUnmounted(() => {
           </div>
 
           <div v-if="!myWorks.length" class="text-center py-20 text-gray-400 bg-white rounded-xl border border-dashed border-sandalwood/10"><p>还没交过作业，快去食谱广场试试吧</p></div>
-          <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
-             <div v-for="work in myWorks" :key="work.id" class="aspect-square bg-gray-100 rounded-xl overflow-hidden relative group cursor-pointer shadow-sm border border-gray-200">
+          <div v-else class="grid grid-cols-2 md:grid-cols-3 gap-3">
+             <div
+               v-for="work in myWorks"
+               :key="work.id"
+               class="aspect-square bg-gray-100 rounded-xl overflow-hidden relative group cursor-pointer shadow-sm border border-gray-200"
+               @click="goToHomeworkDetail(work)"
+             >
+                <button
+                  type="button"
+                  class="absolute top-2 right-2 z-10 bg-black/40 text-white/80 rounded-full p-1.5 shadow-sm opacity-0 group-hover:opacity-100 transition"
+                  @click.stop="deleteWork(work.id)"
+                >
+                  <Trash2 class="w-4 h-4" />
+                </button>
                 <img :src="work.image_url" class="w-full h-full object-cover transition-transform group-hover:scale-110" />
                 <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
                    <p class="text-white text-xs line-clamp-2">{{ work.content || '打卡成功' }}</p>
@@ -523,30 +763,376 @@ onUnmounted(() => {
         <div v-else-if="activeTab === 'my_recipes'" class="animate-in slide-in-from-bottom-4 duration-500">
            <div class="flex justify-between items-center mb-4 px-2">
              <h3 class="font-bold text-gray-700">我发布的食谱</h3>
-             <button class="text-xs bg-sandalwood text-white px-3 py-1.5 rounded-full shadow-sm hover:bg-sandalwood/90 flex items-center gap-1">
+             <button
+               type="button"
+               class="text-xs bg-sandalwood text-white px-3 py-1.5 rounded-full shadow-sm hover:bg-sandalwood/90 flex items-center gap-1"
+               @click="openNewRecipeModal"
+             >
                <Utensils class="w-3 h-3" /> 发布新菜谱
              </button>
           </div>
 
-          <div v-if="!myRecipes.length" class="text-center py-20 text-gray-400 bg-white rounded-xl border border-dashed border-sandalwood/10"><p>您还没有发布过原创食谱</p></div>
-          <div class="grid grid-cols-1 gap-4">
-             <div v-for="recipe in myRecipes" :key="recipe.id" class="bg-white p-4 rounded-xl shadow-card border border-gray-100 flex gap-4">
-                <div class="w-20 h-20 rounded-xl bg-green-50 flex items-center justify-center text-3xl shrink-0 border border-green-100">🥗</div>
-                <div class="flex-1">
-                   <h4 class="font-bold text-gray-800 text-lg">{{ recipe.name }}</h4>
-                   <p class="text-xs text-gray-500 mt-1 line-clamp-2">{{ recipe.description || '暂无描述' }}</p>
-                   <div class="mt-2 flex gap-2">
-                      <span class="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded">原创</span>
-                      <span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded">{{ formatDate(recipe.created_at) }}</span>
-                   </div>
+          <div v-if="!myRecipes.length" class="text-center py-20 text-gray-400 bg-white rounded-xl border border-dashed border-sandalwood/10">
+            <p>您还没有发布过原创食谱</p>
+          </div>
+          <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div
+              v-for="recipe in myRecipes"
+              :key="recipe.id"
+              class="group bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-stone-100 flex flex-col cursor-pointer relative"
+              @click="openMyRecipe(recipe)"
+            >
+              <button
+                type="button"
+                class="absolute top-2 right-2 z-10 bg-white/90 rounded-full p-1.5 shadow-sm text-stone-300 hover:text-red-500 hover:bg-red-50 transition"
+                @click.stop="deleteMyRecipe(recipe.id)"
+              >
+                <Trash2 class="w-4 h-4" />
+              </button>
+              <div class="relative h-40 overflow-hidden bg-gray-100">
+                <img v-if="recipe.image" :src="recipe.image" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <div v-else class="w-full h-full flex items-center justify-center text-4xl">🥗</div>
+                <div class="absolute bottom-2 left-2 flex gap-2" v-if="recipe.time">
+                  <span class="bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-md">
+                    {{ recipe.time }}
+                  </span>
                 </div>
-             </div>
+              </div>
+              <div class="p-4 flex-1 flex flex-col">
+                <h4 class="text-base font-bold text-gray-800 mb-1 line-clamp-2">{{ recipe.name }}</h4>
+                <p class="text-xs text-gray-500 mb-2 line-clamp-2">{{ recipe.description || '暂无描述' }}</p>
+                <div class="flex flex-wrap gap-2 mt-auto">
+                  <span class="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded">原创</span>
+                  <span v-if="recipe.body_type" class="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded">
+                    {{ recipe.body_type }}
+                  </span>
+                  <span v-if="recipe.created_at" class="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded">
+                    {{ formatDate(recipe.created_at) }}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
       </div>
     </div>
   </div>
+
+  <!-- 我发布的食谱：详情资料卡（样式对齐“食谱推荐”的详情卡） -->
+  <Transition
+    enter-active-class="transition duration-300 ease-out"
+    enter-from-class="opacity-0 translate-y-4"
+    enter-to-class="opacity-100 translate-y-0"
+    leave-active-class="transition duration-200 ease-in"
+    leave-from-class="opacity-100 translate-y-0"
+    leave-to-class="opacity-0 translate-y-4"
+  >
+    <Teleport to="body">
+      <div v-if="selectedMyRecipe" class="fixed inset-0 z-[1300] flex items-center justify-center p-4 sm:p-6 bg-black/40 backdrop-blur-[2px]">
+        <div class="absolute inset-0" @click="closeMyRecipe"></div>
+        <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl h-[90vh] flex flex-col overflow-hidden z-10">
+          <button @click="closeMyRecipe" class="absolute top-4 right-4 z-20 bg-black/20 backdrop-blur-md text-white p-2 rounded-full hover:bg-black/40 transition">
+            <X :size="20" />
+          </button>
+
+          <div class="flex-1 overflow-y-auto custom-scrollbar bg-white pb-20">
+            <div class="h-72 w-full shrink-0 relative">
+              <img v-if="selectedMyRecipe.image" :src="selectedMyRecipe.image" class="w-full h-full object-cover">
+              <div v-else class="w-full h-full flex items-center justify-center text-6xl text-gray-300">🥗</div>
+              <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white to-transparent h-24"></div>
+            </div>
+
+            <div class="p-6 sm:p-8 -mt-6 relative z-10">
+              <h2 class="text-3xl font-bold text-stone-900 mb-2">{{ selectedMyRecipe.name }}</h2>
+              
+              <div class="flex items-center gap-4 mb-8 bg-stone-50 p-4 rounded-xl border border-stone-100">
+                <div class="text-center px-4 border-r border-stone-200">
+                  <div class="text-3xl font-bold text-amber-500">{{ selectedMyRecipe.rating ?? '--' }}</div>
+                  <div class="text-[10px] text-stone-400">综合评分</div>
+                </div>
+                <div class="flex-1 pl-2">
+                  <div class="text-sm text-stone-600 mb-2">
+                    <span class="font-bold text-emerald-600">{{ selectedMyRecipe.cooked_count || 0 }}</span> 人已做过
+                  </div>
+                  <div class="flex flex-wrap gap-2 text-[11px] text-stone-400">
+                    <span v-if="selectedMyRecipe.time" class="inline-flex items-center gap-1 bg-white px-2 py-1 rounded-full border border-stone-100">
+                      <Clock :size="12" /> {{ selectedMyRecipe.time }}
+                    </span>
+                    <span v-if="selectedMyRecipe.solar_term" class="inline-flex items-center gap-1 bg-amber-50 text-amber-700 px-2 py-1 rounded-full border border-amber-100">
+                      {{ selectedMyRecipe.solar_term }}
+                    </span>
+                    <span v-if="selectedMyRecipe.created_at" class="inline-flex items-center gap-1 bg-stone-50 px-2 py-1 rounded-full border border-stone-100">
+                      创建于 {{ formatDate(selectedMyRecipe.created_at) }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-4 mb-6">
+                <div class="bg-stone-50 p-3 rounded-xl border border-stone-100">
+                  <span class="text-xs text-stone-400 block mb-1">适宜体质</span>
+                  <span class="font-medium text-emerald-700 flex items-center gap-1">
+                    <UserCheck :size="14"/> {{ selectedMyRecipe.body_type || '—' }}
+                  </span>
+                </div>
+                <div class="bg-stone-50 p-3 rounded-xl border border-stone-100">
+                  <span class="text-xs text-stone-400 block mb-1">主要功效</span>
+                  <span class="font-medium text-amber-700 flex items-center gap-1">
+                    <Sparkles :size="14"/>
+                    {{ (selectedMyRecipe.efficacy && selectedMyRecipe.efficacy.length) ? selectedMyRecipe.efficacy.join('/') : '—' }}
+                  </span>
+                </div>
+              </div>
+
+              <p v-if="selectedMyRecipe.description" class="text-stone-600 leading-relaxed mb-8 bg-stone-50 p-4 rounded-xl border border-stone-100">
+                {{ selectedMyRecipe.description }}
+              </p>
+
+              <div class="mb-8">
+                <h3 class="text-lg font-bold mb-4 flex items-center gap-2"><Soup :size="20" /> 所需食材</h3>
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div
+                    v-for="(ing, idx) in (selectedMyRecipe.ingredients || [])"
+                    :key="idx"
+                    class="flex items-center justify-between p-2 rounded-lg border border-stone-100 bg-white"
+                  >
+                    <span class="text-stone-700">{{ ing.name }}</span>
+                    <span class="text-xs text-stone-400">{{ ing.amount }}</span>
+                  </div>
+                  <div v-if="!(selectedMyRecipe.ingredients && selectedMyRecipe.ingredients.length)" class="text-sm text-stone-400">
+                    暂无食材信息
+                  </div>
+                </div>
+              </div>
+
+              <div class="mb-10">
+                <h3 class="text-lg font-bold mb-4 flex items-center gap-2"><ListOrdered :size="20" /> 烹饪步骤</h3>
+                <div v-if="selectedMyRecipe.steps && selectedMyRecipe.steps.length" class="space-y-6">
+                  <div v-for="(step, idx) in selectedMyRecipe.steps" :key="idx" class="flex gap-4">
+                    <div class="flex-shrink-0 w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-sm font-bold mt-0.5">
+                      {{ idx + 1 }}
+                    </div>
+                    <p class="text-stone-600 leading-relaxed">{{ step }}</p>
+                  </div>
+                </div>
+                <div v-else class="text-sm text-stone-400 bg-stone-50 p-4 rounded-xl border border-stone-100">
+                  暂无步骤信息
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </Teleport>
+  </Transition>
+
+  <!-- 发布新菜谱弹窗 -->
+  <transition
+    enter-active-class="transition duration-200 ease-out"
+    enter-from-class="opacity-0 scale-95"
+    enter-to-class="opacity-100 scale-100"
+    leave-active-class="transition duration-150 ease-in"
+    leave-from-class="opacity-100 scale-100"
+    leave-to-class="opacity-0 scale-95"
+  >
+    <div
+      v-if="showNewRecipeModal"
+      class="fixed inset-0 z-[1200] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
+    >
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+          <h3 class="font-bold text-lg text-gray-800">发布新菜谱</h3>
+          <button
+            type="button"
+            class="text-gray-400 hover:text-gray-600"
+            @click="closeNewRecipeModal"
+          >
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">菜谱名称</label>
+            <input
+              v-model="newRecipeName"
+              type="text"
+              class="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-sandalwood/20 focus:border-sandalwood/60"
+              placeholder="例如：四神健脾养胃粥"
+            />
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">一句简介（可选）</label>
+            <textarea
+              v-model="newRecipeDesc"
+              rows="2"
+              class="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-sandalwood/20 focus:border-sandalwood/60"
+              placeholder="简单介绍这道菜适合什么人、有什么功效"
+            ></textarea>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">适宜体质</label>
+              <select
+                v-model="newRecipeBodyType"
+                class="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sandalwood/20 focus:border-sandalwood/60"
+              >
+                <option
+                  v-for="opt in BODY_TYPES"
+                  :key="opt.value || 'all'"
+                  :value="opt.value"
+                  :disabled="!opt.value"
+                >
+                  {{ opt.label }}
+                </option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">对应节气（可选）</label>
+              <select
+                v-model="newRecipeSolarTerm"
+                class="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sandalwood/20 focus:border-sandalwood/60"
+              >
+                <option v-for="opt in solarTermOptions" :key="opt.value" :value="opt.value">
+                  {{ opt.label }}
+                </option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">烹饪时间（可选）</label>
+            <input
+              v-model="newRecipeTime"
+              type="text"
+              class="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-sandalwood/20 focus:border-sandalwood/60"
+              placeholder="例如：约30分钟"
+            />
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">主要功效标签（可选）</label>
+            <input
+              v-model="newRecipeEfficacy"
+              type="text"
+              class="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-sandalwood/20 focus:border-sandalwood/60"
+              placeholder="例如：健脾养胃 清热降火（用空格或逗号分隔）"
+            />
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">食材清单</label>
+            <div class="space-y-2">
+              <div
+                v-for="(ing, idx) in newRecipeIngredients"
+                :key="idx"
+                class="grid grid-cols-[1.2fr_1fr_auto] gap-2 items-center"
+              >
+                <input
+                  v-model="ing.name"
+                  type="text"
+                  class="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-sandalwood/20 focus:border-sandalwood/60"
+                  placeholder="食材名称，如：山药"
+                />
+                <input
+                  v-model="ing.amount"
+                  type="text"
+                  class="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-sandalwood/20 focus:border-sandalwood/60"
+                  placeholder="用量，如：20g"
+                />
+                <button
+                  type="button"
+                  class="text-xs text-gray-400 hover:text-red-500 px-2 py-1 flex items-center gap-1"
+                  @click="newRecipeIngredients.splice(idx, 1)"
+                  v-if="newRecipeIngredients.length > 1"
+                >
+                  <Trash2 class="w-3 h-3" /> 删除
+                </button>
+              </div>
+              <button
+                type="button"
+                class="mt-1 inline-flex items-center px-3 py-1.5 rounded-full border border-gray-300 text-xs text-gray-600 hover:bg-gray-50"
+                @click="newRecipeIngredients.push({ name: '', amount: '' })"
+              >
+                + 添加食材
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">详细步骤</label>
+            <div class="space-y-2">
+              <div
+                v-for="(step, idx) in newRecipeSteps"
+                :key="idx"
+                class="flex items-start gap-2"
+              >
+                <span class="mt-2 text-xs text-gray-400 w-5 text-right">{{ idx + 1 }}.</span>
+                <textarea
+                  v-model="newRecipeSteps[idx]"
+                  rows="2"
+                  class="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-sandalwood/20 focus:border-sandalwood/60"
+                  :placeholder="`填写第 ${idx + 1} 步的做法`"
+                ></textarea>
+                <button
+                  type="button"
+                  class="mt-2 text-xs text-gray-400 hover:text-red-500 px-2 py-1 flex items-center gap-1"
+                  @click="newRecipeSteps.splice(idx, 1)"
+                  v-if="newRecipeSteps.length > 1"
+                >
+                  <Trash2 class="w-3 h-3" /> 删除
+                </button>
+              </div>
+              <button
+                type="button"
+                class="mt-1 inline-flex items-center px-3 py-1.5 rounded-full border border-gray-300 text-xs text-gray-600 hover:bg-gray-50"
+                @click="newRecipeSteps.push('')"
+              >
+                + 添加步骤
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">菜谱配图（可选）</label>
+            <div class="flex items-center gap-3">
+              <div class="w-20 h-20 rounded-xl bg-gray-100 flex items-center justify-center overflow-hidden border border-gray-200 text-gray-400 text-xs">
+                <img v-if="newRecipeImagePreview" :src="newRecipeImagePreview" class="w-full h-full object-cover" />
+                <span v-else>暂无图片</span>
+              </div>
+              <label class="inline-flex items-center px-3 py-2 rounded-full border border-gray-300 text-xs font-medium text-gray-700 cursor-pointer bg-white hover:bg-gray-50">
+                选择图片
+                <input type="file" accept="image/*" class="hidden" @change="onNewRecipeImageSelected" />
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="px-4 py-3 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
+          <button
+            type="button"
+            class="px-4 py-2 rounded-full text-xs font-medium text-gray-500 hover:bg-gray-100"
+            @click="closeNewRecipeModal"
+            :disabled="isPublishingRecipe"
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            class="px-5 py-2 rounded-full text-xs font-bold text-white bg-sandalwood hover:bg-sandalwood/90 disabled:opacity-60 disabled:cursor-not-allowed"
+            @click="handlePublishRecipe"
+            :disabled="isPublishingRecipe"
+          >
+            {{ isPublishingRecipe ? '发布中...' : '发布菜谱' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </transition>
 </template>
 
 <style scoped>
@@ -557,4 +1143,9 @@ onUnmounted(() => {
 .shadow-card { box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05); }
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* 复用食谱详情弹窗的滚动条样式 */
+.custom-scrollbar::-webkit-scrollbar { width: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background-color: #d6d3d1; border-radius: 20px; }
 </style>

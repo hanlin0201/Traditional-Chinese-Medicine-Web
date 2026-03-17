@@ -1,4 +1,6 @@
 <script setup>
+defineOptions({ name: 'HomeView' })
+
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search, Loader2, ArrowLeft, Filter, ChevronDown, X } from 'lucide-vue-next'

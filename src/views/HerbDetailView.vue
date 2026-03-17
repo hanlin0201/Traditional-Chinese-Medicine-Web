@@ -64,29 +64,73 @@ const getPartTagClass = (text) => {
   return 'border-sandalwood/20 bg-sandalwood/5 text-sandalwood/90'
 }
 
-// 具体功效标签颜色（21 类）
+// 具体功效标签颜色（以 CSV“具体功效”内容为准）
+const DETAIL_EFFECT_CLASS_MAP = {
+  // 清热系
+  清热解毒: 'border-sky-200 bg-sky-50 text-sky-700',
+  利水渗湿: 'border-sky-200 bg-sky-50 text-sky-700',
+  泻下通便: 'border-sky-200 bg-sky-50 text-sky-700',
+
+  // 补益/扶正
+  扶正补虚: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+
+  // 痰咳
+  化痰止咳: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+
+  // 理气
+  疏肝理气: 'border-bamboo/25 bg-bamboo/10 text-bamboo',
+
+  // 活血/风湿
+  活血化瘀: 'border-cinnabar/20 bg-cinnabar/5 text-cinnabar',
+  祛风湿痛: 'border-cinnabar/20 bg-cinnabar/5 text-cinnabar',
+
+  // 温散解表
+  温阳散寒: 'border-amber-200 bg-amber-50 text-amber-800',
+  发散表邪: 'border-amber-200 bg-amber-50 text-amber-800',
+  消食导滞: 'border-amber-200 bg-amber-50 text-amber-800',
+
+  // 安神
+  宁心安神: 'border-violet-200 bg-violet-50 text-violet-700',
+
+  // 止血/收涩
+  宁血止血: 'border-rose-200 bg-rose-50 text-rose-700',
+  收敛固涩: 'border-slate-300 bg-slate-50 text-slate-700',
+
+  // 杀虫
+  驱虫杀虫: 'border-slate-300 bg-slate-50 text-slate-700',
+}
+
 const getDetailEffectClass = (text) => {
   if (!text) return ''
-  if (text.includes('健脾') || text.includes('补气') || text.includes('增强免疫') || text.includes('升阳')) {
-    return 'border-amber-200 bg-amber-50 text-amber-800'
-  }
-  if (text.includes('清热') || text.includes('降火') || text.includes('利水') || text.includes('泻下')) {
+  if (DETAIL_EFFECT_CLASS_MAP[text]) return DETAIL_EFFECT_CLASS_MAP[text]
+
+  // 兜底：少量关键词匹配，避免新表偶尔出现的新标签全变成默认色
+  if (text.includes('清热') || text.includes('解毒') || text.includes('利水') || text.includes('泻下')) {
     return 'border-sky-200 bg-sky-50 text-sky-700'
   }
-  if (text.includes('润肺') || text.includes('滋阴') || text.includes('养肝明目')) {
+  if (text.includes('补虚') || text.includes('扶正')) {
     return 'border-emerald-200 bg-emerald-50 text-emerald-700'
   }
-  if (text.includes('活血') || text.includes('祛风湿') || text.includes('散寒') || text.includes('止痛')) {
+  if (text.includes('化痰') || text.includes('止咳')) {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+  }
+  if (text.includes('理气') || text.includes('疏肝')) {
+    return 'border-bamboo/25 bg-bamboo/10 text-bamboo'
+  }
+  if (text.includes('活血') || text.includes('化瘀') || text.includes('风湿') || text.includes('止痛')) {
     return 'border-cinnabar/20 bg-cinnabar/5 text-cinnabar'
   }
-  if (text.includes('养心安神')) {
+  if (text.includes('温阳') || text.includes('散寒') || text.includes('解表') || text.includes('消食')) {
+    return 'border-amber-200 bg-amber-50 text-amber-800'
+  }
+  if (text.includes('安神')) {
     return 'border-violet-200 bg-violet-50 text-violet-700'
   }
-  if (text.includes('驱虫')) {
-    return 'border-slate-300 bg-slate-50 text-slate-700'
-  }
-  if (text.includes('收敛止血')) {
+  if (text.includes('止血')) {
     return 'border-rose-200 bg-rose-50 text-rose-700'
+  }
+  if (text.includes('收敛') || text.includes('固涩') || text.includes('驱虫') || text.includes('杀虫')) {
+    return 'border-slate-300 bg-slate-50 text-slate-700'
   }
   return 'border-sandalwood/20 bg-paper text-sandalwood/90'
 }

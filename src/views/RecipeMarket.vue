@@ -7,12 +7,13 @@ import {
   Clock, UserCheck, Sparkles, Leaf, X, Soup, ListOrdered, 
   Star, Heart, Camera, Send, Loader2, Image as ImageIcon,
   MessageCircle, ThumbsUp, Tag, ChevronLeft, MoreHorizontal,
-  Search, Filter, ChevronDown
+  Search, Filter, ChevronDown, Trash2
 } from 'lucide-vue-next'
 import { supabase } from '@/supabaseClient'
 import { useAuth } from '@/composables/useAuth'
 import { SOLAR_TERMS_LOOKUP } from '@/constants/solarTerms'
 import { BODY_TYPES, EFFICACY_OPTIONS, TIME_RANGES, parseTimeToMinutes } from '@/constants/recipeFilters'
+import { getRecipeMarketCachedData, setRecipeMarketCachedData } from '@/composables/usePagePreload'
 
 const router = useRouter()
 const route = useRoute()
@@ -119,18 +120,37 @@ const homeworkComments = ref([])
 const newHomeworkComment = ref('') 
 const homeworkIsLiked = ref(false) 
 
+function normalizeRecipe(item, myFavorites = []) {
+  return {
+    ...item,
+    bodyType: item.body_type,
+    efficacy: item.efficacy || [],
+    ingredients: item.ingredients || [],
+    steps: item.steps || [],
+    rating: item.rating || (8.5 + Math.random()).toFixed(1),
+    cooked_count: item.cooked_count || 0,
+    is_favorite: myFavorites.includes(item.id),
+  }
+}
+
 // --- 1. 获取基础食谱数据 ---
 const fetchRecipes = async () => {
-  if (recipes.value.length > 0) return 
+  if (recipes.value.length > 0) return
+
+  const cached = getRecipeMarketCachedData()
+  const hasCachedData = Array.isArray(cached) && cached.length > 0
+  if (hasCachedData) {
+    recipes.value = cached
+    loading.value = false
+  }
 
   try {
-    loading.value = true
+    if (!hasCachedData) loading.value = true
     const uid = currentUser.value?.id
 
     let { data, error } = await supabase.from('recipes').select('*').order('id')
     if (error) throw error
 
-    // 获取收藏状态（仅登录用户）
     let myFavorites = []
     if (uid) {
       const { data: favs } = await supabase.from('favorite_recipes').select('recipe_id').eq('user_id', uid)
@@ -138,16 +158,9 @@ const fetchRecipes = async () => {
     }
 
     if (data) {
-      recipes.value = data.map(item => ({
-        ...item,
-        bodyType: item.body_type, 
-        efficacy: item.efficacy || [],
-        ingredients: item.ingredients || [],
-        steps: item.steps || [],
-        rating: item.rating || (8.5 + Math.random()).toFixed(1),
-        cooked_count: item.cooked_count || 0,
-        is_favorite: myFavorites.includes(item.id)
-      }))
+      const normalized = data.map(item => normalizeRecipe(item, myFavorites))
+      recipes.value = normalized
+      setRecipeMarketCachedData(normalized)
     }
   } catch (error) {
     console.error('获取食谱失败:', error)
@@ -164,6 +177,25 @@ const fetchInteractions = async (recipeId) => {
   // 作业按时间倒序
   const { data: hData } = await supabase.from('homeworks').select('*').eq('recipe_id', recipeId).order('created_at', { ascending: false })
   homeworks.value = hData || []
+
+  // 统一用作业条数回填“已交作业数”，避免刷新后又变成 0
+  const count = homeworks.value.length
+  const recipeInList = recipes.value.find(r => r.id === recipeId)
+  if (recipeInList) {
+    recipeInList.cooked_count = count
+  }
+  if (selectedRecipe.value && selectedRecipe.value.id === recipeId) {
+    selectedRecipe.value.cooked_count = count
+  }
+
+  // 如果路由上带了指定的作业 ID，则自动打开对应详情页（用于「我的作品」跳转）
+  const pendingHomeworkId = route.query.homework_id
+  if (pendingHomeworkId) {
+    const targetHomework = homeworks.value.find(h => String(h.id) === String(pendingHomeworkId))
+    if (targetHomework) {
+      openHomeworkPage(targetHomework)
+    }
+  }
 }
 
 // --- 3. 提交评论 ---
@@ -243,23 +275,31 @@ const submitHomework = async () => {
     // 处理标签
     const tagsArray = uploadTags.value.split(/[,，\s]+/).filter(t => t.trim())
 
-    const { error: dbError } = await supabase.from('homeworks').insert({
+    const { data: inserted, error: dbError } = await supabase.from('homeworks').insert({
       recipe_id: selectedRecipe.value.id,
       user_id: currentUser.value.id,
       image_url: publicUrlData.publicUrl,
       content: uploadContent.value || '打卡成功！',
       tags: tagsArray, 
       user_name: currentUser.value.user_metadata?.full_name || '养生达人'
-    })
+    }).select().single()
 
     if (dbError) throw dbError
 
     alert('作业发布成功！')
     
-    // 手动 +1
+    // 手动 +1（本地 + 数据库）
     selectedRecipe.value.cooked_count = (selectedRecipe.value.cooked_count || 0) + 1
+    await supabase
+      .from('recipes')
+      .update({ cooked_count: selectedRecipe.value.cooked_count })
+      .eq('id', selectedRecipe.value.id)
     
     closeUploadModal()
+    // 优先把新作业插入到本地列表顶部，避免等待网络
+    if (inserted) {
+      homeworks.value = [inserted, ...homeworks.value]
+    }
     fetchInteractions(selectedRecipe.value.id)
     
   } catch (e) {
@@ -273,6 +313,13 @@ const submitHomework = async () => {
 const openHomeworkPage = async (homework) => {
   selectedHomework.value = homework
   showHomeworkPage.value = true
+  // 同步路由参数，便于从个人中心跳转/分享
+  router.replace({
+    query: {
+      ...route.query,
+      homework_id: homework.id,
+    },
+  })
   
   const { data: comments } = await supabase.from('homework_comments').select('*').eq('homework_id', homework.id).order('created_at', { ascending: true })
   homeworkComments.value = comments || []
@@ -286,6 +333,43 @@ const openHomeworkPage = async (homework) => {
 const closeHomeworkPage = () => {
   showHomeworkPage.value = false
   selectedHomework.value = null
+  router.replace({
+    query: {
+      ...route.query,
+      homework_id: undefined,
+    },
+  })
+}
+
+// 删除当前查看的作业（仅作者本人可见）
+const deleteSelectedHomework = async () => {
+  if (!currentUser.value || !selectedHomework.value) return
+  if (currentUser.value.id !== selectedHomework.value.user_id) return
+  if (!confirm('确定要删除这条作业吗？')) return
+
+  try {
+    const { error } = await supabase
+      .from('homeworks')
+      .delete()
+      .eq('id', selectedHomework.value.id)
+      .eq('user_id', currentUser.value.id)
+
+    if (error) throw error
+
+    homeworks.value = homeworks.value.filter(h => h.id !== selectedHomework.value.id)
+    if (selectedRecipe.value) {
+      const nextCount = Math.max(0, (selectedRecipe.value.cooked_count || 0) - 1)
+      selectedRecipe.value.cooked_count = nextCount
+      await supabase
+        .from('recipes')
+        .update({ cooked_count: nextCount })
+        .eq('id', selectedRecipe.value.id)
+    }
+    closeHomeworkPage()
+  } catch (e) {
+    console.error(e)
+    alert('删除失败，请稍后重试')
+  }
 }
 
 const toggleHomeworkLike = async () => {
@@ -350,11 +434,16 @@ onMounted(() => fetchRecipes())
 
 onActivated(() => {
   const pendingId = route.query.open_id
-  if (pendingId && !selectedRecipe.value) {
-    const target = recipes.value.find(r => r.id == pendingId)
-    if (target) {
-      selectedRecipe.value = target
-      fetchInteractions(target.id)
+  if (pendingId) {
+    if (!selectedRecipe.value || selectedRecipe.value.id != pendingId) {
+      const target = recipes.value.find(r => r.id == pendingId)
+      if (target) {
+        selectedRecipe.value = target
+        fetchInteractions(target.id)
+      }
+    } else if (selectedRecipe.value) {
+      // 已经有选中的食谱，但可能需要根据新路由参数重新加载互动数据
+      fetchInteractions(selectedRecipe.value.id)
     }
   }
 })
@@ -716,7 +805,16 @@ onActivated(() => {
                  <Heart :size="22" :class="homeworkIsLiked ? 'fill-red-500 text-red-500' : 'text-stone-800'" />
                  <span class="text-[10px] text-stone-500">{{ selectedHomework.likes_count || '赞' }}</span>
               </button>
-              
+
+              <button
+                v-if="currentUser && selectedHomework && currentUser.id === selectedHomework.user_id"
+                @click="deleteSelectedHomework"
+                class="flex items-center gap-1 text-xs text-red-500 px-3 py-1.5 rounded-full border border-red-200 hover:bg-red-50"
+              >
+                <Trash2 :size="14" />
+                删除作业
+              </button>
+
               </div>
         </div>
       </Teleport>

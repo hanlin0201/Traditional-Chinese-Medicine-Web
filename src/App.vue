@@ -61,7 +61,7 @@ function openAuthPanel() {
 
     <main class="relative z-0">
       <RouterView v-slot="{ Component }">
-        <KeepAlive include="RecipeMarket">
+        <KeepAlive include="RecipeMarket,HomeView">
           <component :is="Component" />
         </KeepAlive>
       </RouterView>
