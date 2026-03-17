@@ -18,6 +18,7 @@ const { user, handleLogout } = useAuth()
 const loading = ref(true)
 const activeTab = ref('plans')
 const foldedStates = ref({}) 
+const showAccountMenu = ref(false)
 
 // --- 基础数据 ---
 const username = ref('')
@@ -498,10 +499,18 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('profile-updated', getProfile)
 })
+
+function toggleAccountMenu() {
+  showAccountMenu.value = !showAccountMenu.value
+}
+
+function closeAccountMenu() {
+  showAccountMenu.value = false
+}
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#FDFBF7] pb-24">
+  <div class="min-h-screen bg-[#FDFBF7] pb-24" @click="closeAccountMenu">
     
     <div class="bg-sandalwood text-white pt-12 pb-16 px-4 relative overflow-hidden shadow-lg">
       <div class="absolute top-0 right-0 opacity-10 transform translate-x-10 -translate-y-10 pointer-events-none">
@@ -509,6 +518,38 @@ onUnmounted(() => {
       </div>
 
       <div class="relative z-10 flex flex-col items-center sm:flex-row sm:items-start gap-6 max-w-4xl mx-auto">
+        <button
+          type="button"
+          class="absolute top-0 right-0 p-2 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center"
+          @click.stop="toggleAccountMenu"
+          aria-label="账号设置"
+        >
+          <Settings class="w-5 h-5 text-white" />
+        </button>
+
+        <div
+          v-if="showAccountMenu"
+          class="absolute top-10 right-0 w-36 bg-white text-gray-800 rounded-xl shadow-xl border border-sandalwood/10 py-2 z-20"
+          @click.stop
+        >
+          <button
+            type="button"
+            class="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-stone-50"
+            @click="doLogout"
+          >
+            <LogOut class="w-4 h-4 text-stone-400" />
+            <span>退出登录</span>
+          </button>
+          <button
+            type="button"
+            class="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-stone-50"
+            @click="doSwitchAccount"
+          >
+            <UserPlus class="w-4 h-4 text-stone-400" />
+            <span>切换账号</span>
+          </button>
+        </div>
+
         <input type="file" ref="fileInput" accept="image/*" class="hidden" @change="handleFileChange" />
         <div 
           @click="triggerFileInput"
@@ -550,34 +591,11 @@ onUnmounted(() => {
              <div><span class="text-white text-lg font-bold block">{{ savedRecipes.length + favoriteHerbs.length }}</span>收藏</div>
              <div><span class="text-white text-lg font-bold block">{{ myWorks.length }}</span>作品</div>
           </div>
-          <div class="mt-4">
-            <router-link to="/profile/edit" class="inline-flex items-center gap-1.5 text-white/90 hover:text-white text-sm font-medium">
-              <Edit2 class="w-4 h-4" /> 编辑资料
-            </router-link>
-          </div>
         </div>
       </div>
     </div>
 
   <div class="-mt-8 px-2 relative z-20 w-full space-y-4 max-w-6xl mx-auto">
-      
-      <div class="bg-white rounded-xl shadow-card p-4 border border-sandalwood/5 overflow-hidden">
-        <h3 class="font-bold text-gray-700 mb-3 flex items-center gap-2"><Settings class="w-4 h-4 text-sandalwood" /> 账号与设置</h3>
-        <div class="space-y-1">
-          <router-link to="/profile/edit" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-stone-50 transition-colors">
-            <Edit2 class="w-4 h-4 text-stone-400" />
-            <span>编辑资料</span>
-          </router-link>
-          <button type="button" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-stone-50 transition-colors text-left" @click="doLogout">
-            <LogOut class="w-4 h-4 text-stone-400" />
-            <span>退出登录</span>
-          </button>
-          <button type="button" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-stone-50 transition-colors text-left" @click="doSwitchAccount">
-            <UserPlus class="w-4 h-4 text-stone-400" />
-            <span>切换账号</span>
-          </button>
-        </div>
-      </div>
 
       <div class="bg-white rounded-xl shadow-card p-1 border border-sandalwood/5 overflow-hidden">
          <HealthTagManager />
