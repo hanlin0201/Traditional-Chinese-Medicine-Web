@@ -12,6 +12,17 @@ import Herb3DScene from '@/components/Herb3DScene.vue'
 import { supabase } from '@/supabaseClient' 
 import { useAuth } from '@/composables/useAuth'
 import { getHerbTagDisplayByName } from '@/composables/useHerbTags'
+// 入药部位对应的顶部背景图（放在项目根目录的 png）
+import partRootImg from '../../根茎类.png'
+import partFruitSeedImg from '../../果实种子类.png'
+import partWholeHerbImg from '../../全草类.png'
+import partFlowerImg from '../../花类.png'
+import partVineImg from '../../藤木类.png'
+import partAnimalImg from '../../动物类.png'
+import partBranchBarkImg from '../../枝叶树皮类.png'
+import partFungiAlgaeImg from '../../菌藻类.png'
+import partMineralImg from '../../矿物类.png'
+import partOtherImg from '../../其它.png'
 
 const route = useRoute()
 const router = useRouter()
@@ -32,6 +43,33 @@ const isToggling = ref(false) // 是否正在交互中(防止连点)
 const herbTagInfo = computed(() => {
   if (!herb.value || !herb.value.name) return null
   return getHerbTagDisplayByName(herb.value.name) || null
+})
+
+// 入药部位 → 背景图映射（用普通对象，避免类型标注报错）
+const PART_BG_MAP = {
+  '根茎类': partRootImg,
+  '果实/种子类': partFruitSeedImg,
+  '全草类': partWholeHerbImg,
+  '花类': partFlowerImg,
+  '藤木类': partVineImg,
+  '动物类': partAnimalImg,
+  '枝叶/树皮类': partBranchBarkImg,
+  '菌藻类': partFungiAlgaeImg,
+  '矿物类': partMineralImg,
+  '其他': partOtherImg,
+}
+
+// 计算当前药材对应的入药部位背景图
+const herbPartBg = computed(() => {
+  const part = herbTagInfo.value?.part
+  if (!part) return null
+  // 直接用 includes 兼容 “根茎”“根茎类”等写法
+  for (const key of Object.keys(PART_BG_MAP)) {
+    if (part.includes(key.replace('类', ''))) {
+      return PART_BG_MAP[key]
+    }
+  }
+  return null
 })
 
 // 根据药性文本返回颜色样式：凉→蓝，平→绿，温→橙
@@ -344,41 +382,119 @@ function goBack() {
     </template>
 
     <template v-else>
-      <!-- 顶部封面区域：优先展示真实药材图片，缺图时回退到 3D 占位 -->
-      <div class="w-full h-[42vh] min-h-[300px] bg-paper/90 border-b border-sandalwood/10 relative overflow-hidden">
-        <!-- 有封面图时：展示大图 -->
-        <template v-if="herb?.image_url">
-          <img
-            :src="herb.image_url"
-            alt=""
-            class="w-full h-full object-contain md:object-cover transform scale-105 md:scale-100"
-          />
-          <!-- 顶部和底部做一点渐变，保证标题/内容可读 -->
-          <div class="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-[#FDFBF7] via-[#FDFBF7]/40 to-transparent" />
-          <div class="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#FDFBF7] via-[#FDFBF7]/40 to-transparent" />
-        </template>
-
-        <!-- 无封面图时：保留原来的 3D 场景作为占位 -->
-        <template v-else>
-          <TresCanvas clear-color="#FDFBF7" alpha>
-            <TresPerspectiveCamera :position="[3, 3, 3]" :look-at="[0, 0, 0]" />
-            <OrbitControls :enable-zoom="false" :auto-rotate="false" /> 
-            <Herb3DScene />
-            <TresAmbientLight :intensity="1.5" />
-            <TresDirectionalLight :position="[5, 5, 5]" :intensity="1" />
-          </TresCanvas>
-          
-          <div class="absolute bottom-2 right-4 text-xs text-sandalwood/40 font-serif pointer-events-none">
-            ⟲ 拖动旋转查看
-          </div>
-        </template>
+      <!-- 顶部封面区域：统一纸张渐变 + 分类底图 -->
+      <div class="w-full h-[220px] sm:h-[260px] md:h-[300px] bg-gradient-to-b from-[#F8F1E6] to-[#F1E4D1] border-b border-sandalwood/10 relative overflow-hidden">
+        <!-- 分类背景图：根据入药部位切换 -->
+        <img
+          v-if="herbPartBg"
+          :src="herbPartBg"
+          alt=""
+          class="absolute inset-0 w-full h-full object-cover object-[center_70%] opacity-70 mix-blend-multiply"
+        />
+        <!-- 顶部/底部轻微光晕，保证信息卡片与文字对比度 -->
+        <div class="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-[#FDFBF7] via-[#FDFBF7]/40 to-transparent pointer-events-none" />
+        <div class="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#FDFBF7] via-[#FDFBF7]/40 to-transparent pointer-events-none" />
       </div>
 
-      <main class="flex-1 px-4 py-6 max-w-2xl mx-auto w-full space-y-5 animate-fade-in-up">
-        
-        <div class="flex justify-center mb-2">
-          <div class="flex p-1 rounded-xl bg-sandalwood/5 border border-sandalwood/10 w-full max-w-xs shadow-inner">
-            <button
+      <!-- 主体区域：悬浮信息卡片 + 模式切换 + 目录 + 详细内容 -->
+      <main class="flex-1 px-4 pb-10 -mt-10 sm:-mt-16 relative z-0">
+        <!-- 悬浮信息卡片 -->
+        <section class="max-w-4xl mx-auto">
+          <div
+            class="bg-paper-card shadow-paper rounded-2xl border border-sandalwood/15 px-4 sm:px-6 py-4 sm:py-5 flex flex-col sm:flex-row gap-4 sm:gap-6 items-start sm:items-center"
+          >
+            <!-- 药材缩略图 -->
+            <div
+              v-if="herb?.image_url"
+              class="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden border border-sandalwood/15 bg-paper flex-shrink-0"
+            >
+              <img
+                :src="herb.image_url"
+                :alt="herb?.name || '药材图片'"
+                class="w-full h-full object-cover"
+              />
+            </div>
+            <div v-else class="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl border border-dashed border-sandalwood/20 bg-paper/70 flex items-center justify-center text-[11px] text-sandalwood/50 flex-shrink-0">
+              无图片
+            </div>
+
+            <!-- 基本信息文案 -->
+            <div class="flex-1 space-y-2">
+              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <h1 class="font-serif font-semibold text-sandalwood text-xl sm:text-2xl">
+                  {{ herb?.name || '药材详情' }}
+                </h1>
+                <p v-if="herb?.pinyin || herb?.latin_name" class="text-xs sm:text-sm text-sandalwood/60">
+                  {{ herb?.pinyin }}<span v-if="herb?.pinyin && herb?.latin_name"> · </span>{{ herb?.latin_name }}
+                </p>
+              </div>
+              <p v-if="herb?.alias" class="text-xs sm:text-sm text-sandalwood/60">
+                别名：{{ herb.alias }}
+              </p>
+
+              <!-- 功效与属性标签：紧跟在别名下方 -->
+              <div v-if="herbTagInfo" class="space-y-1.5 pt-1">
+                <div class="flex flex-wrap gap-1.5 text-[11px] sm:text-xs">
+                  <span
+                    v-if="herbTagInfo.efficacyCategory"
+                    class="px-2.5 py-1 rounded-full border bg-paper text-sandalwood/90 border-sandalwood/30 font-semibold"
+                  >
+                    {{ herbTagInfo.efficacyCategory }}
+                  </span>
+                  <span
+                    v-if="herbTagInfo.nature"
+                    :class="['px-2.5 py-1 rounded-full border font-semibold', getNatureTagClass(herbTagInfo.nature)]"
+                  >
+                    {{ herbTagInfo.nature }}
+                  </span>
+                  <span
+                    v-if="herbTagInfo.taste"
+                    class="px-2.5 py-1 rounded-full border border-amber-100 bg-amber-50 text-amber-700 font-semibold"
+                  >
+                    {{ herbTagInfo.taste }}
+                  </span>
+                  <span
+                    v-if="herbTagInfo.part"
+                    :class="['px-2.5 py-1 rounded-full border font-semibold', getPartTagClass(herbTagInfo.part)]"
+                  >
+                    {{ herbTagInfo.part }}
+                  </span>
+                  <span
+                    v-if="herbTagInfo.meridian"
+                    class="px-2.5 py-1 rounded-full border border-cinnabar/15 bg-cinnabar/5 text-cinnabar font-semibold"
+                  >
+                    {{ herbTagInfo.meridian }}
+                  </span>
+                </div>
+
+                <!-- 具体功效标签 -->
+                <div
+                  v-if="herbTagInfo.detailEffects && herbTagInfo.detailEffects.length"
+                  class="flex flex-wrap gap-1.5 pt-0.5 text-[10px] sm:text-[11px]"
+                >
+                  <span
+                    v-for="effect in herbTagInfo.detailEffects"
+                    :key="effect"
+                    :class="['px-2 py-0.5 rounded-full border font-medium', getDetailEffectClass(effect)]"
+                  >
+                    {{ effect }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- 关键属性一行展示（不再重复“某某类”） -->
+              <div class="flex flex-wrap gap-1.5 mt-1 text-[11px] sm:text-xs">
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 模式切换与目录 -->
+        <section class="max-w-4xl mx-auto mt-5 space-y-4">
+          <!-- 模式切换 -->
+          <div class="flex justify-center">
+            <div class="flex p-1 rounded-xl bg-sandalwood/5 border border-sandalwood/10 w-full max-w-xs shadow-inner">
+              <button
               type="button"
               :class="[
                 'flex-1 py-2.5 rounded-lg text-sm font-medium font-serif transition-all duration-300',
@@ -402,78 +518,28 @@ function goBack() {
             >
               专业典籍
             </button>
+            </div>
           </div>
-        </div>
-        
-        <!-- 药材多维标签：位于模式切换下方、具体介绍上方 -->
-        <div v-if="herbTagInfo" class="space-y-1.5">
-          <div class="flex flex-wrap gap-2 text-xs sm:text-sm">
-            <span
-              v-if="herbTagInfo.efficacyCategory"
-              class="px-3 py-1 rounded-full border bg-paper text-sandalwood/90 border-sandalwood/30 font-semibold"
-            >
-              {{ herbTagInfo.efficacyCategory }}
-            </span>
-            <span
-              v-if="herbTagInfo.nature"
-              :class="['px-3 py-1 rounded-full border font-semibold', getNatureTagClass(herbTagInfo.nature)]"
-            >
-              {{ herbTagInfo.nature }}
-            </span>
-            <span
-              v-if="herbTagInfo.taste"
-              class="px-3 py-1 rounded-full border border-amber-100 bg-amber-50 text-amber-700 font-semibold"
-            >
-              {{ herbTagInfo.taste }}
-            </span>
-            <span
-              v-if="herbTagInfo.part"
-              :class="['px-3 py-1 rounded-full border font-semibold', getPartTagClass(herbTagInfo.part)]"
-            >
-              {{ herbTagInfo.part }}
-            </span>
-            <span
-              v-if="herbTagInfo.meridian"
-              class="px-3 py-1 rounded-full border border-cinnabar/15 bg-cinnabar/5 text-cinnabar font-semibold"
-            >
-              {{ herbTagInfo.meridian }}
-            </span>
-          </div>
+        </section>
 
-          <!-- 具体功效标签 -->
-          <div
-            v-if="herbTagInfo.detailEffects && herbTagInfo.detailEffects.length"
-            class="flex flex-wrap gap-1.5 pt-0.5"
-          >
-            <span
-              v-for="effect in herbTagInfo.detailEffects"
-              :key="effect"
-              :class="['px-2.5 py-1 rounded-full border text-[11px] sm:text-xs font-medium', getDetailEffectClass(effect)]"
-            >
-              {{ effect }}
-            </span>
-          </div>
-        </div>
+        <!-- 下方标签区与锚点已合并进顶部信息卡片，这里留白以便内容“呼吸” -->
+        <section class="max-w-4xl mx-auto mt-4" />
         
         <!-- 专业模式：原有 herbs 表内容 -->
         <template v-if="detailMode === 'professional'">
-          <div class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
+          <section id="section-basic" class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
             <h2 class="text-cinnabar font-serif font-semibold text-base mb-3 flex items-center gap-2">
               <span class="w-1 h-4 bg-cinnabar rounded" /> 基本信息
             </h2>
             <div class="space-y-2 text-sm">
-              <div class="flex" v-if="herb.classification">
-                <span class="text-sandalwood/60 w-20 shrink-0">药材类别</span>
-                <span class="text-sandalwood/90">{{ herb.classification }}</span>
-              </div>
               <div class="flex" v-if="herb.alias">
                 <span class="text-sandalwood/60 w-20 shrink-0">别名</span>
                 <span class="text-sandalwood/90">{{ herb.alias }}</span>
               </div>
             </div>
-          </div>
+          </section>
 
-          <div class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
+          <section id="section-taste-meridian" class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
             <h2 class="text-cinnabar font-serif font-semibold text-base mb-2 flex items-center gap-2">
               <span class="w-1 h-4 bg-cinnabar rounded" /> 性味归经
             </h2>
@@ -481,9 +547,9 @@ function goBack() {
               {{ herb.nature }}；{{ herb.channel }}
               {{ herb.taste ? '；' + herb.taste : '' }}
             </p>
-          </div>
+          </section>
 
-          <div class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
+          <section id="section-function" class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
             <h2 class="text-cinnabar font-serif font-semibold text-base mb-2 flex items-center gap-2">
               <span class="w-1 h-4 bg-cinnabar rounded" /> 功效与作用
             </h2>
@@ -495,9 +561,9 @@ function goBack() {
               class="text-sandalwood/90 text-sm leading-relaxed text-justify formatted-content"
               v-html="formatNumberedText(herb.effect)"
             ></div>
-          </div>
+          </section>
 
-          <div class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
+          <section id="section-usage" class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
             <h2 class="text-bamboo font-serif font-semibold text-base mb-2 flex items-center gap-2">
               <span class="w-1 h-4 bg-bamboo rounded" /> 用法用量
             </h2>
@@ -505,7 +571,7 @@ function goBack() {
               class="text-sandalwood/90 text-sm leading-relaxed text-justify formatted-content"
               v-html="formatNumberedText(herb.usage)"
             ></div>
-          </div>
+          </section>
 
           <div class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
             <h2 class="text-cinnabar font-serif font-semibold text-base mb-2 flex items-center gap-2">
@@ -574,7 +640,7 @@ function goBack() {
 
               </div>
 
-              <div v-if="herbEasy.safety_alarm || herbEasy.is_safe_for_pregnant !== null" class="rounded-xl bg-red-50/40 shadow-paper p-5 border border-red-100 space-y-3">
+              <section id="section-caution" v-if="herbEasy.safety_alarm || herbEasy.is_safe_for_pregnant !== null" class="rounded-xl bg-red-50/40 shadow-paper p-5 border border-red-100 space-y-3">
                 <h2 class="text-cinnabar font-serif font-semibold text-base flex items-center gap-2">
                   <span class="w-1 h-4 bg-cinnabar rounded" /> 注意事项
                 </h2>
@@ -589,7 +655,7 @@ function goBack() {
                     {{ herbEasy.is_safe_for_pregnant ? '安全可用' : '慎用或禁用' }}
                   </span>
                 </div>
-              </div>
+              </section>
 
             </div>
           </template>
