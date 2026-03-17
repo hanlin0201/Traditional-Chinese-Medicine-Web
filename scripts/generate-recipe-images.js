@@ -42,7 +42,10 @@ function parseCli() {
     strict: true,
   })
   return {
-    style: values.style || process.env.RECIPE_IMAGE_STYLE || '温暖的中式养生食物摄影，自然光',
+    style:
+      values.style ||
+      process.env.RECIPE_IMAGE_STYLE ||
+      '高质量写实风格的中式家常养生菜肴美食摄影，真实灯光与质感，细节清晰，接近实拍照片，无文字，无插画风',
     onlyPlaceholders: values['only-placeholders'],
     limit: values.limit ? parseInt(values.limit, 10) : null,
   }
