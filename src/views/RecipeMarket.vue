@@ -121,6 +121,7 @@ const newHomeworkComment = ref('')
 const homeworkIsLiked = ref(false) 
 
 function normalizeRecipe(item, myFavorites = []) {
+  const isUserSubmission = !!(item.author_user_id != null && String(item.author_user_id).length > 0)
   return {
     ...item,
     bodyType: item.body_type,
@@ -130,6 +131,9 @@ function normalizeRecipe(item, myFavorites = []) {
     rating: item.rating || (8.5 + Math.random()).toFixed(1),
     cooked_count: item.cooked_count || 0,
     is_favorite: myFavorites.includes(item.id),
+    is_user_submission: isUserSubmission,
+    author_display_name: item.author_name || '养生达人',
+    author_display_avatar: item.author_avatar_url || '',
   }
 }
 
@@ -148,7 +152,11 @@ const fetchRecipes = async () => {
     if (!hasCachedData) loading.value = true
     const uid = currentUser.value?.id
 
-    let { data, error } = await supabase.from('recipes').select('*').order('id')
+    let { data, error } = await supabase
+      .from('recipes')
+      .select('*')
+      .or('moderation_status.eq.published,moderation_status.is.null')
+      .order('id')
     if (error) throw error
 
     let myFavorites = []
@@ -583,6 +591,20 @@ onActivated(() => {
         </div>
         <div class="p-4 flex-1 flex flex-col">
           <h3 class="text-lg font-bold text-stone-800 mb-1">{{ recipe.name }}</h3>
+          <div v-if="recipe.is_user_submission" class="flex items-center gap-2 mb-2">
+            <img
+              v-if="recipe.author_display_avatar"
+              :src="recipe.author_display_avatar"
+              class="w-6 h-6 rounded-full object-cover border border-stone-200"
+              alt=""
+            />
+            <div
+              v-else
+              class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-[10px] font-bold"
+            >{{ recipe.author_display_name?.[0] }}</div>
+            <span class="text-xs text-stone-500 truncate max-w-[10rem]">{{ recipe.author_display_name }}</span>
+            <span class="text-[10px] px-1.5 py-0 rounded border border-amber-200 bg-amber-50 text-amber-900 shrink-0">用户投稿</span>
+          </div>
           <p class="text-xs text-stone-400 mb-3">{{ recipe.cooked_count }} 人做过</p>
           <div class="flex flex-wrap gap-2 mt-auto">
             <span class="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-100">{{ recipe.bodyType }}</span>
@@ -617,6 +639,27 @@ onActivated(() => {
 
               <div class="p-6 sm:p-8 -mt-6 relative z-10">
                 <h2 class="text-3xl font-bold text-stone-900 mb-2">{{ selectedRecipe.name }}</h2>
+
+                <div
+                  v-if="selectedRecipe.is_user_submission"
+                  class="flex items-center gap-3 mb-6 p-3 rounded-xl bg-amber-50/60 border border-amber-100"
+                >
+                  <img
+                    v-if="selectedRecipe.author_display_avatar"
+                    :src="selectedRecipe.author_display_avatar"
+                    class="w-10 h-10 rounded-full object-cover border border-amber-200 shrink-0"
+                    alt=""
+                  />
+                  <div
+                    v-else
+                    class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-sm font-bold shrink-0"
+                  >{{ selectedRecipe.author_display_name?.[0] }}</div>
+                  <div class="min-w-0">
+                    <div class="text-[10px] text-amber-800/80">发布者</div>
+                    <div class="font-semibold text-stone-800 truncate">{{ selectedRecipe.author_display_name }}</div>
+                  </div>
+                  <span class="ml-auto text-[10px] px-2 py-0.5 rounded-full border border-amber-200 bg-white text-amber-900 shrink-0">用户实名投稿</span>
+                </div>
                 
                 <div class="flex items-center gap-4 mb-8 bg-stone-50 p-4 rounded-xl border border-stone-100">
                    <div class="text-center px-4 border-r border-stone-200">

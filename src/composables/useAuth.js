@@ -8,6 +8,7 @@
 import { ref, computed } from 'vue'
 import { supabase } from '@/supabaseClient'
 import * as auth from '@/auth'
+import { ADMIN_LOGIN_EMAIL } from '@/utils/loginEmail'
 
 const GUEST_KEY = 'herb_guest'
 
@@ -17,19 +18,23 @@ const isGuest = ref(false)
 
 async function _fetchProfile() {
   if (!user.value?.id) return
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
-    .select('username, bio, avatar_url, location')
+    .select('*')
     .eq('id', user.value.id)
     .maybeSingle()
+  if (error && error.code !== 'PGRST116') {
+    console.warn('profiles 读取失败', error)
+  }
   profile.value = data
     ? {
         username: data.username ?? '',
         bio: data.bio ?? '',
         avatar_url: data.avatar_url ?? '',
         location: data.location ?? '',
+        is_admin: !!data.is_admin,
       }
-    : { username: '', bio: '', avatar_url: '', location: '' }
+    : { username: '', bio: '', avatar_url: '', location: '', is_admin: false }
 }
 
 /** 清除游客标记，避免刷新后被误判为游客 */
@@ -89,6 +94,13 @@ export async function initAuth() {
 
 export function useAuth() {
   const gatePassed = computed(() => isGuest.value || !!user.value)
+
+  /** 管理员：固定测试账号邮箱 或 profiles.is_admin */
+  const isAdmin = computed(() => {
+    if (!user.value) return false
+    if (user.value.email === ADMIN_LOGIN_EMAIL) return true
+    return !!profile.value?.is_admin
+  })
 
   async function handleLogin(email, password) {
     const res = await auth.handleLogin(email, password)
@@ -166,6 +178,7 @@ export function useAuth() {
     profile,
     isGuest,
     gatePassed,
+    isAdmin,
     handleLogin,
     handleRegister,
     sendLoginOtp,

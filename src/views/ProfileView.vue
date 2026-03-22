@@ -6,15 +6,17 @@ import { useAuth } from '@/composables/useAuth'
 import HealthTagManager from '@/components/HealthTagManager.vue'
 import { SOLAR_TERMS_LOOKUP } from '@/constants/solarTerms'
 import { BODY_TYPES } from '@/constants/recipeFilters'
+import { ADMIN_LOGIN_EMAIL } from '@/utils/loginEmail'
+import { clearRecipeMarketCache } from '@/composables/usePagePreload'
 import { 
   Trash2, ChevronDown, FileText, ChefHat, User, Edit2, 
   Check, Camera, Calendar, Activity, X, Leaf, 
   Lock, Unlock, Image as ImageIcon, BookOpen, Utensils, Settings, LogOut, UserPlus,
-  UserCheck, Sparkles, Soup, ListOrdered, Clock
+  UserCheck, Sparkles, Soup, ListOrdered, Clock, Mail, ShieldCheck, CircleSlash
 } from 'lucide-vue-next'
 
 const router = useRouter()
-const { user, handleLogout } = useAuth()
+const { user, handleLogout, isAdmin } = useAuth()
 const loading = ref(true)
 const activeTab = ref('plans')
 const foldedStates = ref({}) 
@@ -41,7 +43,14 @@ const carePlans = ref([])
 const savedRecipes = ref([])   // 🌟 混合了 AI 和 广场食谱
 const favoriteHerbs = ref([])  
 const myWorks = ref([])        
-const myRecipes = ref([])      
+/** 旧版：仅存 profiles.my_recipes JSON（未走 recipes 表） */
+const myRecipes = ref([])
+/** 新版：当前用户在 recipes 表中的投稿（含审核状态） */
+const dbMyRecipes = ref([])
+const inboxMessages = ref([])
+/** 管理员：待审核队列 */
+const pendingModeration = ref([])
+const moderationBusy = ref(false)
 
 // --- 我发布的菜谱：发布弹窗状态 ---
 const showNewRecipeModal = ref(false)
@@ -49,7 +58,8 @@ const newRecipeName = ref('')
 const newRecipeDesc = ref('')
 const newRecipeBodyType = ref('')
 const newRecipeSolarTerm = ref('')
-const newRecipeTime = ref('')
+const newRecipeTimeNumber = ref('')
+const newRecipeTimeUnit = ref('分钟')  // 分钟 | 小时
 const newRecipeEfficacy = ref('')
 // 结构化食材/步骤输入：支持逐项新增/删除
 const newRecipeIngredients = ref([{ name: '', amount: '' }])
@@ -57,11 +67,50 @@ const newRecipeSteps = ref([''])
 const newRecipeImageFile = ref(null)
 const newRecipeImagePreview = ref('')
 const isPublishingRecipe = ref(false)
+/** 勾选后写入 recipes 表且 moderation_status=pending，显示「审核中」 */
+const publishToSquare = ref(false)
+
+const mergedMyRecipes = computed(() => {
+  const db = (dbMyRecipes.value || []).map((r) => ({ ...r, _rowSource: 'db' }))
+  const leg = (myRecipes.value || []).map((r) => ({ ...r, _rowSource: 'legacy' }))
+  return [...db, ...leg].sort(
+    (a, b) =>
+      new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
+  )
+})
+
+function getMyRecipeStatusLabel(r) {
+  if (r._rowSource === 'legacy') return '个人菜谱'
+  const s = r.moderation_status
+  if (s === 'pending') return '审核中'
+  if (s === 'published') return '已发布菜谱'
+  return '个人菜谱'
+}
+
+function statusLabelClass(label) {
+  if (label === '审核中') return 'bg-amber-50 text-amber-800 border-amber-100'
+  if (label === '已发布菜谱') return 'bg-emerald-50 text-emerald-800 border-emerald-100'
+  return 'bg-stone-50 text-stone-600 border-stone-100'
+}
+
+function canDeleteMyRecipeEntry(r) {
+  if (r._rowSource === 'legacy') return true
+  if (r.moderation_status === 'pending') return false
+  return true
+}
 
 const solarTermOptions = computed(() => [
   { value: '', label: '不按节气' },
   ...SOLAR_TERMS_LOOKUP.map(t => ({ value: t.name, label: t.name }))
 ])
+
+/** 烹饪时间：数字 + 单位 组合为 "约xx分钟/小时" */
+function computedTimeStr() {
+  const n = String(newRecipeTimeNumber.value || '').trim()
+  if (!n || isNaN(Number(n)) || Number(n) <= 0) return null
+  const u = newRecipeTimeUnit.value === '小时' ? '小时' : '分钟'
+  return `约${n}${u}`
+}
 
 // --- 我发布的食谱：详情弹窗 & 删除 ---
 const selectedMyRecipe = ref(null)
@@ -72,29 +121,134 @@ function closeMyRecipe() {
   selectedMyRecipe.value = null
 }
 
-async function deleteMyRecipe(recipeId) {
+async function cascadeDeletePublishedFromSquare(recipeId) {
+  const rid = recipeId
+  await supabase.from('comments').delete().eq('recipe_id', rid)
+  await supabase.from('homeworks').delete().eq('recipe_id', rid)
+  await supabase.from('favorite_recipes').delete().eq('recipe_id', rid)
+  const { error } = await supabase.from('recipes').delete().eq('id', rid)
+  if (error) throw error
+}
+
+async function deleteMyRecipeEntry(r) {
   if (!user.value) {
     alert('请先登录后再操作')
     return
   }
-  if (!confirm('确定要删除这条已发布的食谱吗？')) return
+  if (!canDeleteMyRecipeEntry(r)) {
+    alert('该食谱正在审核中，请等待审核结束后再删除')
+    return
+  }
+  if (!confirm('确定要删除这条食谱吗？')) return
 
   try {
-    const next = myRecipes.value.filter(r => r.id !== recipeId)
-    const { error } = await supabase
-      .from('profiles')
-      .update({ my_recipes: next, updated_at: new Date() })
-      .eq('id', user.value.id)
-    if (error) throw error
-
-    myRecipes.value = next
-    if (selectedMyRecipe.value && selectedMyRecipe.value.id === recipeId) {
-      closeMyRecipe()
+    if (r._rowSource === 'legacy') {
+      const next = myRecipes.value.filter((x) => x.id !== r.id)
+      const { error } = await supabase
+        .from('profiles')
+        .update({ my_recipes: next, updated_at: new Date() })
+        .eq('id', user.value.id)
+      if (error) throw error
+      myRecipes.value = next
+    } else {
+      if (r.moderation_status === 'published') {
+        await cascadeDeletePublishedFromSquare(r.id)
+      } else {
+        const { error } = await supabase.from('recipes').delete().eq('id', r.id).eq('author_user_id', user.value.id)
+        if (error) throw error
+      }
+      dbMyRecipes.value = dbMyRecipes.value.filter((x) => x.id !== r.id)
+      clearRecipeMarketCache()
     }
+    if (selectedMyRecipe.value && selectedMyRecipe.value.id === r.id) closeMyRecipe()
     saveProfilePayload()
   } catch (e) {
     console.error(e)
-    alert('删除失败，请稍后重试')
+    alert(e.message || '删除失败，请稍后重试')
+  }
+}
+
+async function moderatePendingRecipe(recipe, approved) {
+  if (!isAdmin.value || !recipe?.id) return
+  moderationBusy.value = true
+  try {
+    const authorId = recipe.author_user_id
+    const nm = recipe.name || '未命名菜谱'
+    if (approved) {
+      const { error: uErr } = await supabase
+        .from('recipes')
+        .update({
+          moderation_status: 'published',
+          last_moderation_result: 'approved',
+          moderated_at: new Date().toISOString(),
+        })
+        .eq('id', recipe.id)
+        .eq('moderation_status', 'pending')
+      if (uErr) throw uErr
+      const { error: inboxErr } = await supabase.from('inbox_messages').insert({
+        user_id: authorId,
+        title: '菜谱审核通过',
+        body: `您投稿的「${nm}」已通过审核，已在「养生食谱广场」展示。`,
+        kind: 'moderation_approved',
+        recipe_id: recipe.id,
+      })
+      if (inboxErr) console.warn('站内信发送失败（请确认 inbox_messages 表及 RLS 策略已部署）', inboxErr)
+    } else {
+      const { error: uErr } = await supabase
+        .from('recipes')
+        .update({
+          moderation_status: 'personal',
+          last_moderation_result: 'rejected',
+          moderated_at: new Date().toISOString(),
+        })
+        .eq('id', recipe.id)
+        .eq('moderation_status', 'pending')
+      if (uErr) throw uErr
+      const { error: inboxErr } = await supabase.from('inbox_messages').insert({
+        user_id: authorId,
+        title: '菜谱未通过审核',
+        body: `您投稿的「${nm}」未通过审核，已保留在「我的菜谱」中（个人菜谱）。`,
+        kind: 'moderation_rejected',
+        recipe_id: recipe.id,
+      })
+      if (inboxErr) console.warn('站内信发送失败（请确认 inbox_messages 表及 RLS 策略已部署）', inboxErr)
+    }
+    clearRecipeMarketCache()
+    await getProfile()
+    closeMyRecipe()
+    alert(approved ? '已通过审核' : '已驳回')
+  } catch (e) {
+    console.error(e)
+    alert(e.message || '操作失败，请确认已在 Supabase 执行迁移 SQL 且管理员 is_admin 已设置')
+  } finally {
+    moderationBusy.value = false
+  }
+}
+
+async function markInboxRead(msg) {
+  if (!msg?.id || msg.read_at) return
+  try {
+    await supabase.from('inbox_messages').update({ read_at: new Date().toISOString() }).eq('id', msg.id)
+    msg.read_at = new Date().toISOString()
+  } catch (e) {
+    console.warn(e)
+  }
+}
+
+function openInboxMessage(msg) {
+  markInboxRead(msg)
+  const rid = msg.recipe_id
+  if (rid == null) return
+  const r = mergedMyRecipes.value.find((x) => String(x.id) === String(rid))
+  if (r) {
+    activeTab.value = 'my_recipes'
+    openMyRecipe(r)
+    return
+  }
+  const p = pendingModeration.value.find((x) => String(x.id) === String(rid))
+  if (p && isAdmin.value) {
+    activeTab.value = 'mailbox'
+    openMyRecipe({ ...p, _rowSource: 'db' })
   }
 }
 
@@ -103,12 +257,14 @@ function resetNewRecipeForm() {
   newRecipeDesc.value = ''
   newRecipeBodyType.value = ''
   newRecipeSolarTerm.value = ''
-  newRecipeTime.value = ''
+  newRecipeTimeNumber.value = ''
+  newRecipeTimeUnit.value = '分钟'
   newRecipeEfficacy.value = ''
   newRecipeIngredients.value = [{ name: '', amount: '' }]
   newRecipeSteps.value = ['']
   newRecipeImageFile.value = null
   newRecipeImagePreview.value = ''
+  publishToSquare.value = false
 }
 
 function openNewRecipeModal() {
@@ -184,48 +340,50 @@ async function handlePublishRecipe() {
       .map(s => (s || '').trim())
       .filter(Boolean)
 
-    // 3. 当前阶段：不改 recipes 表结构（避免 author_id 不存在的报错）
-    //    直接把“我发布的食谱”存到 profiles.my_recipes（JSON 数组）中，仅当前账号可见。
-    const nowIso = new Date().toISOString()
-    const newRecipe = {
-      id: `my-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    const displayName = (username.value && String(username.value).trim()) || user.value.email || '养生达人'
+
+    // 写入 recipes 表：广场投稿 = pending；仅个人 = personal
+    const moderationStatus = publishToSquare.value ? 'pending' : 'personal'
+    const insertPayload = {
       name: newRecipeName.value.trim(),
       description: newRecipeDesc.value.trim() || null,
       image: imageUrl || null,
       body_type: newRecipeBodyType.value,
       solar_term: newRecipeSolarTerm.value || null,
-      time: newRecipeTime.value.trim() || null,
+      time: computedTimeStr(),
       efficacy: efficacyArr,
       ingredients: ingredientsArr,
       steps: stepsArr,
-      created_at: nowIso,
-      // 个人上传暂不参与评分，先用 null 占位
-      rating: null,
-      cooked_count: 0
+      rating: 8.5,
+      cooked_count: 0,
+      author_user_id: user.value.id,
+      author_name: displayName,
+      author_avatar_url: avatar_url.value || null,
+      moderation_status: moderationStatus,
     }
 
-    const nextMyRecipes = [newRecipe, ...myRecipes.value]
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({ my_recipes: nextMyRecipes, updated_at: new Date() })
-      .eq('id', user.value.id)
-    if (updateError) throw updateError
-
-    // 回读校验：确保确实写入账号数据（避免“看似成功但实际没存上”）
-    const { data: verifyProfile, error: verifyError } = await supabase
-      .from('profiles')
-      .select('my_recipes')
-      .eq('id', user.value.id)
+    const { data: inserted, error: insertError } = await supabase
+      .from('recipes')
+      .insert(insertPayload)
+      .select()
       .single()
-    if (verifyError) throw verifyError
-    if (!verifyProfile?.my_recipes || !Array.isArray(verifyProfile.my_recipes)) {
-      throw new Error('保存失败：账号未返回 my_recipes 字段，请检查 profiles 表结构/权限')
+
+    if (insertError) {
+      console.error(insertError)
+      throw new Error(
+        insertError.message ||
+          '写入 recipes 失败：请在 Supabase 执行 supabase/migrations 中的 SQL（增加 moderation 等字段）',
+      )
     }
 
-    myRecipes.value = verifyProfile.my_recipes
+    dbMyRecipes.value = [inserted, ...dbMyRecipes.value]
     saveProfilePayload()
 
-    alert('菜谱发布成功！目前仅在“我发布的食谱”中可见')
+    if (publishToSquare.value) {
+      alert('已提交审核！请在「我的菜谱」查看「审核中」状态，审核结果将在「信箱」通知。')
+    } else {
+      alert('菜谱已保存为「个人菜谱」（未发布到食谱广场）。')
+    }
     closeNewRecipeModal()
   } catch (e) {
     console.error(e)
@@ -249,6 +407,7 @@ function applyProfilePayload(payload) {
   savedRecipes.value = payload.savedRecipes ?? []
   myWorks.value = payload.myWorks ?? []
   myRecipes.value = payload.myRecipes ?? []
+  dbMyRecipes.value = payload.dbMyRecipes ?? []
 }
 function saveProfilePayload() {
   if (!user.value) return
@@ -264,6 +423,7 @@ function saveProfilePayload() {
     savedRecipes: [...savedRecipes.value],
     myWorks: [...myWorks.value],
     myRecipes: [...myRecipes.value],
+    dbMyRecipes: [...dbMyRecipes.value],
   }
 }
 
@@ -284,12 +444,21 @@ async function getProfile() {
       { data: herbsData },
       { data: favRecipesData },
       { data: worksData },
+      { data: dbRecipesData, error: dbRecipesErr },
+      { data: inboxData, error: inboxErr },
     ] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', uid).single(),
       supabase.from('favorite_herbs').select('*, herb:herbs(*)').eq('user_id', uid).order('created_at', { ascending: false }),
       supabase.from('favorite_recipes').select('*, recipe:recipes(*)').eq('user_id', uid).order('created_at', { ascending: false }),
       supabase.from('homeworks').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
+      supabase.from('recipes').select('*').eq('author_user_id', uid).order('created_at', { ascending: false }),
+      supabase.from('inbox_messages').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
     ])
+
+    if (dbRecipesErr) console.warn('加载我的 recipes 投稿失败（是否已执行迁移 SQL？）', dbRecipesErr)
+    dbMyRecipes.value = dbRecipesData || []
+    if (inboxErr) console.warn('加载信箱失败（是否已创建 inbox_messages 表？）', inboxErr)
+    inboxMessages.value = inboxData || []
 
     let aiRecipes = []
     if (profileData) {
@@ -339,8 +508,22 @@ async function getProfile() {
     )
 
     if (worksData) myWorks.value = worksData
-    // 我发布的食谱：从 profiles.my_recipes 读取（当前账号私有）
+    // 旧版 JSON：profiles.my_recipes
     myRecipes.value = (profileData?.my_recipes && Array.isArray(profileData.my_recipes)) ? profileData.my_recipes : []
+
+    const userIsAdmin =
+      user.value?.email === ADMIN_LOGIN_EMAIL || !!profileData?.is_admin
+    if (userIsAdmin) {
+      const { data: pend, error: pendErr } = await supabase
+        .from('recipes')
+        .select('*')
+        .eq('moderation_status', 'pending')
+        .order('created_at', { ascending: false })
+      if (pendErr) console.warn('加载待审核队列失败', pendErr)
+      pendingModeration.value = pend || []
+    } else {
+      pendingModeration.value = []
+    }
 
     saveProfilePayload()
   } catch (error) {
@@ -481,6 +664,105 @@ async function doSwitchAccount() {
 
 // 工具函数
 function ensureArray(val) { return (!val) ? [] : (Array.isArray(val) ? val : [val]) }
+
+/** 将接口/缓存里的食材字段统一成数组（支持 JSON 字符串、类数组对象） */
+function normalizeIngredientsInput(raw) {
+  if (raw == null || raw === '') return []
+  if (typeof raw === 'string') {
+    const t = raw.trim()
+    if (!t) return []
+    if (t.startsWith('[') || t.startsWith('{')) {
+      try {
+        return normalizeIngredientsInput(JSON.parse(t))
+      } catch {
+        return [t]
+      }
+    }
+    return [t]
+  }
+  if (Array.isArray(raw)) return raw
+  if (typeof raw === 'object') {
+    const keys = Object.keys(raw)
+    if (keys.length && keys.every((k) => /^\d+$/.test(k))) {
+      return keys
+        .map(Number)
+        .sort((a, b) => a - b)
+        .map((k) => raw[String(k)])
+    }
+  }
+  return [raw]
+}
+
+/**
+ * 把嵌套结构压成可读字符串；禁止对普通对象用 String()，否则会得到 [object Object]
+ */
+function scalarToLabel(v, depth = 0) {
+  if (depth > 8) return ''
+  if (v == null || v === '') return ''
+  if (typeof v === 'string') {
+    const t = v.trim()
+    if (!t) return ''
+    if (t.startsWith('[') || t.startsWith('{')) {
+      try {
+        return scalarToLabel(JSON.parse(t), depth + 1)
+      } catch {
+        /* 保持原文 */
+      }
+    }
+    return t
+  }
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v)
+  if (Array.isArray(v)) {
+    return v.map((x) => scalarToLabel(x, depth + 1)).filter(Boolean).join(' ')
+  }
+  if (typeof v === 'object') {
+    const preferred =
+      v.name ??
+      v.ingredient ??
+      v.material ??
+      v.zh ??
+      v.cn ??
+      v.label ??
+      v.text ??
+      v.value ??
+      v.食材 ??
+      v.药名
+    if (preferred !== undefined && preferred !== null) {
+      const inner = scalarToLabel(preferred, depth + 1)
+      if (inner) return inner
+    }
+    for (const val of Object.values(v)) {
+      if (typeof val === 'boolean' || val == null) continue
+      const s = scalarToLabel(val, depth + 1)
+      if (s) return s
+    }
+  }
+  return ''
+}
+
+function formatIngredientRow(item) {
+  if (item == null || item === '') return ''
+  if (typeof item === 'string') return scalarToLabel(item)
+  if (typeof item !== 'object') return scalarToLabel(item)
+  const name = scalarToLabel(
+    item.name ?? item.ingredient ?? item.material ?? item.label ?? item.title ?? item.text ?? item.食材
+  )
+  const amount = scalarToLabel(
+    item.amount ?? item.quantity ?? item.dosage ?? item.weight ?? item.dose ?? item.用量 ?? item.剂量
+  )
+  if (name && amount) return `${name} ${amount}`
+  if (name) return name
+  if (amount) return amount
+  return scalarToLabel(item)
+}
+
+/** string[]（AI）或 { name, amount }[]（广场），兼容 JSON 字符串与嵌套字段 */
+function formatIngredientsForDisplay(ingredients) {
+  return normalizeIngredientsInput(ingredients)
+    .map((item) => formatIngredientRow(item))
+    .filter(Boolean)
+    .join('、')
+}
 function formatDate(isoString) {
   if (!isoString) return ''
   return new Date(isoString).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', hour: '2-digit', minute:'2-digit' })
@@ -564,10 +846,14 @@ function closeAccountMenu() {
 
         <div class="flex-1 min-w-0 text-center sm:text-left w-full">
           <div class="flex items-center justify-center sm:justify-start gap-2 mb-2">
-            <div v-if="!isEditingName" @click="isEditingName = true" class="group flex items-center gap-2 cursor-pointer">
+            <div v-if="!isEditingName" @click="isEditingName = true" class="group flex items-center gap-2 cursor-pointer flex-wrap justify-center sm:justify-start">
               <h1 class="text-2xl font-serif font-bold text-white tracking-wide truncate group-hover:opacity-80">
                 {{ username || '点击设置昵称' }}
               </h1>
+              <span
+                v-if="isAdmin"
+                class="text-[10px] px-2 py-0.5 rounded-full bg-white/20 border border-white/30 text-white/95 shrink-0"
+              >管理员</span>
               <Edit2 class="w-4 h-4 text-white/50 group-hover:text-white transition-colors opacity-0 group-hover:opacity-100" />
             </div>
             <div v-else class="flex items-center gap-2 animate-in fade-in zoom-in duration-200">
@@ -608,6 +894,7 @@ function closeAccountMenu() {
             { id: 'recipes', icon: ChefHat, label: '收藏食谱' },
             { id: 'works', icon: ImageIcon, label: '我的作品' },
             { id: 'my_recipes', icon: BookOpen, label: '我的菜谱' },
+            { id: 'mailbox', icon: Mail, label: '信箱' },
           ]"
           :key="tab.id"
           @click="activeTab = tab.id" 
@@ -654,7 +941,7 @@ function closeAccountMenu() {
                       </div>
                       <div class="flex-1 min-w-0">
                         <div class="font-bold text-gray-800 text-sm truncate">{{ recipe.name }}</div>
-                        <div class="text-xs text-gray-500 truncate mt-0.5">食材：{{ ensureArray(recipe.ingredients).join('、') }}</div>
+                        <div class="text-xs text-gray-500 truncate mt-0.5">食材：{{ formatIngredientsForDisplay(recipe.ingredients) }}</div>
                       </div>
                       <ChevronDown class="w-4 h-4 text-gray-400 transition-transform duration-300" :class="{'rotate-180': foldedStates[`plan-${plan.id}-recipe-${recipe.id}`]}" />
                     </div>
@@ -736,7 +1023,7 @@ function closeAccountMenu() {
                    </div>
                 </div>
              </div>
-             <div class="mt-4 text-xs text-gray-600 bg-gray-50 p-3 rounded-lg leading-relaxed"><span class="font-bold text-gray-800">食材：</span>{{ ensureArray(recipe.ingredients).join('、') }}</div>
+             <div class="mt-4 text-xs text-gray-600 bg-gray-50 p-3 rounded-lg leading-relaxed"><span class="font-bold text-gray-800">食材：</span>{{ formatIngredientsForDisplay(recipe.ingredients) }}</div>
              
              <button @click="toggleFold(`saved-${recipe.id}`)" class="w-full mt-3 text-xs text-center font-bold text-sandalwood bg-sandalwood/5 hover:bg-sandalwood/10 py-2 rounded-lg flex items-center justify-center gap-1 transition-colors">
                {{ foldedStates[`saved-${recipe.id}`] ? '收起做法' : '查看详细做法' }}
@@ -790,22 +1077,27 @@ function closeAccountMenu() {
              </button>
           </div>
 
-          <div v-if="!myRecipes.length" class="text-center py-20 text-gray-400 bg-white rounded-xl border border-dashed border-sandalwood/10">
+          <div v-if="!mergedMyRecipes.length" class="text-center py-20 text-gray-400 bg-white rounded-xl border border-dashed border-sandalwood/10">
             <p>您还没有发布过原创食谱</p>
           </div>
           <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div
-              v-for="recipe in myRecipes"
-              :key="recipe.id"
+              v-for="recipe in mergedMyRecipes"
+              :key="`${recipe._rowSource}-${recipe.id}`"
               class="group bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-stone-100 flex flex-col cursor-pointer relative"
               @click="openMyRecipe(recipe)"
             >
               <button
                 type="button"
-                class="absolute top-2 right-2 z-10 bg-white/90 rounded-full p-1.5 shadow-sm text-stone-300 hover:text-red-500 hover:bg-red-50 transition"
-                @click.stop="deleteMyRecipe(recipe.id)"
+                class="absolute top-2 right-2 z-10 rounded-full p-1.5 shadow-sm transition"
+                :class="canDeleteMyRecipeEntry(recipe)
+                  ? 'bg-white/90 text-stone-300 hover:text-red-500 hover:bg-red-50'
+                  : 'bg-white/90 text-amber-500 cursor-not-allowed hover:text-amber-600 hover:bg-amber-50'"
+                :title="!canDeleteMyRecipeEntry(recipe) ? '待审核不可删除' : '删除菜谱'"
+                @click.stop="deleteMyRecipeEntry(recipe)"
               >
-                <Trash2 class="w-4 h-4" />
+                <CircleSlash v-if="!canDeleteMyRecipeEntry(recipe)" class="w-4 h-4" />
+                <Trash2 v-else class="w-4 h-4" />
               </button>
               <div class="relative h-40 overflow-hidden bg-gray-100">
                 <img v-if="recipe.image" :src="recipe.image" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
@@ -821,6 +1113,10 @@ function closeAccountMenu() {
                 <p class="text-xs text-gray-500 mb-2 line-clamp-2">{{ recipe.description || '暂无描述' }}</p>
                 <div class="flex flex-wrap gap-2 mt-auto">
                   <span class="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded">原创</span>
+                  <span
+                    class="text-[10px] px-2 py-0.5 rounded border"
+                    :class="statusLabelClass(getMyRecipeStatusLabel(recipe))"
+                  >{{ getMyRecipeStatusLabel(recipe) }}</span>
                   <span v-if="recipe.body_type" class="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded">
                     {{ recipe.body_type }}
                   </span>
@@ -829,6 +1125,59 @@ function closeAccountMenu() {
                   </span>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-else-if="activeTab === 'mailbox'" class="animate-in slide-in-from-bottom-4 duration-500">
+          <div class="flex justify-between items-center mb-4 px-2">
+            <h3 class="font-bold text-gray-700">信箱</h3>
+            <span class="text-xs text-gray-400">站内通知</span>
+          </div>
+
+          <div v-if="isAdmin && pendingModeration.length" class="mb-6 px-1">
+            <div class="flex items-center gap-2 mb-3">
+              <ShieldCheck class="w-4 h-4 text-amber-700" />
+              <span class="text-sm font-bold text-gray-800">待审核菜谱</span>
+              <span class="text-xs text-gray-400">（来自用户投稿「发布到食谱广场」）</span>
+            </div>
+            <div class="space-y-2">
+              <div
+                v-for="pr in pendingModeration"
+                :key="`pend-${pr.id}`"
+                class="bg-amber-50/90 border border-amber-100 rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:border-amber-200 transition"
+                @click="openMyRecipe({ ...pr, _rowSource: 'db' })"
+              >
+                <img v-if="pr.image" :src="pr.image" class="w-14 h-14 rounded-lg object-cover bg-white shrink-0" />
+                <div v-else class="w-14 h-14 rounded-lg bg-white flex items-center justify-center text-2xl shrink-0">🥗</div>
+                <div class="flex-1 min-w-0">
+                  <div class="font-bold text-gray-800 truncate">{{ pr.name }}</div>
+                  <div class="text-xs text-gray-500 truncate">投稿人：{{ pr.author_name || '—' }}</div>
+                </div>
+                <span class="text-xs font-bold text-amber-800 shrink-0">去审核</span>
+              </div>
+            </div>
+          </div>
+
+          <div
+            v-if="!inboxMessages.length && !(isAdmin && pendingModeration.length)"
+            class="text-center py-16 text-gray-400 bg-white rounded-xl border border-dashed border-sandalwood/10"
+          >
+            <p>暂无站内信</p>
+          </div>
+          <div v-else class="space-y-2">
+            <div
+              v-for="msg in inboxMessages"
+              :key="msg.id"
+              class="bg-white rounded-xl border border-stone-100 p-4 shadow-sm cursor-pointer hover:border-sandalwood/30 transition"
+              :class="{ 'opacity-70': msg.read_at }"
+              @click="openInboxMessage(msg)"
+            >
+              <div class="flex justify-between gap-2 items-start">
+                <span class="font-bold text-gray-800 text-sm">{{ msg.title }}</span>
+                <span class="text-[10px] text-gray-400 shrink-0">{{ formatDate(msg.created_at) }}</span>
+              </div>
+              <p class="text-xs text-gray-600 mt-2 leading-relaxed">{{ msg.body }}</p>
             </div>
           </div>
         </div>
@@ -863,6 +1212,54 @@ function closeAccountMenu() {
 
             <div class="p-6 sm:p-8 -mt-6 relative z-10">
               <h2 class="text-3xl font-bold text-stone-900 mb-2">{{ selectedMyRecipe.name }}</h2>
+
+              <div class="flex flex-wrap items-center gap-2 mb-3">
+                <span
+                  class="text-[10px] px-2 py-0.5 rounded border"
+                  :class="statusLabelClass(getMyRecipeStatusLabel(selectedMyRecipe))"
+                >{{ getMyRecipeStatusLabel(selectedMyRecipe) }}</span>
+              </div>
+
+              <div
+                v-if="selectedMyRecipe._rowSource === 'db' && selectedMyRecipe.author_name"
+                class="flex items-center gap-2 mb-6 text-sm text-stone-600 bg-stone-50/80 px-3 py-2 rounded-xl border border-stone-100"
+              >
+                <img
+                  v-if="selectedMyRecipe.author_avatar_url"
+                  :src="selectedMyRecipe.author_avatar_url"
+                  class="w-9 h-9 rounded-full object-cover border border-stone-200 shrink-0"
+                />
+                <div
+                  v-else
+                  class="w-9 h-9 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-xs font-bold shrink-0"
+                >{{ selectedMyRecipe.author_name?.[0] }}</div>
+                <div>
+                  <div class="text-[10px] text-stone-400">发布者</div>
+                  <div class="font-medium text-stone-800">{{ selectedMyRecipe.author_name }}</div>
+                </div>
+              </div>
+
+              <div
+                v-if="isAdmin && selectedMyRecipe._rowSource === 'db' && selectedMyRecipe.moderation_status === 'pending'"
+                class="flex flex-col sm:flex-row gap-2 mb-8"
+              >
+                <button
+                  type="button"
+                  class="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold disabled:opacity-50"
+                  :disabled="moderationBusy"
+                  @click="moderatePendingRecipe(selectedMyRecipe, true)"
+                >
+                  通过审核
+                </button>
+                <button
+                  type="button"
+                  class="flex-1 py-2.5 rounded-xl bg-stone-200 text-stone-800 text-sm font-bold disabled:opacity-50"
+                  :disabled="moderationBusy"
+                  @click="moderatePendingRecipe(selectedMyRecipe, false)"
+                >
+                  不通过
+                </button>
+              </div>
               
               <div class="flex items-center gap-4 mb-8 bg-stone-50 p-4 rounded-xl border border-stone-100">
                 <div class="text-center px-4 border-r border-stone-200">
@@ -947,7 +1344,7 @@ function closeAccountMenu() {
   </Transition>
 
   <!-- 发布新菜谱弹窗 -->
-  <transition
+  <Transition
     enter-active-class="transition duration-200 ease-out"
     enter-from-class="opacity-0 scale-95"
     enter-to-class="opacity-100 scale-100"
@@ -955,11 +1352,13 @@ function closeAccountMenu() {
     leave-from-class="opacity-100 scale-100"
     leave-to-class="opacity-0 scale-95"
   >
-    <div
-      v-if="showNewRecipeModal"
-      class="fixed inset-0 z-[1200] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
-    >
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+    <Teleport to="body">
+      <div
+        v-if="showNewRecipeModal"
+        class="fixed inset-0 z-[1500] flex items-start justify-center bg-black/45 backdrop-blur-sm px-3 sm:px-4 pt-20 sm:pt-24 pb-4 sm:pb-6 overflow-y-auto"
+      >
+        <div class="absolute inset-0" @click="closeNewRecipeModal"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[calc(100vh-7rem)] sm:max-h-[calc(100vh-8rem)] flex flex-col overflow-hidden">
         <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">
           <h3 class="font-bold text-lg text-gray-800">发布新菜谱</h3>
           <button
@@ -1024,12 +1423,26 @@ function closeAccountMenu() {
 
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">烹饪时间（可选）</label>
-            <input
-              v-model="newRecipeTime"
-              type="text"
-              class="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-sandalwood/20 focus:border-sandalwood/60"
-              placeholder="例如：约30分钟"
-            />
+            <div class="flex gap-2">
+              <input
+                v-model="newRecipeTimeNumber"
+                type="number"
+                min="1"
+                step="1"
+                class="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-sandalwood/20 focus:border-sandalwood/60"
+                placeholder="填写时长数字"
+              />
+              <select
+                v-model="newRecipeTimeUnit"
+                class="w-24 px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sandalwood/20 focus:border-sandalwood/60"
+              >
+                <option value="分钟">分钟</option>
+                <option value="小时">小时</option>
+              </select>
+            </div>
+            <p v-if="newRecipeTimeNumber" class="text-[10px] text-gray-400 mt-1">
+              将显示为：{{ computedTimeStr() }}
+            </p>
           </div>
 
           <div>
@@ -1060,7 +1473,7 @@ function closeAccountMenu() {
                   v-model="ing.amount"
                   type="text"
                   class="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-sandalwood/20 focus:border-sandalwood/60"
-                  placeholder="用量，如：20g"
+                  placeholder="用量，如20克"
                 />
                 <button
                   type="button"
@@ -1115,6 +1528,19 @@ function closeAccountMenu() {
             </div>
           </div>
 
+          <div class="flex items-start gap-2 p-3 rounded-xl border border-amber-100 bg-amber-50/50">
+            <input
+              id="publishSquare"
+              v-model="publishToSquare"
+              type="checkbox"
+              class="mt-1 rounded border-gray-300 text-sandalwood focus:ring-sandalwood/30"
+            />
+            <label for="publishSquare" class="text-xs text-gray-700 leading-relaxed cursor-pointer select-none">
+              <span class="font-bold text-amber-900">发布到食谱广场</span>
+              <span class="block text-gray-500 mt-0.5">勾选后进入「审核中」，通过后将出现在养生食谱广场；不勾选则为「个人菜谱」。</span>
+            </label>
+          </div>
+
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">菜谱配图（可选）</label>
             <div class="flex items-center gap-3">
@@ -1149,8 +1575,9 @@ function closeAccountMenu() {
           </button>
         </div>
       </div>
-    </div>
-  </transition>
+      </div>
+    </Teleport>
+  </Transition>
 </template>
 
 <style scoped>

@@ -1,8 +1,9 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { X } from 'lucide-vue-next'
 import { useAuth } from '@/composables/useAuth'
 import { getAuthErrorMessage } from '@/auth'
+import { normalizeLoginEmail } from '@/utils/loginEmail'
 
 const props = defineProps({ dismissible: { type: Boolean, default: false } })
 const emit = defineEmits(['close'])
@@ -50,9 +51,10 @@ async function handleSubmitPassword() {
   errorMsg.value = ''
   successMsg.value = ''
   loading.value = true
+  const mail = normalizeLoginEmail(email.value)
   const res = isRegister.value
-    ? await handleRegister(email.value.trim(), password.value)
-    : await handleLogin(email.value.trim(), password.value)
+    ? await handleRegister(mail, password.value)
+    : await handleLogin(mail, password.value)
   loading.value = false
   if (res.ok) {
     if (res.needsEmailConfirmation) {
@@ -68,7 +70,7 @@ async function handleSubmitPassword() {
 }
 
 async function handleSendOtp() {
-  const mail = email.value.trim()
+  const mail = normalizeLoginEmail(email.value)
   if (!mail || otpSending.value || otpCountdown.value > 0) return
   errorMsg.value = ''
   successMsg.value = ''
@@ -98,7 +100,7 @@ async function handleSubmitOtp() {
   errorMsg.value = ''
   successMsg.value = ''
   loading.value = true
-  const res = await verifyLoginOtp(email.value.trim(), otpCode.value.trim())
+  const res = await verifyLoginOtp(normalizeLoginEmail(email.value), otpCode.value.trim())
   loading.value = false
   if (res.ok) {
     emit('close')
@@ -110,6 +112,18 @@ async function handleSubmitOtp() {
 function handleGuest() {
   setGuestMode()
   emit('close')
+}
+
+/** 测试管理员：请在 Supabase 创建用户 123456@tcm.local / 密码 123456 */
+async function handleAdminQuickLogin() {
+  isOtpMode.value = false
+  isRegister.value = false
+  email.value = '123456'
+  password.value = '123456'
+  errorMsg.value = ''
+  successMsg.value = ''
+  await nextTick()
+  await handleSubmitPassword()
 }
 </script>
 
@@ -163,10 +177,10 @@ function handleGuest() {
       <form v-if="!isOtpMode" class="login-overlay-form" @submit.prevent="handleSubmitPassword">
         <input
           v-model="email"
-          type="email"
-          placeholder="邮箱"
+          type="text"
+          placeholder="邮箱，或账号（如 123456 → 123456@tcm.local）"
           class="login-overlay-input"
-          autocomplete="email"
+          autocomplete="username"
         />
         <input
           v-model="password"
@@ -201,8 +215,8 @@ function handleGuest() {
       <form v-else class="login-overlay-form" @submit.prevent="handleSubmitOtp">
         <input
           v-model="email"
-          type="email"
-          placeholder="邮箱"
+          type="text"
+          placeholder="邮箱（验证码登录需真实可收信邮箱）"
           class="login-overlay-input"
           autocomplete="email"
         />
@@ -235,6 +249,14 @@ function handleGuest() {
 
       <button type="button" class="login-overlay-guest" @click="handleGuest">
         以游客身份试用 (Guest Mode)
+      </button>
+
+      <button
+        type="button"
+        class="login-overlay-admin-link"
+        @click="handleAdminQuickLogin"
+      >
+        管理员登录（测试）
       </button>
     </div>
   </div>

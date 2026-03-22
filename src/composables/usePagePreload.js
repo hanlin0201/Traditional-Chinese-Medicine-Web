@@ -2,7 +2,7 @@ import { supabase } from '@/supabaseClient'
 
 const TTL_MS = 5 * 60 * 1000
 const HERB_CACHE_KEY_PAGE1 = 'herb_list_page_1'
-const RECIPE_CACHE_KEY = 'recipe_market_cache_v1'
+const RECIPE_CACHE_KEY = 'recipe_market_cache_v2'
 
 function setCache(key, data) {
   try {
@@ -48,6 +48,15 @@ export function setRecipeMarketCachedData(data) {
   setCache(RECIPE_CACHE_KEY, data)
 }
 
+/** 食谱广场数据有更新（审核/删除）时调用，避免读到旧缓存 */
+export function clearRecipeMarketCache() {
+  try {
+    localStorage.removeItem(RECIPE_CACHE_KEY)
+  } catch (e) {
+    console.warn('clearRecipeMarketCache failed', e)
+  }
+}
+
 export async function preloadHomeFeaturePages() {
   if (preloadPromise) return preloadPromise
 
@@ -72,7 +81,11 @@ export async function preloadHomeFeaturePages() {
     // 3) 食谱列表数据预加载（供 RecipeMarket 首屏秒开）
     const warmRecipes = (async () => {
       if (getCache(RECIPE_CACHE_KEY)) return
-      const { data, error } = await supabase.from('recipes').select('*').order('id')
+      const { data, error } = await supabase
+        .from('recipes')
+        .select('*')
+        .or('moderation_status.eq.published,moderation_status.is.null')
+        .order('id')
       if (!error && data) {
         setCache(RECIPE_CACHE_KEY, data.map(normalizeRecipe))
       }
