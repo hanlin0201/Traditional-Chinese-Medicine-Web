@@ -176,7 +176,12 @@ const fetchSeasonalData = async () => {
   try {
     const { data: info } = await supabase.from('solar_terms').select('*').eq('name', termName).single()
     termInfo.value = info || MOCK_DATA.info
-    const { data: recipes } = await supabase.from('recipes').select('id, name, image').eq('solar_term', termName).limit(3)
+    const { data: recipes } = await supabase
+      .from('recipes')
+      .select('id, name, image')
+      .eq('solar_term', termName)
+      .or('moderation_status.eq.published,moderation_status.is.null')
+      .limit(3)
     seasonalRecipes.value = (recipes && recipes.length) ? recipes : MOCK_DATA.recipes
   } catch (e) {
     termInfo.value = MOCK_DATA.info; 

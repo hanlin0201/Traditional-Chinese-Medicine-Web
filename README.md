@@ -81,3 +81,12 @@ src/
 - **药材图片**：`herb.image` 与 `CDN_URL` 拼接；若加载失败则用 `public/placeholder-herb.svg`。可将 `CDN_URL` 与 `herb.image` 改为真实资源。
 - **AI 回复**：当前为前端模拟，可替换为真实大模型 API。
 - **3D**：详情页现为 CSS 占位。若需 TresJS，可安装 `@tresjs/core`、`three`，并在 `HerbDetailView.vue` 中接入 `TresCanvas` 与 3D 模型。
+
+## 用户投稿食谱 · 审核 · 站内信箱（Supabase）
+
+1. 在 **Supabase Dashboard → SQL Editor** 中执行 `supabase/migrations/20260320120000_recipe_moderation_inbox.sql`（增加 `recipes` 审核字段、`inbox_messages` 站内信表、`profiles.is_admin` 等）。
+2. **管理员账号（测试）**  
+   - 在 **Authentication → Users** 创建用户：邮箱 **`123456@tcm.local`**，密码 **`123456`**（Supabase 要求合法邮箱格式；前端在登录框输入 **`123456`** 会自动补全为 `123456@tcm.local`）。  
+   - 登录后个人中心会显示 **「管理员」** 标签；也可在 `profiles` 中将该用户 `is_admin = true`（可选）。  
+   - 登录页底部有低调的 **「管理员登录（测试）」**，可一键填入并登录。
+3. **流程**：个人中心发布菜谱时可勾选 **「发布到食谱广场」** → 状态为 **审核中** → 管理员在 **「信箱」** 中处理 **待审核** → 用户收到 **站内信**；通过后菜谱出现在 **养生膳食广场**，并展示投稿者头像与昵称。
