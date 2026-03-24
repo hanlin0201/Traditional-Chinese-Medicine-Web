@@ -41,6 +41,7 @@ const privacySettings = ref({
 // --- 五大板块数据 ---
 const carePlans = ref([])      
 const savedRecipes = ref([])   // 🌟 混合了 AI 和 广场食谱
+const recipeFilter = ref('market') // market | ai
 const favoriteHerbs = ref([])  
 const myWorks = ref([])        
 /** 旧版：仅存 profiles.my_recipes JSON（未走 recipes 表） */
@@ -69,6 +70,14 @@ const newRecipeImagePreview = ref('')
 const isPublishingRecipe = ref(false)
 /** 勾选后写入 recipes 表且 moderation_status=pending，显示「审核中」 */
 const publishToSquare = ref(false)
+
+const marketSavedRecipes = computed(() =>
+  (savedRecipes.value || []).filter((r) => !r?.is_ai),
+)
+
+const aiSavedRecipes = computed(() =>
+  (savedRecipes.value || []).filter((r) => !!r?.is_ai),
+)
 
 const mergedMyRecipes = computed(() => {
   const db = (dbMyRecipes.value || []).map((r) => ({ ...r, _rowSource: 'db' }))
@@ -267,12 +276,32 @@ function resetNewRecipeForm() {
   publishToSquare.value = false
 }
 
-function openNewRecipeModal() {
+function openNewRecipeModal(prefill = null) {
   if (!user.value) {
     alert('请先登录后再发布菜谱')
     return
   }
   resetNewRecipeForm()
+  if (prefill) {
+    newRecipeName.value = String(prefill.name || '').trim()
+    newRecipeDesc.value = String(prefill.description || '').trim()
+    newRecipeBodyType.value = String(prefill.bodyType || '').trim()
+    newRecipeSolarTerm.value = String(prefill.solarTerm || '').trim()
+    newRecipeEfficacy.value = String(prefill.efficacyText || '').trim()
+
+    const prefIngredients = Array.isArray(prefill.ingredients) ? prefill.ingredients : []
+    newRecipeIngredients.value = prefIngredients.length
+      ? prefIngredients.map((i) => ({
+          name: String(i?.name || '').trim(),
+          amount: String(i?.amount || '').trim()
+        }))
+      : [{ name: '', amount: '' }]
+
+    const prefSteps = Array.isArray(prefill.steps) ? prefill.steps : []
+    newRecipeSteps.value = prefSteps.length
+      ? prefSteps.map((s) => String(s || '').trim()).filter(Boolean)
+      : ['']
+  }
   showNewRecipeModal.value = true
 }
 
@@ -442,19 +471,20 @@ async function getProfile() {
     const [
       { data: profileData },
       { data: herbsData },
-      { data: favRecipesData },
+      { data: favRecsLinkData, error: favRecipesErr },
       { data: worksData },
       { data: dbRecipesData, error: dbRecipesErr },
       { data: inboxData, error: inboxErr },
     ] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', uid).single(),
       supabase.from('favorite_herbs').select('*, herb:herbs(*)').eq('user_id', uid).order('created_at', { ascending: false }),
-      supabase.from('favorite_recipes').select('*, recipe:recipes(*)').eq('user_id', uid).order('created_at', { ascending: false }),
+      supabase.from('favorite_recipes').select('id, recipe_id, created_at').eq('user_id', uid).order('created_at', { ascending: false }),
       supabase.from('homeworks').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
       supabase.from('recipes').select('*').eq('author_user_id', uid).order('created_at', { ascending: false }),
       supabase.from('inbox_messages').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
     ])
 
+    if (favRecipesErr) console.warn('加载广场收藏失败', favRecipesErr)
     if (dbRecipesErr) console.warn('加载我的 recipes 投稿失败（是否已执行迁移 SQL？）', dbRecipesErr)
     dbMyRecipes.value = dbRecipesData || []
     if (inboxErr) console.warn('加载信箱失败（是否已创建 inbox_messages 表？）', inboxErr)
@@ -494,14 +524,25 @@ async function getProfile() {
     }
 
     let marketRecipes = []
-    if (favRecipesData) {
-      marketRecipes = favRecipesData.map(item => ({
-        ...item.recipe,
-        favorite_id: item.id,
-        saved_at: item.created_at,
-        is_ai: false,
-        tags: item.recipe?.tags || ['广场精选']
-      }))
+    if (favRecsLinkData && favRecsLinkData.length > 0) {
+      const recipeIds = favRecsLinkData.map(f => f.recipe_id)
+      const { data: recipeDetails, error: recipeDetailsErr } = await supabase
+        .from('recipes')
+        .select('*')
+        .in('id', recipeIds)
+      if (recipeDetailsErr) console.warn('加载广场收藏详情失败', recipeDetailsErr)
+      if (recipeDetails) {
+        const recipeMap = Object.fromEntries(recipeDetails.map(r => [r.id, r]))
+        marketRecipes = favRecsLinkData
+          .filter(f => recipeMap[f.recipe_id])
+          .map(f => ({
+            ...recipeMap[f.recipe_id],
+            favorite_id: f.id,
+            saved_at: f.created_at,
+            is_ai: false,
+            tags: recipeMap[f.recipe_id].tags || ['广场精选']
+          }))
+      }
     }
     savedRecipes.value = [...marketRecipes, ...aiRecipes].sort((a, b) =>
       new Date(b.saved_at) - new Date(a.saved_at)
@@ -552,6 +593,105 @@ async function togglePrivacy(type) {
   await saveProfileField({ [fieldMap[type]]: privacySettings.value[type] })
 }
 
+// --- 广场收藏：跳转 RecipeMarket modal ---
+function openMarketRecipe(recipe) {
+  if (!recipe?.id) return
+  router.push({
+    name: 'RecipeMarket',
+    query: { open_id: recipe.id },
+  })
+}
+
+function getSavedRecipeCover(recipe) {
+  return String(recipe?.image || recipe?.image_url || '').trim()
+}
+
+// --- AI 推荐：一键补全为可发布食谱 ---
+const bodyTypeValueSet = new Set(BODY_TYPES.map((x) => x.value).filter(Boolean))
+
+function normalizeAiIngredientsForPublish(raw) {
+  const rows = Array.isArray(raw) ? raw : []
+  const mapped = rows
+    .map((item) => {
+      if (typeof item === 'string') return { name: item.trim(), amount: '' }
+      const name = String(item?.name ?? item?.ingredient ?? item?.material ?? item?.label ?? item?.text ?? '').trim()
+      const amount = String(item?.amount ?? item?.quantity ?? item?.dosage ?? item?.weight ?? '').trim()
+      return { name, amount }
+    })
+    .filter((x) => x.name)
+  return mapped.length ? mapped : [{ name: '', amount: '' }]
+}
+
+function normalizeAiStepsForPublish(raw) {
+  const steps = (Array.isArray(raw) ? raw : [])
+    .map((s) => String(s || '').trim())
+    .filter(Boolean)
+  return steps.length ? steps : ['']
+}
+
+function inferBodyTypeFromAi(recipe) {
+  const direct = String(recipe?.body_type || recipe?.bodyType || '').trim()
+  if (direct) return direct
+  const pool = [
+    ...(Array.isArray(recipe?.tags) ? recipe.tags : []),
+    ...(Array.isArray(recipe?.efficacy) ? recipe.efficacy : []),
+  ].map((x) => String(x || '').trim())
+  return pool.find((x) => bodyTypeValueSet.has(x)) || ''
+}
+
+function openPublishPrefillFromAi(recipe) {
+  const tags = (Array.isArray(recipe?.tags) ? recipe.tags : []).map((x) => String(x || '').trim()).filter(Boolean)
+  const efficacy = (Array.isArray(recipe?.efficacy) ? recipe.efficacy : []).map((x) => String(x || '').trim()).filter(Boolean)
+  const efficacyText = [...new Set([...efficacy, ...tags])].join(' ')
+
+  openNewRecipeModal({
+    name: String(recipe?.name || '').trim(),
+    description: String(recipe?.description || '').trim(),
+    bodyType: inferBodyTypeFromAi(recipe),
+    efficacyText,
+    ingredients: normalizeAiIngredientsForPublish(recipe?.ingredients),
+    steps: normalizeAiStepsForPublish(recipe?.steps),
+  })
+}
+
+function goToMarketSimilar(recipe) {
+  const recipeName = String(recipe?.name || '').trim()
+  const firstTag = (Array.isArray(recipe?.tags) ? recipe.tags : [])
+    .map((x) => String(x || '').trim())
+    .find(Boolean)
+  const keyword = recipeName || firstTag || ''
+  router.push({
+    name: 'RecipeMarket',
+    query: keyword ? { q: keyword } : {},
+  })
+}
+
+// --- 药材收藏：图片加载 ---
+function getLocalHerbImagePath(herbName) {
+  const name = String(herbName || '').trim()
+  if (!name) return '/placeholder-herb.svg'
+  return `/photo/${encodeURIComponent(name)}.jpg`
+}
+
+function getFavoriteHerbImage(herb) {
+  const imageUrl = String(herb?.image_url || '').trim()
+  if (imageUrl) return imageUrl
+  return getLocalHerbImagePath(herb?.name)
+}
+
+function handleFavoriteHerbImageError(event, herb) {
+  const img = event?.target
+  if (!img) return
+  const localPath = getLocalHerbImagePath(herb?.name)
+  if (!img.dataset.triedLocal && localPath !== '/placeholder-herb.svg') {
+    img.dataset.triedLocal = '1'
+    img.src = localPath
+    return
+  }
+  img.onerror = null
+  img.src = '/placeholder-herb.svg'
+}
+
 // --- 删除逻辑 ---
 async function deletePlan(planId) {
   if(!confirm('确定删除这条调理记录吗?')) return
@@ -579,15 +719,15 @@ async function deleteRecipe(recipe) {
       await supabase.from('profiles').update({ saved_recipes: newAiRecipes }).eq('id', user.value.id)
       
       // 更新前端
-      savedRecipes.value = savedRecipes.value.filter(r => r.id !== recipe.id)
-      
+      savedRecipes.value = savedRecipes.value.filter((r) => !(r.id === recipe.id && !!r.is_ai === !!recipe.is_ai))
+
     } else {
       // 2. 删除广场食谱 (删 favorite_recipes 表)
       const { error } = await supabase.from('favorite_recipes').delete().eq('id', recipe.favorite_id)
       if (error) throw error
-      
+
       // 更新前端
-      savedRecipes.value = savedRecipes.value.filter(r => r.id !== recipe.id)
+      savedRecipes.value = savedRecipes.value.filter((r) => !(r.id === recipe.id && !!r.is_ai === !!recipe.is_ai))
     }
   } catch (e) {
     console.error(e)

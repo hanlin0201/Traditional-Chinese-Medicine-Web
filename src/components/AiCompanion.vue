@@ -309,15 +309,24 @@ function cleanPrescription(jsonData) {
   if (!Array.isArray(aiResponse.recipes)) {
     aiResponse.recipes = Array.isArray(jsonData.recipe) ? jsonData.recipe : (jsonData.recipes ? [jsonData.recipes].flat() : [])
   }
-  aiResponse.recipes = aiResponse.recipes.map(r => (typeof r === 'string' ? { name: r, category: 'meal', ingredients: [], steps: [], tags: [] } : {
-    ...r,
-    id: 'r_' + Math.random().toString(36).substr(2, 9),
-    name: r.name || '调理食谱',
-    category: r.category || 'meal',
-    ingredients: ensureArray(r.ingredients),
-    steps: ensureArray(r.steps),
-    tags: ensureArray(r.tags)
-  })).filter(Boolean).filter(r => !isUnsafeRecipe(r))
+  aiResponse.recipes = aiResponse.recipes.map(r => {
+    if (typeof r === 'string') {
+      return { name: r, category: 'meal', ingredients: [], steps: [], tags: [], rationale: '' }
+    }
+    const rationale = String(
+      r.rationale || r.reason || r.medical_basis || r.theory || r.医理依据 || '',
+    ).trim()
+    return {
+      ...r,
+      id: 'r_' + Math.random().toString(36).substr(2, 9),
+      name: r.name || '调理食谱',
+      category: r.category || 'meal',
+      ingredients: ensureArray(r.ingredients),
+      steps: ensureArray(r.steps),
+      tags: ensureArray(r.tags),
+      rationale
+    }
+  }).filter(Boolean).filter(r => !isUnsafeRecipe(r))
   aiResponse.lifestyle = ensureArray(aiResponse.lifestyle)
   if (aiResponse.recipes.length === 0) {
     aiResponse.lifestyle = [...aiResponse.lifestyle, '该方案涉及需专业指导的药材，部分方剂已隐藏，建议线下咨询医师。']
@@ -467,7 +476,11 @@ async function toggleFavorite(recipe) {
     const { data } = await supabase.from('profiles').select('saved_recipes').eq('id', user.value.id).single()
     let list = data?.saved_recipes || []; if(!Array.isArray(list)) list = []
     const idx = list.findIndex(r => String(r.id) === recipeId)
-    if (idx >= 0) list.splice(idx, 1); else list.push({ ...recipe, id: recipeId, saved_at: new Date().toISOString() })
+    const rationale = String(
+      recipe.rationale || recipe.reason || recipe.medical_basis || recipe.theory || recipe.医理依据 || '',
+    ).trim()
+    if (idx >= 0) list.splice(idx, 1)
+    else list.push({ ...recipe, rationale, id: recipeId, saved_at: new Date().toISOString() })
     await supabase.from('profiles').update({ saved_recipes: list }).eq('id', user.value.id)
     window.dispatchEvent(new Event('profile-updated'))
   } catch (err) { alert('操作失败'); console.error(err) }

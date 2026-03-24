@@ -32,6 +32,11 @@ const efficacyFilters = ref([])   // 多选：选中的功效标签
 const timeRangeFilter = ref('')
 const showFilterPanel = ref(false)
 
+function applySearchKeywordFromQuery() {
+  const q = String(route.query.q || '').trim()
+  if (q) searchKeyword.value = q
+}
+
 // 节气选项（筛选用）
 const solarTermOptions = [{ value: '', label: '全部节气' }, ...SOLAR_TERMS_LOOKUP.map(t => ({ value: t.name, label: t.name }))]
 
@@ -438,9 +443,13 @@ const handleHerbClick = (item) => {
   if (item.isHerb) router.push({ name: 'HerbDetail', params: { name: item.name } })
 };
 
-onMounted(() => fetchRecipes())
+onMounted(() => {
+  applySearchKeywordFromQuery()
+  fetchRecipes()
+})
 
 onActivated(() => {
+  applySearchKeywordFromQuery()
   const pendingId = route.query.open_id
   if (pendingId) {
     if (!selectedRecipe.value || selectedRecipe.value.id != pendingId) {
