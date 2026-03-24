@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '@/supabaseClient'
 import { useAuth } from '@/composables/useAuth'
 import { ChevronLeft, Heart, MoreHorizontal, Trash2 } from 'lucide-vue-next'
+import RecipeMarketDetailModal from '@/components/RecipeMarketDetailModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -15,6 +16,9 @@ const recipe = ref(null)
 const comments = ref([])
 const newComment = ref('')
 const isLiked = ref(false)
+
+const showRelatedRecipeModal = ref(false)
+const relatedRecipeId = ref(null)
 
 const formatDate = (isoStr) => {
   if (!isoStr) return ''
@@ -34,7 +38,6 @@ async function fetchData() {
     homework.value = hw
     comments.value = cs || []
 
-    // 关联食谱信息，用于展示“跟做自：某某食谱”
     if (hw?.recipe_id) {
       const { data: recipeData } = await supabase
         .from('recipes')
@@ -99,7 +102,7 @@ async function toggleLike() {
         homework_id: homework.value.id,
       })
     }
-  } catch (e) {
+  } catch {
     isLiked.value = original
     homework.value.likes_count = (homework.value.likes_count || 0) + (original ? 1 : -1)
   }
@@ -118,12 +121,17 @@ async function deleteHomework() {
       .eq('user_id', currentUser.value.id)
 
     if (error) throw error
-    // 这里不处理 recipes.cooked_count，交给 RecipeMarket 页面自己刷新时再维护
     router.back()
   } catch (e) {
     console.error(e)
     alert('删除失败，请稍后重试')
   }
+}
+
+function openRelatedRecipe() {
+  if (!recipe.value?.id) return
+  relatedRecipeId.value = recipe.value.id
+  showRelatedRecipeModal.value = true
 }
 
 onMounted(fetchData)
@@ -163,7 +171,8 @@ onMounted(fetchData)
         <div class="p-5 pb-20 max-w-2xl mx-auto">
           <div
             v-if="recipe"
-            class="mb-4 p-3 rounded-xl bg-emerald-50/40 border border-emerald-100 flex items-center gap-3"
+            class="mb-4 p-3 rounded-xl bg-emerald-50/40 border border-emerald-100 flex items-center gap-3 cursor-pointer hover:bg-emerald-50/70 transition-colors"
+            @click="openRelatedRecipe"
           >
             <div class="w-12 h-12 rounded-lg overflow-hidden bg-white flex-shrink-0">
               <img
@@ -190,6 +199,13 @@ onMounted(fetchData)
                 </span>
               </div>
             </div>
+            <button
+              type="button"
+              class="text-[11px] font-semibold text-emerald-700 bg-white/80 border border-emerald-200 px-2.5 py-1 rounded-full shrink-0"
+              @click.stop="openRelatedRecipe"
+            >
+              查看完整食谱
+            </button>
           </div>
 
           <h1 class="text-xl font-bold text-stone-900 mb-3 leading-relaxed">
@@ -258,6 +274,11 @@ onMounted(fetchData)
       作业不存在或已被删除
     </div>
   </div>
+
+  <RecipeMarketDetailModal
+    v-model="showRelatedRecipeModal"
+    :recipe-id="relatedRecipeId"
+  />
 </template>
 
 <style scoped>
@@ -272,4 +293,3 @@ onMounted(fetchData)
   border-radius: 20px;
 }
 </style>
-
