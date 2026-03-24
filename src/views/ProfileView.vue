@@ -1127,7 +1127,16 @@ function closeAccountMenu() {
              <div v-if="!favoriteHerbs.length" class="text-center py-20 text-gray-400 bg-white rounded-xl border border-dashed border-sandalwood/10"><p>私库空空如也</p></div>
              <div v-for="herb in favoriteHerbs" :key="herb.favorite_id" class="bg-white p-4 rounded-xl shadow-card border border-sandalwood/10 relative group hover:shadow-lg cursor-pointer flex items-center gap-4" @click="goToHerbDetail(herb.name)">
                 <button @click.stop="deleteHerb(herb.favorite_id)" class="absolute top-3 right-3 text-gray-300 hover:text-red-400 p-2 hover:bg-red-50 rounded-full transition-colors opacity-0 group-hover:opacity-100 z-10"><X class="w-4 h-4" /></button>
-                <div class="w-14 h-14 rounded-lg bg-[#EEF2E6] flex items-center justify-center text-2xl shrink-0 text-[#5A7C65]">🌿</div>
+                <div class="w-14 h-14 rounded-lg bg-[#EEF2E6] overflow-hidden shrink-0 border border-[#5A7C65]/20">
+                  <img
+                    :src="getFavoriteHerbImage(herb)"
+                    :alt="herb.name"
+                    class="w-full h-full object-cover"
+                    loading="lazy"
+                    decoding="async"
+                    @error="(e) => handleFavoriteHerbImageError(e, herb)"
+                  />
+                </div>
                 <div class="flex-1 min-w-0">
                    <h4 class="font-bold text-gray-800">{{ herb.name }}</h4>
                    <p class="text-xs text-gray-500 mt-1 truncate">{{ herb.nature }} · {{ herb.taste }}</p>
