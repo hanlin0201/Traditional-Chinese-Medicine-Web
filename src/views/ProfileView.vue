@@ -1,3 +1,8 @@
+<script>
+const _profileCache = { userId: null, payload: null }
+export default {}
+</script>
+
 <script setup>
 import { onMounted, onUnmounted, ref, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
@@ -427,7 +432,7 @@ async function handlePublishRecipe() {
 }
 
 // 会话缓存：再次进入个人中心时先展示上次数据，调理/收藏/作品数不闪 0
-const _profileCache = { userId: null, payload: null }
+// _profileCache 定义在模块级 <script> 块，跨组件实例持久化
 function applyProfilePayload(payload) {
   if (!payload) return
   profile.value = payload.profile
