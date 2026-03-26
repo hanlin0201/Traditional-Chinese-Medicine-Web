@@ -1,14 +1,15 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '@/supabaseClient'
 import { useAuth } from '@/composables/useAuth'
 import { ChevronLeft, Heart, MoreHorizontal, Trash2 } from 'lucide-vue-next'
 import RecipeMarketDetailModal from '@/components/RecipeMarketDetailModal.vue'
+import { getUserDisplayInfo, DEFAULT_USER_DISPLAY_NAME } from '@/utils/userDisplay'
 
 const route = useRoute()
 const router = useRouter()
-const { user: currentUser } = useAuth()
+const { user: currentUser, profile: currentUserProfile } = useAuth()
 
 const loading = ref(true)
 const homework = ref(null)
@@ -19,6 +20,25 @@ const isLiked = ref(false)
 
 const showRelatedRecipeModal = ref(false)
 const relatedRecipeId = ref(null)
+const authorProfile = ref(null)
+
+const homeworkUserDisplay = computed(() =>
+  getUserDisplayInfo({
+    profile: authorProfile.value,
+    fallbackName: homework.value?.user_name,
+    defaultName: DEFAULT_USER_DISPLAY_NAME,
+  }),
+)
+
+function getCurrentUserDisplayName() {
+  const display = getUserDisplayInfo({
+    profile: currentUserProfile.value,
+    fallbackName: currentUser.value?.user_metadata?.full_name,
+    email: currentUser.value?.email,
+    defaultName: DEFAULT_USER_DISPLAY_NAME,
+  })
+  return display.name
+}
 
 const formatDate = (isoStr) => {
   if (!isoStr) return ''
@@ -36,6 +56,16 @@ async function fetchData() {
       supabase.from('homework_comments').select('*').eq('homework_id', id).order('created_at', { ascending: true }),
     ])
     homework.value = hw
+    if (hw?.user_id) {
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('id, username, avatar_url')
+        .eq('id', hw.user_id)
+        .maybeSingle()
+      authorProfile.value = userProfile || null
+    } else {
+      authorProfile.value = null
+    }
     comments.value = cs || []
 
     if (hw?.recipe_id) {
@@ -71,7 +101,7 @@ async function submitComment() {
       homework_id: homework.value.id,
       user_id: currentUser.value.id,
       content: newComment.value,
-      user_name: currentUser.value.user_metadata?.full_name || '养生达人',
+      user_name: getCurrentUserDisplayName(),
     })
     .select()
     .single()
@@ -134,6 +164,13 @@ function openRelatedRecipe() {
   showRelatedRecipeModal.value = true
 }
 
+function goToHomeworkUserProfile(e) {
+  e?.stopPropagation?.()
+  const uid = homework.value?.user_id
+  if (!uid) return
+  router.push({ name: 'Profile', query: { uid } })
+}
+
 onMounted(fetchData)
 </script>
 
@@ -146,11 +183,16 @@ onMounted(fetchData)
       <div class="font-bold text-base flex items-center gap-2">
         <div
           v-if="homework"
-          class="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center text-[10px] font-bold text-emerald-700"
+          class="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center text-[10px] font-bold text-emerald-700 cursor-pointer"
+          @click="goToHomeworkUserProfile"
         >
-          {{ homework.user_name?.[0] }}
+          {{ homeworkUserDisplay.name?.[0] }}
         </div>
-        <span v-if="homework">{{ homework.user_name }}</span>
+        <span
+          v-if="homework"
+          class="cursor-pointer hover:text-emerald-700"
+          @click="goToHomeworkUserProfile"
+        >{{ homeworkUserDisplay.name }}</span>
         <span v-else>作业详情</span>
       </div>
       <button class="p-2 -mr-2 text-stone-800">

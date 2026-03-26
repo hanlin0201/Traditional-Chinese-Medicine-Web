@@ -1,6 +1,6 @@
 <script setup>
-import { onMounted, onUnmounted, ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { onMounted, onUnmounted, ref, computed, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { supabase } from '@/supabaseClient'
 import { useAuth } from '@/composables/useAuth'
 import HealthTagManager from '@/components/HealthTagManager.vue'
@@ -17,7 +17,10 @@ import {
 } from 'lucide-vue-next'
 
 const router = useRouter()
+const route = useRoute()
 const { user, handleLogout, isAdmin } = useAuth()
+const viewedUserId = computed(() => String(route.query.uid || user.value?.id || '').trim())
+const isOwner = computed(() => !!user.value?.id && viewedUserId.value === user.value.id)
 const loading = ref(true)
 const activeTab = ref('plans')
 const foldedStates = ref({}) 
@@ -440,8 +443,8 @@ function applyProfilePayload(payload) {
   dbMyRecipes.value = payload.dbMyRecipes ?? []
 }
 function saveProfilePayload() {
-  if (!user.value) return
-  _profileCache.userId = user.value.id
+  if (!isOwner.value || !user.value) return
+  _profileCache.userId = viewedUserId.value
   _profileCache.payload = {
     profile: profile.value,
     username: username.value,
@@ -464,8 +467,8 @@ function toggleFold(uniqueKey) {
 
 // --- 1. 获取数据：5 个请求并行 + 双源合并 ---
 async function getProfile() {
-  if (!user.value) return
-  const uid = user.value.id
+  const uid = viewedUserId.value
+  if (!uid) return
   const isRevalidate = loading.value === false && _profileCache.userId === uid
   if (!isRevalidate) loading.value = true
   try {
@@ -577,18 +580,28 @@ async function getProfile() {
 
 // --- 保存逻辑 ---
 async function saveProfileField(updates) {
+  if (!isOwner.value || !user.value) return
   await supabase.from('profiles').update({ ...updates, updated_at: new Date() }).eq('id', user.value.id)
 }
 async function saveName() {
+  if (!isOwner.value) {
+    isEditingName.value = false
+    return
+  }
   isEditingName.value = false
   if (!username.value.trim()) username.value = '未命名'
   await saveProfileField({ username: username.value })
 }
 async function saveBio() {
+  if (!isOwner.value) {
+    isEditingBio.value = false
+    return
+  }
   isEditingBio.value = false
   await saveProfileField({ bio: bio.value })
 }
 async function togglePrivacy(type) {
+  if (!isOwner.value) return
   const fieldMap = { plans: 'is_plans_private', recipes: 'is_saved_private', herbs: 'is_herbs_private' }
   privacySettings.value[type] = !privacySettings.value[type]
   await saveProfileField({ [fieldMap[type]]: privacySettings.value[type] })
@@ -822,8 +835,12 @@ async function deleteWork(workId) {
 }
 
 // --- 其他 ---
-function triggerFileInput() { fileInput.value.click() }
+function triggerFileInput() {
+  if (!isOwner.value) return
+  fileInput.value.click()
+}
 async function handleFileChange(event) {
+  if (!isOwner.value) return
   const file = event.target.files[0]
   if (!file) return
   if (file.size > 1024 * 1024) return alert('图片太大，请选择小于 1MB 的图片')
@@ -964,7 +981,7 @@ function formatDate(isoString) {
 }
 
 onMounted(() => {
-  if (user.value && _profileCache.userId === user.value.id && _profileCache.payload) {
+  if (isOwner.value && user.value && _profileCache.userId === user.value.id && _profileCache.payload) {
     applyProfilePayload(_profileCache.payload)
     loading.value = false
     getProfile() // 后台刷新，不阻塞界面
@@ -972,6 +989,10 @@ onMounted(() => {
     getProfile()
   }
   window.addEventListener('profile-updated', getProfile)
+})
+watch(viewedUserId, (next, prev) => {
+  if (!next || next === prev) return
+  getProfile()
 })
 onUnmounted(() => {
   window.removeEventListener('profile-updated', getProfile)
@@ -996,6 +1017,7 @@ function closeAccountMenu() {
 
       <div class="relative z-10 flex flex-col items-center sm:flex-row sm:items-start gap-6 max-w-4xl mx-auto">
         <button
+          v-if="isOwner"
           type="button"
           class="absolute top-0 right-0 p-2 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center"
           @click.stop="toggleAccountMenu"
@@ -1029,19 +1051,25 @@ function closeAccountMenu() {
 
         <input type="file" ref="fileInput" accept="image/*" class="hidden" @change="handleFileChange" />
         <div 
-          @click="triggerFileInput"
-          class="w-24 h-24 rounded-full bg-white/20 flex items-center justify-center border-4 border-white/20 backdrop-blur-md cursor-pointer group relative overflow-hidden transition-transform hover:scale-105 shadow-inner shrink-0"
+          @click="isOwner ? triggerFileInput() : null"
+          class="w-24 h-24 rounded-full bg-white/20 flex items-center justify-center border-4 border-white/20 backdrop-blur-md group relative overflow-hidden transition-transform hover:scale-105 shadow-inner shrink-0"
+          :class="isOwner ? 'cursor-pointer' : 'cursor-default'"
         >
           <img v-if="avatar_url" :src="avatar_url" class="w-full h-full object-cover" />
           <User v-else class="w-12 h-12 text-white/80" />
-          <div class="absolute inset-0 bg-black/30 hidden group-hover:flex items-center justify-center transition-all">
+          <div v-if="isOwner" class="absolute inset-0 bg-black/30 hidden group-hover:flex items-center justify-center transition-all">
             <Camera class="w-8 h-8 text-white opacity-90" />
           </div>
         </div>
 
         <div class="flex-1 min-w-0 text-center sm:text-left w-full">
           <div class="flex items-center justify-center sm:justify-start gap-2 mb-2">
-            <div v-if="!isEditingName" @click="isEditingName = true" class="group flex items-center gap-2 cursor-pointer flex-wrap justify-center sm:justify-start">
+            <div
+              v-if="!isEditingName"
+              @click="isOwner ? (isEditingName = true) : null"
+              class="group flex items-center gap-2 flex-wrap justify-center sm:justify-start"
+              :class="isOwner ? 'cursor-pointer' : 'cursor-default'"
+            >
               <h1 class="text-2xl font-serif font-bold text-white tracking-wide truncate group-hover:opacity-80">
                 {{ username || '点击设置昵称' }}
               </h1>
@@ -1058,7 +1086,12 @@ function closeAccountMenu() {
           </div>
 
           <div class="text-white/80 text-sm font-light leading-relaxed max-w-lg">
-             <div v-if="!isEditingBio" @click="isEditingBio = true" class="group cursor-pointer min-h-[1.5em] flex items-center justify-center sm:justify-start gap-2">
+             <div
+               v-if="!isEditingBio"
+               @click="isOwner ? (isEditingBio = true) : null"
+               class="group min-h-[1.5em] flex items-center justify-center sm:justify-start gap-2"
+               :class="isOwner ? 'cursor-pointer' : 'cursor-default'"
+             >
                <span>{{ bio || '写一句简介，记录你的养生心得...' }}</span>
                <Edit2 class="w-3 h-3 text-white/40 group-hover:text-white/80 opacity-0 group-hover:opacity-100 transition-opacity" />
              </div>
@@ -1319,11 +1352,11 @@ function closeAccountMenu() {
           </div>
 
           <div v-if="!myWorks.length" class="text-center py-20 text-gray-400 bg-white rounded-xl border border-dashed border-sandalwood/10"><p>还没交过作业，快去食谱广场试试吧</p></div>
-          <div v-else class="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div v-else class="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2.5">
              <div
                v-for="work in myWorks"
                :key="work.id"
-               class="aspect-square bg-gray-100 rounded-xl overflow-hidden relative group cursor-pointer shadow-sm border border-gray-200"
+               class="aspect-square bg-gray-100 rounded-lg overflow-hidden relative group cursor-pointer shadow-sm border border-gray-200"
                @click="goToHomeworkDetail(work)"
              >
                 <button
@@ -1334,7 +1367,7 @@ function closeAccountMenu() {
                   <Trash2 class="w-4 h-4" />
                 </button>
                 <img :src="work.image_url" class="w-full h-full object-cover transition-transform group-hover:scale-110" />
-                <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
+                <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2">
                    <p class="text-white text-xs line-clamp-2">{{ work.content || '打卡成功' }}</p>
                    <span class="text-[10px] text-white/60 mt-1">{{ formatDate(work.created_at) }}</span>
                 </div>
@@ -1357,7 +1390,7 @@ function closeAccountMenu() {
           <div v-if="!mergedMyRecipes.length" class="text-center py-20 text-gray-400 bg-white rounded-xl border border-dashed border-sandalwood/10">
             <p>您还没有发布过原创食谱</p>
           </div>
-          <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div v-else class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
             <div
               v-for="recipe in mergedMyRecipes"
               :key="`${recipe._rowSource}-${recipe.id}`"
@@ -1376,7 +1409,7 @@ function closeAccountMenu() {
                 <CircleSlash v-if="!canDeleteMyRecipeEntry(recipe)" class="w-4 h-4" />
                 <Trash2 v-else class="w-4 h-4" />
               </button>
-              <div class="relative h-40 overflow-hidden bg-gray-100">
+              <div class="relative h-36 lg:h-40 overflow-hidden bg-gray-100">
                 <img v-if="recipe.image" :src="recipe.image" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                 <div v-else class="w-full h-full flex items-center justify-center text-4xl">🥗</div>
                 <div class="absolute bottom-2 left-2 flex gap-2" v-if="recipe.time">

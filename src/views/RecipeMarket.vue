@@ -1,7 +1,7 @@
 <script setup>
 defineOptions({ name: 'RecipeMarket' })
 
-import { ref, onMounted, onActivated, computed } from 'vue'
+import { ref, onMounted, onActivated, onDeactivated, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { 
   Clock, UserCheck, Sparkles, Leaf, X, Soup, ListOrdered, 
@@ -14,10 +14,11 @@ import { useAuth } from '@/composables/useAuth'
 import { SOLAR_TERMS_LOOKUP } from '@/constants/solarTerms'
 import { BODY_TYPES, EFFICACY_OPTIONS, TIME_RANGES, parseTimeToMinutes } from '@/constants/recipeFilters'
 import { getRecipeMarketCachedData, setRecipeMarketCachedData } from '@/composables/usePagePreload'
+import { getUserDisplayInfo, DEFAULT_USER_DISPLAY_NAME } from '@/utils/userDisplay'
 
 const router = useRouter()
 const route = useRoute()
-const { user: currentUser } = useAuth()
+const { user: currentUser, profile: currentUserProfile } = useAuth()
 
 // --- 状态定义 ---
 const recipes = ref([])
@@ -105,6 +106,48 @@ function clearAllFilters() {
   timeRangeFilter.value = ''
 }
 
+function buildProfilesMap(rows = []) {
+  return Object.fromEntries((rows || []).map(row => [row.id, row]))
+}
+
+async function fetchProfilesMap(userIds = []) {
+  const uniqIds = [...new Set((userIds || []).filter(Boolean).map(id => String(id).trim()))]
+  if (!uniqIds.length) return {}
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, username, avatar_url')
+    .in('id', uniqIds)
+  if (error) {
+    console.warn('加载用户信息失败', error)
+    return {}
+  }
+  return buildProfilesMap(data || [])
+}
+
+function getCurrentUserDisplayName() {
+  const display = getUserDisplayInfo({
+    profile: currentUserProfile.value,
+    fallbackName: currentUser.value?.user_metadata?.full_name,
+    email: currentUser.value?.email,
+    defaultName: DEFAULT_USER_DISPLAY_NAME,
+  })
+  return display.name
+}
+
+function getHomeworkDisplayInfo(hw, profilesById = {}) {
+  return getUserDisplayInfo({
+    profile: hw?.user_id ? profilesById[hw.user_id] : null,
+    fallbackName: hw?.user_name,
+    defaultName: DEFAULT_USER_DISPLAY_NAME,
+  })
+}
+
+function goToUserProfile(userId, e) {
+  e?.stopPropagation?.()
+  if (!userId) return
+  router.push({ name: 'Profile', query: { uid: userId } })
+}
+
 // 互动数据
 const comments = ref([]) 
 const homeworks = ref([])
@@ -125,8 +168,15 @@ const homeworkComments = ref([])
 const newHomeworkComment = ref('') 
 const homeworkIsLiked = ref(false) 
 
-function normalizeRecipe(item, myFavorites = []) {
+function normalizeRecipe(item, myFavorites = [], profilesById = {}) {
   const isUserSubmission = !!(item.author_user_id != null && String(item.author_user_id).length > 0)
+  const authorProfile = item.author_user_id ? profilesById[item.author_user_id] : null
+  const authorDisplay = getUserDisplayInfo({
+    profile: authorProfile,
+    fallbackName: item.author_name,
+    fallbackAvatar: item.author_avatar_url,
+    defaultName: DEFAULT_USER_DISPLAY_NAME,
+  })
   return {
     ...item,
     bodyType: item.body_type,
@@ -137,8 +187,8 @@ function normalizeRecipe(item, myFavorites = []) {
     cooked_count: item.cooked_count || 0,
     is_favorite: myFavorites.includes(item.id),
     is_user_submission: isUserSubmission,
-    author_display_name: item.author_name || '养生达人',
-    author_display_avatar: item.author_avatar_url || '',
+    author_display_name: authorDisplay.name,
+    author_display_avatar: authorDisplay.avatar,
   }
 }
 
@@ -171,7 +221,9 @@ const fetchRecipes = async () => {
     }
 
     if (data) {
-      const normalized = data.map(item => normalizeRecipe(item, myFavorites))
+      const authorIds = data.map(item => item.author_user_id).filter(Boolean)
+      const profilesById = await fetchProfilesMap(authorIds)
+      const normalized = data.map(item => normalizeRecipe(item, myFavorites, profilesById))
       recipes.value = normalized
       setRecipeMarketCachedData(normalized)
     }
@@ -189,7 +241,16 @@ const fetchInteractions = async (recipeId) => {
 
   // 作业按时间倒序
   const { data: hData } = await supabase.from('homeworks').select('*').eq('recipe_id', recipeId).order('created_at', { ascending: false })
-  homeworks.value = hData || []
+  const rawHomeworks = hData || []
+  const profilesById = await fetchProfilesMap(rawHomeworks.map(hw => hw.user_id))
+  homeworks.value = rawHomeworks.map(hw => {
+    const display = getHomeworkDisplayInfo(hw, profilesById)
+    return {
+      ...hw,
+      user_display_name: display.name,
+      user_display_avatar: display.avatar,
+    }
+  })
 
   // 统一用作业条数回填“已交作业数”，避免刷新后又变成 0
   const count = homeworks.value.length
@@ -220,7 +281,7 @@ const submitComment = async () => {
   const { error } = await supabase.from('comments').insert({
     recipe_id: selectedRecipe.value.id,
     content: newComment.value,
-    user_name: currentUser.value.user_metadata?.full_name || '养生达人',
+    user_name: getCurrentUserDisplayName(),
     user_id: currentUser.value.id
   })
 
@@ -294,7 +355,7 @@ const submitHomework = async () => {
       image_url: publicUrlData.publicUrl,
       content: uploadContent.value || '打卡成功！',
       tags: tagsArray, 
-      user_name: currentUser.value.user_metadata?.full_name || '养生达人'
+      user_name: getCurrentUserDisplayName()
     }).select().single()
 
     if (dbError) throw dbError
@@ -412,7 +473,7 @@ const submitHomeworkComment = async () => {
     homework_id: selectedHomework.value.id,
     user_id: currentUser.value.id,
     content: newHomeworkComment.value,
-    user_name: currentUser.value.user_metadata?.full_name || '养生达人'
+    user_name: getCurrentUserDisplayName()
   }).select().single()
 
   if (!error && data) {
@@ -463,6 +524,11 @@ onActivated(() => {
       fetchInteractions(selectedRecipe.value.id)
     }
   }
+})
+
+onDeactivated(() => {
+  showHomeworkPage.value = false
+  selectedHomework.value = null
 })
 </script>
 
@@ -600,12 +666,16 @@ onActivated(() => {
         </div>
         <div class="p-4 flex-1 flex flex-col">
           <h3 class="text-lg font-bold text-stone-800 mb-1">{{ recipe.name }}</h3>
-          <div v-if="recipe.is_user_submission" class="flex items-center gap-2 mb-2">
+          <div
+            v-if="recipe.is_user_submission"
+            class="flex items-center gap-2 mb-2 cursor-pointer w-fit rounded-lg px-1 -mx-1 hover:bg-stone-50"
+            @click.stop="goToUserProfile(recipe.author_user_id, $event)"
+          >
             <img
               v-if="recipe.author_display_avatar"
               :src="recipe.author_display_avatar"
               class="w-6 h-6 rounded-full object-cover border border-stone-200"
-              alt=""
+              alt="作者头像"
             />
             <div
               v-else
@@ -651,13 +721,14 @@ onActivated(() => {
 
                 <div
                   v-if="selectedRecipe.is_user_submission"
-                  class="flex items-center gap-3 mb-6 p-3 rounded-xl bg-amber-50/60 border border-amber-100"
+                  class="flex items-center gap-3 mb-6 p-3 rounded-xl bg-amber-50/60 border border-amber-100 cursor-pointer hover:bg-amber-50/90"
+                  @click="goToUserProfile(selectedRecipe.author_user_id, $event)"
                 >
                   <img
                     v-if="selectedRecipe.author_display_avatar"
                     :src="selectedRecipe.author_display_avatar"
                     class="w-10 h-10 rounded-full object-cover border border-amber-200 shrink-0"
-                    alt=""
+                    alt="作者头像"
                   />
                   <div
                     v-else
@@ -739,8 +810,22 @@ onActivated(() => {
                        
                        <div class="flex-1 min-w-0 flex flex-col">
                           <div class="flex items-center gap-2 mb-2">
-                             <div class="w-6 h-6 rounded-full bg-stone-200 flex items-center justify-center text-[10px] text-stone-500 font-bold">{{ hw.user_name?.[0] }}</div>
-                             <span class="text-xs text-stone-500 font-medium truncate">{{ hw.user_name }}</span>
+                             <img
+                               v-if="hw.user_display_avatar"
+                               :src="hw.user_display_avatar"
+                               class="w-6 h-6 rounded-full object-cover border border-stone-200 cursor-pointer"
+                               alt="用户头像"
+                               @click.stop="goToUserProfile(hw.user_id, $event)"
+                             />
+                             <div
+                               v-else
+                               class="w-6 h-6 rounded-full bg-stone-200 flex items-center justify-center text-[10px] text-stone-500 font-bold cursor-pointer"
+                               @click.stop="goToUserProfile(hw.user_id, $event)"
+                             >{{ hw.user_display_name?.[0] }}</div>
+                             <span
+                               class="text-xs text-stone-500 font-medium truncate cursor-pointer hover:text-emerald-700"
+                               @click.stop="goToUserProfile(hw.user_id, $event)"
+                             >{{ hw.user_display_name }}</span>
                              <span class="text-[10px] text-stone-300 ml-auto">{{ formatDate(hw.created_at) }}</span>
                           </div>
                           <p class="text-sm text-stone-800 line-clamp-2 mb-2">{{ hw.content }}</p>
@@ -811,8 +896,22 @@ onActivated(() => {
                  <ChevronLeft :size="24" />
               </button>
               <div class="font-bold text-base flex items-center gap-2">
-                 <div class="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center text-[10px] font-bold text-emerald-700">{{ selectedHomework.user_name?.[0] }}</div>
-                 {{ selectedHomework.user_name }}
+                 <img
+                   v-if="selectedHomework.user_display_avatar"
+                   :src="selectedHomework.user_display_avatar"
+                   class="w-6 h-6 rounded-full object-cover border border-stone-200 cursor-pointer"
+                   alt="用户头像"
+                   @click.stop="goToUserProfile(selectedHomework.user_id, $event)"
+                 />
+                 <div
+                   v-else
+                   class="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center text-[10px] font-bold text-emerald-700 cursor-pointer"
+                   @click.stop="goToUserProfile(selectedHomework.user_id, $event)"
+                 >{{ selectedHomework.user_display_name?.[0] }}</div>
+                 <span
+                   class="cursor-pointer hover:text-emerald-700"
+                   @click.stop="goToUserProfile(selectedHomework.user_id, $event)"
+                 >{{ selectedHomework.user_display_name }}</span>
               </div>
               <button class="p-2 -mr-2 text-stone-800"><MoreHorizontal :size="24" /></button>
            </div>
