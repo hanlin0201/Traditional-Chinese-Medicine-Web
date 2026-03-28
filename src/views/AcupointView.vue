@@ -4,6 +4,7 @@ import { Search, ChevronRight, ChevronDown, X, ZoomIn, ZoomOut, RotateCcw } from
 import { MERIDIAN_GROUPS, CATEGORIES, searchAcupoints } from '@/constants/acupoints.js'
 import { ACUPOINT_COORDS, getPointCoord } from '@/constants/acupointCoords.js'
 import { supabase } from '@/supabaseClient'
+import { FEATURE_COPY } from '@/constants/branding'
 
 // ===================== 状态 =====================
 
@@ -368,7 +369,8 @@ watch(activeMeridian, () => {
 
       <!-- 标题 + 2D/3D 切换 -->
       <div class="viewport-header">
-        <h1 class="viewport-title">经络穴位导航</h1>
+        <h1 class="viewport-title">{{ FEATURE_COPY.acupoints.title }}</h1>
+        <p class="viewport-motto">{{ FEATURE_COPY.acupoints.motto }}</p>
         <div class="view-toggle">
           <button
             class="toggle-btn"
@@ -828,6 +830,17 @@ watch(activeMeridian, () => {
   letter-spacing: 4px;
   margin: 0;
   text-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.viewport-motto {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: rgba(93, 64, 55, 0.75);
+  letter-spacing: 0.12em;
+  text-align: center;
+  max-width: 20rem;
+  line-height: 1.4;
 }
 
 /* 2D / 3D 切换按钮 */

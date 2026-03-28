@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { HelpCircle, XCircle, RefreshCw, Loader2 } from 'lucide-vue-next'
 import { supabase } from '@/supabaseClient'
+import { FEATURE_COPY } from '@/constants/branding'
 
 const bgImage = "https://bpic.588ku.com/back_list_pic/25/01/23/ec0cb9c263b689042869b689494b650e.jpg!/fw/350/quality/95/unsharp/true/compress/true"
 
@@ -86,13 +87,13 @@ onMounted(() => {
     <div class="content-wrapper">
       <div class="section-header">
         <div class="title-row">
-          <h3 class="title">养生避雷针</h3>
+          <h3 class="title">{{ FEATURE_COPY.mythBuster.title }}</h3>
           <div class="refresh-control" :class="{ 'is-loading': loading }" @click="refreshBatch">
             <RefreshCw class="refresh-icon" />
             <span class="action-text">随机换一批</span>
           </div>
         </div>
-        <span class="subtitle">粉碎谣言 · 正本清源</span>
+        <span class="subtitle">{{ FEATURE_COPY.mythBuster.motto }}</span>
       </div>
 
       <div class="myth-list">
@@ -177,11 +178,12 @@ onMounted(() => {
   margin-bottom: 8px;
 }
 .title {
-  font-size: 2.2rem;
+  font-family: 'Ma Shan Zheng', cursive;
+  font-size: 2.35rem;
   color: #5D4037;
-  font-weight: bold;
+  font-weight: 400;
   margin: 0;
-  font-family: 'Noto Serif SC', serif;
+  letter-spacing: 0.08em;
 }
 .refresh-control {
   display: flex;
@@ -202,10 +204,10 @@ onMounted(() => {
 .refresh-icon { width: 18px; height: 18px; flex-shrink: 0; }
 .action-text { font-weight: 600; }
 .subtitle {
-  font-size: 1rem;
+  font-family: 'Ma Shan Zheng', cursive;
+  font-size: 1.05rem;
   color: #8B5E3C;
-  letter-spacing: 4px;
-  text-transform: uppercase;
+  letter-spacing: 0.14em;
 }
 
 .myth-list { display: flex; flex-direction: column; gap: 16px; min-height: 200px; }

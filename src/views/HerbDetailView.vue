@@ -12,17 +12,8 @@ import Herb3DScene from '@/components/Herb3DScene.vue'
 import { supabase } from '@/supabaseClient' 
 import { useAuth } from '@/composables/useAuth'
 import { getHerbTagDisplayByName } from '@/composables/useHerbTags'
-// 入药部位对应的顶部背景图（放在项目根目录的 png）
-import partRootImg from '../../根茎类.png'
-import partFruitSeedImg from '../../果实种子类.png'
-import partWholeHerbImg from '../../全草类.png'
-import partFlowerImg from '../../花类.png'
-import partVineImg from '../../藤木类.png'
-import partAnimalImg from '../../动物类.png'
-import partBranchBarkImg from '../../枝叶树皮类.png'
-import partFungiAlgaeImg from '../../菌藻类.png'
-import partMineralImg from '../../矿物类.png'
-import partOtherImg from '../../其它.png'
+// 入药部位对应的顶部背景图（静态资源见 public/photo/herb-part-categories/）
+const HERB_PART_ART = '/photo/herb-part-categories'
 
 const route = useRoute()
 const router = useRouter()
@@ -47,16 +38,16 @@ const herbTagInfo = computed(() => {
 
 // 入药部位 → 背景图映射（用普通对象，避免类型标注报错）
 const PART_BG_MAP = {
-  '根茎类': partRootImg,
-  '果实/种子类': partFruitSeedImg,
-  '全草类': partWholeHerbImg,
-  '花类': partFlowerImg,
-  '藤木类': partVineImg,
-  '动物类': partAnimalImg,
-  '枝叶/树皮类': partBranchBarkImg,
-  '菌藻类': partFungiAlgaeImg,
-  '矿物类': partMineralImg,
-  '其他': partOtherImg,
+  '根茎类': `${HERB_PART_ART}/根茎类.png`,
+  '果实/种子类': `${HERB_PART_ART}/果实种子类.png`,
+  '全草类': `${HERB_PART_ART}/全草类.png`,
+  '花类': `${HERB_PART_ART}/花类.png`,
+  '藤木类': `${HERB_PART_ART}/藤木类.png`,
+  '动物类': `${HERB_PART_ART}/动物类.png`,
+  '枝叶/树皮类': `${HERB_PART_ART}/枝叶树皮类.png`,
+  '菌藻类': `${HERB_PART_ART}/菌藻类.png`,
+  '矿物类': `${HERB_PART_ART}/矿物类.png`,
+  '其他': `${HERB_PART_ART}/其它.png`,
 }
 
 // 计算当前药材对应的入药部位背景图

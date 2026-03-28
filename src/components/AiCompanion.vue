@@ -1,8 +1,9 @@
 <script setup>
-import { ref, nextTick, watch } from 'vue'
+import { ref, nextTick, watch, onMounted, onUnmounted } from 'vue'
 import { ScrollText, Send, X, ChevronDown, Heart, PlusCircle, Loader2, BookOpen, Coffee, Soup, Pill, MessageCircle, Check } from 'lucide-vue-next'
 import { supabase } from '@/supabaseClient'
 import { useAuth } from '@/composables/useAuth'
+import { AI_TUTOR_LABEL } from '@/constants/branding'
 
 const { user, logUserHistory } = useAuth()
 const open = ref(false)
@@ -515,6 +516,98 @@ async function handleSavePlan(fullMessage) {
 }
 
 function handleKeydown(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }
+
+function openPanel() {
+  open.value = true
+  nextTick(() => scrollToBottom())
+}
+
+/** 面板尺寸：右下角固定，从左下角拖拽调整 */
+const AI_PANEL_SIZE_KEY = 'ai-companion-panel-size'
+const PANEL_MIN_W = 320
+const PANEL_MIN_H = 400
+const PANEL_DEFAULT_W = 480
+const PANEL_DEFAULT_H = 720
+const PANEL_MAX_W = 960
+
+const panelW = ref(PANEL_DEFAULT_W)
+const panelH = ref(PANEL_DEFAULT_H)
+
+function panelMaxH() {
+  return Math.floor(window.innerHeight * 0.92)
+}
+
+function clampPanelSize() {
+  const maxW = Math.min(PANEL_MAX_W, window.innerWidth - 24)
+  panelW.value = Math.max(PANEL_MIN_W, Math.min(panelW.value, maxW))
+  panelH.value = Math.max(PANEL_MIN_H, Math.min(panelH.value, panelMaxH()))
+}
+
+function persistPanelSize() {
+  clampPanelSize()
+  try {
+    localStorage.setItem(AI_PANEL_SIZE_KEY, JSON.stringify({ w: panelW.value, h: panelH.value }))
+  } catch {}
+}
+
+function loadPanelSize() {
+  try {
+    const raw = localStorage.getItem(AI_PANEL_SIZE_KEY)
+    if (!raw) return
+    const { w, h } = JSON.parse(raw)
+    if (typeof w === 'number' && typeof h === 'number') {
+      panelW.value = w
+      panelH.value = h
+      clampPanelSize()
+    }
+  } catch {}
+}
+
+const resizing = ref(false)
+function onResizeHandleDown(e) {
+  if (e.button !== 0) return
+  e.preventDefault()
+  resizing.value = true
+  const startX = e.clientX
+  const startY = e.clientY
+  const startW = panelW.value
+  const startH = panelH.value
+
+  const onMove = (ev) => {
+    if (!resizing.value) return
+    const nextW = startW + (startX - ev.clientX)
+    const nextH = startH + (startY - ev.clientY)
+    panelW.value = Math.max(PANEL_MIN_W, Math.min(PANEL_MAX_W, Math.min(nextW, window.innerWidth - 24)))
+    panelH.value = Math.max(PANEL_MIN_H, Math.min(nextH, panelMaxH()))
+  }
+  const onUp = () => {
+    resizing.value = false
+    persistPanelSize()
+    window.removeEventListener('mousemove', onMove)
+    window.removeEventListener('mouseup', onUp)
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
+  }
+  document.body.style.cursor = 'nesw-resize'
+  document.body.style.userSelect = 'none'
+  window.addEventListener('mousemove', onMove)
+  window.addEventListener('mouseup', onUp)
+}
+
+function onViewportResize() {
+  clampPanelSize()
+}
+
+onMounted(() => {
+  loadPanelSize()
+  window.addEventListener('resize', onViewportResize)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', onViewportResize)
+})
+
+defineExpose({ openPanel })
 </script>
 
 <template>
@@ -524,9 +617,20 @@ function handleKeydown(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDef
 
   <Teleport to="body">
     <Transition enter-active-class="transition duration-200 ease-out" enter-from-class="opacity-0 translate-y-4" enter-to-class="opacity-100 translate-y-0" leave-active-class="transition duration-150 ease-in" leave-from-class="opacity-100 translate-y-0" leave-to-class="opacity-0 translate-y-4">
-      <div v-show="open" class="fixed bottom-24 right-6 z-50 w-[360px] h-[650px] max-h-[85vh] rounded-xl shadow-card border border-sandalwood/20 flex flex-col bg-[#FDFBF7] overflow-hidden">
-        <div class="px-4 py-3 border-b border-sandalwood/15 flex justify-between items-center bg-[#FBF8F2]">
-          <h3 class="font-serif font-semibold text-sandalwood">AI 养生导师</h3>
+      <div
+        v-show="open"
+        class="ai-panel-shell fixed bottom-24 right-6 z-50 rounded-xl shadow-card border border-sandalwood/20 flex flex-col bg-[#FDFBF7] overflow-hidden"
+        :style="{ width: `${panelW}px`, height: `${panelH}px`, maxHeight: `${panelMaxH()}px` }"
+      >
+        <div
+          class="ai-panel-resize-handle"
+          title="拖拽调整窗口大小"
+          aria-label="拖拽调整窗口大小"
+          @mousedown="onResizeHandleDown"
+        />
+
+        <div class="px-4 py-3 border-b border-sandalwood/15 flex justify-between items-center bg-[#FBF8F2] shrink-0">
+          <h3 class="font-serif font-semibold text-sandalwood">{{ AI_TUTOR_LABEL }}</h3>
           <X class="w-5 h-5 cursor-pointer text-sandalwood/70" @click="open = false" />
         </div>
 
@@ -676,5 +780,24 @@ function handleKeydown(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDef
 
 .animate-blink {
   animation: blink 0.8s step-end infinite;
+}
+
+/* 右下角定位：从左下角拖拽放大（向左变宽、向上变高） */
+.ai-panel-shell {
+  position: fixed;
+}
+.ai-panel-resize-handle {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 22px;
+  height: 22px;
+  z-index: 20;
+  cursor: nesw-resize;
+  background: linear-gradient(135deg, transparent 50%, rgba(139, 94, 60, 0.22) 50%);
+  border-bottom-left-radius: 10px;
+}
+.ai-panel-resize-handle:hover {
+  background: linear-gradient(135deg, transparent 45%, rgba(139, 94, 60, 0.35) 45%);
 }
 </style>
