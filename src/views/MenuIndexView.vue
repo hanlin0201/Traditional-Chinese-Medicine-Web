@@ -1,8 +1,8 @@
 <script setup>
-import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed, nextTick, inject } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import gsap from 'gsap'
-import { Sun, Soup, ArrowRight, BookOpen, Utensils, ScrollText, ChevronDown, ArrowUp } from 'lucide-vue-next'
+import { Soup, ArrowRight, BookOpen, Utensils, ScrollText, ChevronDown, ArrowUp, MessageCircle, Activity } from 'lucide-vue-next'
 
 import TcmHistorySection from '@/components/TcmHistorySection.vue'
 import HerbalPairing from '@/components/home/HerbalPairing.vue'
@@ -10,9 +10,18 @@ import MythBuster from '@/components/home/MythBuster.vue'
 // 注意：移除了 getNearestSolarTerm 的引入
 import { supabase } from '@/supabaseClient'
 import { preloadHomeFeaturePages } from '@/composables/usePagePreload'
+import {
+  FEATURE_COPY,
+  SITE_SHORT_NAME,
+  SITE_PLATFORM_TAGLINE,
+  AI_TUTOR_LABEL,
+  AI_TUTOR_MOTTO,
+  homeNextHintText,
+} from '@/constants/branding'
 
 const router = useRouter()
 const route = useRoute()
+const openAiCompanion = inject('openAiCompanion', () => {})
 
 // --- 数据状态 ---
 const currentTermName = ref('')
@@ -29,15 +38,14 @@ const todayLabel = (() => {
 // --- 核心翻页逻辑 ---
 const activeIndex = ref(0)
 const isAnimating = ref(false)
-const totalSections = 5 
+const totalSections = 4
 
 // --- 底部指引文案 ---
 const nextSectionLabels = [
-  { text: '四时之序 · 查看节气', target: 1 },
-  { text: '草本智慧 · 药食同源', target: 2 },
-  { text: '去伪存真 · 养生避雷', target: 3 },
-  { text: '千年医道 · 中医历史', target: 4 },
-  { text: '', target: -1 }
+  { text: homeNextHintText('pairing'), target: 1 },
+  { text: homeNextHintText('mythBuster'), target: 2 },
+  { text: homeNextHintText('history'), target: 3 },
+  { text: '', target: -1 },
 ]
 
 const currentNextLabel = computed(() => {
@@ -85,12 +93,11 @@ const handleTouchEnd = (e) => {
 }
 
 // --- 业务跳转 ---
-function goToHistory() { moveTo(4) }
+function goToHistory() { moveTo(3) }
 function handleMainPanelClick() { router.push('/acupoints') }
 function goToHerbs() { router.push('/herbs') }
 function goToRecipes() { router.push('/recipes') }
 function goToRecipeDetail(id) { router.push({ path: '/recipes', query: { open_id: id } }) }
-
 // --- UI 控制逻辑（来自 main）---
 watch(activeIndex, (newVal) => {
   if (newVal > 0) document.body.classList.add('hide-global-nav')
@@ -100,7 +107,7 @@ watch(activeIndex, (newVal) => {
 watch(
   () => ({ path: route.path, history: route.query.history }),
   (curr) => {
-    if (curr.path === '/' && curr.history === 'open') nextTick(() => moveTo(4))
+    if (curr.path === '/' && curr.history === 'open') nextTick(() => moveTo(3))
   },
   { immediate: true }
 )
@@ -218,72 +225,116 @@ onUnmounted(() => {
     <div class="scroll-container">
       
       <div class="page-section">
-        <section class="tcm-section tcm-hero-section">
-          <div class="bg-overlay-noise"></div>
-          <div class="hero-container relative z-10">
-            <div class="title-group animate-fade-in-down">
-              <h1 class="menu-main-title">中医药百科</h1>
-              <div class="title-decoration"><span class="line"></span><span class="dot"></span><span class="line"></span></div>
-              <p class="menu-sub-title">传承千载医道 · 守护当代安康</p>
-            </div>
-            <div class="menu-entry-grid animate-fade-in-up delay-100">
-              <div class="main-circle-panel" @click="handleMainPanelClick">
-                 <div class="pulse-ring"></div><div class="pulse-ring delay-2"></div>
-                 <div class="center-content"><span class="icon">📍</span><span class="label">3D 经络交互</span><span class="sub-label">点击启动</span></div>
-              </div>
-              <div class="action-buttons">
-                 <button @click.stop="goToHerbs" class="action-btn">
-                    <div class="btn-icon bg-amber-100 text-amber-700"><BookOpen class="w-5 h-5"/></div>
-                    <div class="btn-text"><span class="main">药材百科</span><span class="sub">寻草问药</span></div><ArrowRight class="arrow" />
-                 </button>
-                 <button @click.stop="goToRecipes" class="action-btn">
-                    <div class="btn-icon bg-emerald-100 text-emerald-700"><Utensils class="w-5 h-5"/></div>
-                    <div class="btn-text"><span class="main">食疗方案</span><span class="sub">膳食养生</span></div><ArrowRight class="arrow" />
-                 </button>
-                 <button @click.stop="goToHistory" class="action-btn">
-                    <div class="btn-icon bg-stone-100 text-stone-700"><ScrollText class="w-5 h-5"/></div>
-                    <div class="btn-text"><span class="main">中医历史</span><span class="sub">源远流长</span></div><ArrowRight class="arrow" />
-                 </button>
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
+        <section class="tcm-section tcm-home-hero">
+          <div class="home-hero-inner">
+            <div class="home-glass-card home-glass-card--primary home-glass-card--bento animate-fade-in-up delay-100">
+              <header class="home-card-head home-card-head--bento">
+                <h2 class="home-card-title">{{ SITE_SHORT_NAME }}</h2>
+                <p class="home-card-motto home-card-motto--platform">{{ SITE_PLATFORM_TAGLINE }}</p>
+                <div class="home-card-deco home-card-deco--bento" aria-hidden="true">
+                  <span class="home-card-deco-line"></span>
+                  <span class="home-card-deco-dot"></span>
+                  <span class="home-card-deco-line"></span>
+                </div>
+              </header>
 
-      <div class="page-section">
-        <section class="tcm-section tcm-seasonal-section">
-          <div class="section-inner">
-            <div class="section-header">
-              <h2 class="section-title">四时之序</h2>
-              <p class="section-subtitle">顺应天时，调和阴阳</p>
-              <div class="seasonal-header-decoration"><span class="line"></span><span class="dot"></span><span class="line"></span></div>
-              <p class="today-label"><span class="today-pill">今日：{{ todayLabel }}</span></p>
-            </div>
-            <div v-if="termInfo" class="seasonal-card seasonal-card-enter">
-               <div class="stamp-decoration">节气</div>
-               <div class="card-left">
-                  <div class="term-countdown">
-                    <span class="term-countdown-prefix">距离下一个节气日</span>
-                    <span class="term-countdown-days">
-  {{ nearestDaysDiff > 0 ? `还有 ${nearestDaysDiff} 天` : '今天就是节气日' }}
-                    </span>
+              <div class="home-bento-grid">
+                <aside
+                  v-if="termInfo"
+                  class="bento-tile bento-tile--seasonal seasonal-mini-card seasonal-mini-card--bento seasonal-mini-card--left-tall seasonal-card-enter"
+                >
+                  <div class="seasonal-mini-head seasonal-mini-head--bento">
+                    <div class="seasonal-mini-titles">
+                      <span class="seasonal-mini-eyebrow">{{ FEATURE_COPY.seasonal.title }}</span>
+                      <span class="seasonal-mini-motto">{{ FEATURE_COPY.seasonal.motto }}</span>
+                    </div>
+                    <span class="today-pill today-pill--mini">{{ todayLabel }}</span>
                   </div>
-                  <h2 class="term-name">{{ termInfo.name }}</h2>
-                  <div class="term-principle">{{ termInfo.principle }}</div>
-                  <div class="advice-tags">
-                      <div class="advice-row"><span class="tag-label good">宜</span><span class="tag-text">{{ termInfo.recommend_text }}</span></div>
-                      <div class="advice-row"><span class="tag-label bad">忌</span><span class="tag-text">{{ termInfo.avoid_text }}</span></div>
+                  <div class="seasonal-mini-main seasonal-mini-main--bento">
+                    <div class="seasonal-mini-term-row">
+                      <span class="term-name-mini term-name-mini--bento">{{ termInfo.name }}</span>
+                      <span class="term-count-mini">
+                        {{ nearestDaysDiff > 0 ? `距下一节气 ${nearestDaysDiff} 天` : '今日交节' }}
+                      </span>
+                    </div>
+                    <p class="term-principle-mini term-principle-mini--bento">{{ termInfo.principle }}</p>
+                    <div class="advice-inline advice-inline--bento">
+                      <span class="advice-inline-good"><b>宜</b> {{ termInfo.recommend_text }}</span>
+                      <span class="advice-inline-bad"><b>忌</b> {{ termInfo.avoid_text }}</span>
+                    </div>
                   </div>
-               </div>
-               <div class="card-divider"></div>
-               <div class="card-right">
-                  <div class="right-title"><Soup class="w-4 h-4 text-primary" /><span>当季甄选</span></div>
-                  <div class="mini-recipe-grid">
-                      <div v-for="recipe in seasonalRecipes" :key="recipe.id" class="mini-recipe" @click="goToRecipeDetail(recipe.id)">
-                         <img :src="recipe.image" class="recipe-thumb" /><div class="recipe-overlay"><span class="recipe-name">{{ recipe.name }}</span></div>
-                      </div>
+                  <div class="seasonal-mini-recipes seasonal-mini-recipes--bento">
+                    <div class="seasonal-mini-recipes-head">
+                      <Soup class="seasonal-mini-soup-icon" />
+                      <span class="seasonal-mini-recipes-label">当季甄选</span>
+                    </div>
+                    <div class="mini-recipe-chips mini-recipe-chips--bento">
+                      <button
+                        v-for="recipe in seasonalRecipes"
+                        :key="recipe.id"
+                        type="button"
+                        class="mini-recipe-chip mini-recipe-chip--bento"
+                        :title="recipe.name"
+                        @click="goToRecipeDetail(recipe.id)"
+                      >
+                        <img :src="recipe.image" class="mini-recipe-chip-img" alt="" loading="lazy" />
+                      </button>
+                    </div>
                   </div>
-               </div>
+                </aside>
+
+                <button
+                  type="button"
+                  class="bento-tile bento-tile--recipe recipe-spotlight"
+                  :class="{ 'bento-tile--recipe-tall': !termInfo }"
+                  @click.stop="goToRecipes"
+                >
+                  <Utensils class="recipe-spotlight-icon" stroke-width="1.75" />
+                  <span class="recipe-spotlight-title">{{ FEATURE_COPY.recipes.title }}</span>
+                  <span class="recipe-spotlight-motto">{{ FEATURE_COPY.recipes.motto }}</span>
+                  <span class="recipe-spotlight-hint">进入养生膳食广场</span>
+                  <ArrowRight class="recipe-spotlight-arrow" />
+                </button>
+
+                <button
+                  type="button"
+                  class="bento-tile bento-tile--ai"
+                  :class="{ 'bento-tile--ai-tall': !termInfo }"
+                  @click="openAiCompanion"
+                >
+                  <div class="ai-pulse-ring ai-pulse-ring--rect"></div>
+                  <div class="ai-pulse-ring ai-pulse-ring--rect delay-2"></div>
+                  <div class="ai-mentor-inner">
+                    <MessageCircle class="ai-mentor-icon" stroke-width="1.75" />
+                    <span class="ai-mentor-label">{{ AI_TUTOR_LABEL }}</span>
+                    <span class="ai-mentor-sub">{{ AI_TUTOR_MOTTO }}</span>
+                  </div>
+                </button>
+              </div>
+
+              <nav class="home-quick-nav" aria-label="主要功能入口">
+                <button type="button" class="quick-nav-item" @click.stop="goToHerbs">
+                  <div class="quick-nav-icon quick-nav-icon--herb" aria-hidden="true">
+                    <BookOpen class="quick-nav-svg" stroke-width="1.75" />
+                  </div>
+                  <span class="quick-nav-title">{{ FEATURE_COPY.herbs.title }}</span>
+                  <span class="quick-nav-motto">{{ FEATURE_COPY.herbs.motto }}</span>
+                </button>
+                <button type="button" class="quick-nav-item" @click.stop="handleMainPanelClick">
+                  <div class="quick-nav-icon quick-nav-icon--acu" aria-hidden="true">
+                    <Activity class="quick-nav-svg" stroke-width="1.75" />
+                  </div>
+                  <span class="quick-nav-title">{{ FEATURE_COPY.acupoints.title }}</span>
+                  <span class="quick-nav-motto">{{ FEATURE_COPY.acupoints.motto }}</span>
+                </button>
+                <button type="button" class="quick-nav-item" @click.stop="goToHistory">
+                  <div class="quick-nav-icon quick-nav-icon--hist" aria-hidden="true">
+                    <ScrollText class="quick-nav-svg" stroke-width="1.75" />
+                  </div>
+                  <span class="quick-nav-title">{{ FEATURE_COPY.history.title }}</span>
+                  <span class="quick-nav-motto">{{ FEATURE_COPY.history.motto }}</span>
+                </button>
+              </nav>
             </div>
           </div>
         </section>
@@ -323,7 +374,7 @@ onUnmounted(() => {
         @click="moveTo(currentNextLabel.target)"
       >
         <span class="hint-text">{{ currentNextLabel.text }}</span>
-        <ChevronDown class="animate-bounce w-5 h-5" />
+        <ChevronDown class="hint-chevron animate-bounce" stroke-width="2.25" />
       </div>
     </transition>
 
@@ -338,9 +389,14 @@ onUnmounted(() => {
   position: fixed;
   top: 0; left: 0;
   width: 100%; height: 100vh;
-  overflow: hidden; 
-  overscroll-behavior: none; 
-  touch-action: none; 
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+  --primary: #8b5e3c;
+  --primary-dark: #5d4037;
+  --accent: #c44d36;
+  /* 与 App.vue 顶栏 min-h-[4.5rem] 对齐，避免首屏内容被挡 */
+  --main-nav-h: 4.5rem;
 }
 
 .scroll-container {
@@ -414,38 +470,70 @@ onUnmounted(() => {
   opacity: 0;
 }
 
-/* 底部动态指引 */
+/* 底部「继续下滑」指引：白字、加大、胶囊底 + 轻微呼吸动效 */
 .next-page-hint {
   position: fixed;
-  bottom: 20px;
+  bottom: max(16px, env(safe-area-inset-bottom));
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   z-index: 999;
   cursor: pointer;
-  color: var(--primary);
-  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
-  font-weight: bold;
-  background: transparent;
-  backdrop-filter: none;
-  border: none;
-  padding: 0;
-  transition: all 0.3s;
-  opacity: 0.8;
+  color: #fff;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.12) 0%, rgba(0, 0, 0, 0.22) 100%);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  padding: 12px 28px 14px;
+  box-shadow:
+    0 8px 28px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(0, 0, 0, 0.06) inset;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+  opacity: 1;
+  animation: next-hint-breathe 2.8s ease-in-out infinite;
+}
+
+@keyframes next-hint-breathe {
+  0%,
+  100% {
+    box-shadow:
+      0 8px 28px rgba(0, 0, 0, 0.2),
+      0 0 0 1px rgba(0, 0, 0, 0.06) inset;
+  }
+  50% {
+    box-shadow:
+      0 10px 36px rgba(0, 0, 0, 0.28),
+      0 0 0 1px rgba(255, 255, 255, 0.12) inset;
+  }
 }
 
 .next-page-hint:hover {
-  opacity: 1;
-  transform: translateX(-50%) translateY(-5px);
+  transform: translateX(-50%) translateY(-4px);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.18) 0%, rgba(0, 0, 0, 0.3) 100%);
 }
 
 .hint-text {
-  font-size: 0.95rem;
-  letter-spacing: 0.15em;
-  font-family: 'Noto Serif SC', serif;
+  font-size: clamp(1.05rem, 2.6vw, 1.28rem);
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  font-family: 'Ma Shan Zheng', cursive;
+  text-shadow:
+    0 2px 16px rgba(0, 0, 0, 0.45),
+    0 1px 3px rgba(0, 0, 0, 0.35);
+  text-align: center;
+  max-width: min(94vw, 26rem);
+  line-height: 1.4;
+}
+
+.hint-chevron {
+  width: 1.625rem;
+  height: 1.625rem;
+  flex-shrink: 0;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35));
 }
 
 .fade-enter-active,
@@ -461,79 +549,1045 @@ onUnmounted(() => {
 /* =========================================
    2. 内容样式
    ========================================= */
-.main-scroll-container { --primary: #8B5E3C; --primary-dark: #5D4037; --accent: #C44D36; font-family: 'Noto Serif SC', serif; }
 .tcm-section { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
-.tcm-hero-section { background-image: url('https://images.unsplash.com/photo-1517260739337-6799d2df3fe0?q=80&w=2669&auto=format&fit=crop'); background-size: cover; background-position: center; }
-.tcm-hero-section::before { content: ''; position: absolute; inset: 0; background: rgba(255, 253, 250, 0.85); }
-.hero-container { display: flex; flex-direction: column; align-items: center; gap: 60px; }
-.menu-main-title { font-size: clamp(3rem, 5vw, 4.5rem); color: var(--primary-dark); letter-spacing: 0.2em; font-family: 'Ma Shan Zheng', cursive; margin: 0; text-shadow: 2px 2px 0px rgba(0,0,0,0.05); }
-.menu-sub-title { font-size: 1.1rem; color: var(--primary); font-weight: 500; letter-spacing: 0.4em; }
-.main-circle-panel { width: 240px; height: 240px; border-radius: 50%; background: radial-gradient(circle at 30% 30%, #f5ece2, #dccdbb); box-shadow: 15px 15px 40px #d6cec5, -15px -15px 40px #ffffff; display: flex; align-items: center; justify-content: center; position: relative; cursor: pointer; transition: transform 0.3s; }
-.main-circle-panel:active { transform: scale(0.98); }
-.center-content { text-align: center; z-index: 2; display: flex; flex-direction: column; align-items: center; }
-.center-content .icon { font-size: 3rem; }
-.center-content .label { font-size: 1.1rem; font-weight: bold; color: var(--primary-dark); }
-.pulse-ring { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100%; height: 100%; border-radius: 50%; border: 1px solid var(--primary); opacity: 0; animation: pulse-ring 3s infinite; }
-.pulse-ring.delay-2 { animation-delay: 1.5s; }
-@keyframes pulse-ring { 0% { width: 100%; height: 100%; opacity: 0.5; } 100% { width: 160%; height: 160%; opacity: 0; } }
-.menu-entry-grid { display: flex; gap: 60px; align-items: center; }
-.action-buttons { display: flex; flex-direction: column; gap: 16px; width: 280px; }
-.action-btn { display: flex; align-items: center; gap: 15px; background: white; padding: 16px 24px; border-radius: 16px; border: 1px solid rgba(139, 94, 60, 0.08); box-shadow: 0 4px 12px rgba(0,0,0,0.02); cursor: pointer; transition: all 0.3s; text-align: left; }
-.action-btn:hover { transform: translateX(5px); box-shadow: 0 8px 20px rgba(139, 94, 60, 0.12); border-color: var(--primary); }
-.btn-icon { width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
-.btn-text .main { font-size: 1rem; font-weight: bold; color: var(--primary-dark); display: block; }
-.btn-text .sub { font-size: 0.75rem; color: #888; }
-.arrow { width: 18px; color: #ccc; margin-left: auto; }
-.tcm-seasonal-section { background-image: url('https://images.unsplash.com/photo-1445964047600-cdbdb873673d?q=80&w=2584&auto=format&fit=crop'); background-size: cover; background-position: center; }
-.tcm-seasonal-section::before { content: ''; position: absolute; inset: 0; background: rgba(0, 0, 0, 0.25); }
-.tcm-seasonal-section::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 30%; background: linear-gradient(to top, rgba(0,0,0,0.1), transparent); pointer-events: none; z-index: 1; }
-.section-inner { width: 100%; max-width: 1100px; padding: 0 5%; z-index: 2; }
-.section-header { text-align: center; margin-bottom: 40px; color: white; }
-.section-title { font-family: 'Ma Shan Zheng', cursive; font-size: 2.5rem; letter-spacing: 0.1em; margin: 0; text-shadow: 0 2px 8px rgba(0,0,0,0.2); }
-.section-subtitle { font-size: 1rem; opacity: 0.9; letter-spacing: 0.3em; }
-.seasonal-header-decoration { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 10px 0; }
-.seasonal-header-decoration .line { width: 30px; height: 1px; background: rgba(255,255,255,0.6); }
-.seasonal-header-decoration .dot { width: 4px; height: 4px; border-radius: 50%; background: rgba(255,255,255,0.8); }
-.today-label { margin-top: 4px; }
-.today-pill { display: inline-block; background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 50px; font-size: 0.9rem; letter-spacing: 0.05em; border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-.seasonal-card { width: 100%; background: rgba(255, 255, 255, 0.92); backdrop-filter: blur(20px); border-radius: 20px; padding: 40px; display: flex; gap: 50px; box-shadow: 0 4px 6px rgba(0,0,0,0.07), 0 20px 40px rgba(0,0,0,0.15); border: 1px solid rgba(255,255,255,0.5); position: relative; }
+.tcm-home-hero.tcm-section {
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  padding: calc(var(--main-nav-h) + 0.75rem) clamp(14px, 3.2vw, 32px) max(1rem, env(safe-area-inset-bottom));
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  box-sizing: border-box;
+  background-image: url('/photo/title_background.jpg');
+  background-size: cover;
+  background-position: center;
+}
+.tcm-home-hero.tcm-section::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+  z-index: 1;
+  pointer-events: none;
+}
+.tcm-home-hero.tcm-section::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 30%;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.1), transparent);
+  pointer-events: none;
+  z-index: 1;
+}
+.tcm-home-hero.tcm-section::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+.home-hero-inner {
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+  overflow-x: hidden;
+  /* 中间主区域等比例放大：布局尺寸先缩小再 scale，视觉约占满略放大后的 max-width */
+  --home-mid-scale: 1.5;
+  width: calc(100% / var(--home-mid-scale));
+  max-width: calc(min(1680px, 100%) / var(--home-mid-scale));
+  max-height: calc((100vh - var(--main-nav-h) - 1.75rem) / var(--home-mid-scale));
+  padding: 0;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  align-self: center;
+  transform: scale(var(--home-mid-scale));
+  transform-origin: center center;
+}
+.home-hero-inner .home-glass-card {
+  max-height: calc((100vh - var(--main-nav-h) - 1.75rem) / var(--home-mid-scale));
+}
+.home-glass-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: calc(100vh - var(--main-nav-h) - 1.75rem);
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  border-radius: 22px;
+  padding: clamp(1.15rem, 2vw, 1.65rem);
+  box-shadow:
+    0 4px 28px rgba(45, 55, 45, 0.1),
+    0 1px 0 rgba(255, 255, 255, 0.95) inset;
+  border: 1px solid rgba(255, 255, 255, 0.82);
+}
+.home-glass-card::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+.home-glass-card--primary {
+  width: 100%;
+}
+.home-glass-card--bento {
+  gap: 0;
+  /* 去掉外层整块米色玻璃底，功能入口仍保留各自小卡片样式 */
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+}
+.home-glass-card--bento .home-card-head--bento .home-card-title {
+  color: #fff;
+  font-size: clamp(2.05rem, 4vw, 2.95rem);
+  letter-spacing: 0.15em;
+  text-shadow:
+    0 2px 18px rgba(0, 0, 0, 0.38),
+    0 1px 4px rgba(0, 0, 0, 0.28);
+}
+.home-glass-card--bento .home-card-head--bento .home-card-motto--platform {
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.78rem;
+  text-shadow:
+    0 1px 12px rgba(0, 0, 0, 0.32),
+    0 0 1px rgba(0, 0, 0, 0.15);
+}
+.home-glass-card--bento .home-card-deco-line {
+  background: rgba(255, 255, 255, 0.42);
+}
+.home-glass-card--bento .home-card-deco-dot {
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 0 1px rgba(196, 77, 54, 0.35);
+}
+.home-card-head {
+  flex-shrink: 0;
+  text-align: left;
+  margin-bottom: 0.95rem;
+}
+.home-card-head--bento {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+.home-card-head--bento .home-card-deco--bento {
+  justify-content: center;
+}
+.home-bento-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr);
+  grid-template-rows: minmax(132px, 1fr) auto;
+  gap: 14px;
+  margin-bottom: 20px;
+  flex-shrink: 0;
+  min-height: 0;
+}
+.bento-tile {
+  min-width: 0;
+  box-sizing: border-box;
+}
+.bento-tile--ai {
+  grid-column: 2;
+  grid-row: 2;
+  position: relative;
+  margin: 0;
+  padding: 0.65rem 0.55rem;
+  border: 1px solid rgba(255, 248, 240, 0.55);
+  border-radius: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 暖赭 / 琥珀 / 檀褐 — 与全站纸色、朱砂点缀统一 */
+  background:
+    radial-gradient(ellipse 95% 85% at 18% 12%, rgba(255, 255, 255, 0.32), transparent 52%),
+    radial-gradient(ellipse 120% 100% at 30% 22%, #fdf6ec, #e8c9a0 42%, #b88354 72%, #7a4f32);
+  box-shadow:
+    0 12px 36px rgba(90, 52, 34, 0.28),
+    0 0 0 1px rgba(255, 255, 255, 0.18) inset,
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+}
+.bento-tile--ai-tall {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  padding: 1.25rem 1rem;
+}
+.bento-tile--ai:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 252, 248, 0.72);
+  box-shadow:
+    0 16px 44px rgba(90, 52, 34, 0.34),
+    0 0 0 1px rgba(255, 255, 255, 0.22) inset,
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+.bento-tile--ai:active {
+  transform: translateY(0);
+}
+.bento-tile--recipe {
+  grid-column: 2;
+  grid-row: 1;
+  min-height: 0;
+  align-self: stretch;
+}
+.bento-tile--recipe-tall {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  justify-content: center;
+}
+.bento-tile--seasonal {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  margin: 0;
+  align-self: stretch;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.bento-tile--seasonal::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+.seasonal-mini-card {
+  flex-shrink: 0;
+  margin: 4px 0 14px;
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(255, 252, 247, 0.96), rgba(242, 237, 228, 0.78));
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow:
+    0 8px 28px rgba(45, 40, 35, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.seasonal-mini-card--bento {
+  margin: 0;
+  padding: 0.65rem 0.72rem;
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  background: linear-gradient(
+    158deg,
+    rgba(255, 253, 248, 0.93) 0%,
+    rgba(248, 241, 230, 0.88) 42%,
+    rgba(238, 230, 216, 0.9) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.52);
+  box-shadow:
+    0 10px 36px rgba(45, 40, 35, 0.12),
+    0 2px 12px rgba(139, 94, 60, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    inset 0 0 0 1px rgba(139, 94, 60, 0.06);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.seasonal-mini-head--bento {
+  margin-bottom: 0.35rem;
+}
+.seasonal-mini-main--bento {
+  gap: 4px;
+}
+.term-name-mini--bento {
+  font-size: clamp(1.05rem, 2.4vw, 1.35rem);
+}
+.term-principle-mini--bento {
+  font-size: 0.68rem;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.advice-inline--bento {
+  font-size: 0.62rem;
+  gap: 6px 10px;
+}
+.seasonal-mini-recipes--bento {
+  margin-top: 0.35rem;
+  padding-top: 0.45rem;
+}
+.seasonal-mini-recipes--bento .seasonal-mini-recipes-head {
+  margin-bottom: 6px;
+}
+.mini-recipe-chips--bento {
+  gap: 6px;
+}
+.mini-recipe-chip--bento {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  box-shadow:
+    0 2px 8px rgba(45, 40, 35, 0.1),
+    0 0 0 1px rgba(255, 255, 255, 0.35) inset;
+}
+.seasonal-mini-card--left-tall {
+  padding: 0.88rem 1rem;
+  gap: 8px;
+}
+.seasonal-mini-card--left-tall .seasonal-mini-head--bento {
+  margin-bottom: 0.5rem;
+}
+.seasonal-mini-card--left-tall .term-name-mini--bento {
+  font-size: clamp(1.15rem, 2.6vw, 1.52rem);
+}
+.seasonal-mini-card--left-tall .term-principle-mini--bento {
+  font-size: 0.72rem;
+  -webkit-line-clamp: 4;
+}
+.seasonal-mini-card--left-tall .advice-inline--bento {
+  font-size: 0.65rem;
+}
+.seasonal-mini-card--left-tall .mini-recipe-chip--bento {
+  width: 50px;
+  height: 50px;
+}
+.home-quick-nav {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 2px;
+  margin-bottom: 6px;
+  flex-shrink: 0;
+}
+.quick-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 5px;
+  padding: 11px 8px 12px;
+  margin: 0;
+  border: 1px solid rgba(255, 255, 255, 0.48);
+  border-radius: 18px;
+  background: linear-gradient(
+    168deg,
+    rgba(255, 253, 248, 0.9) 0%,
+    rgba(245, 239, 228, 0.82) 55%,
+    rgba(236, 228, 215, 0.86) 100%
+  );
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+  box-shadow:
+    0 8px 28px rgba(45, 40, 35, 0.1),
+    0 1px 4px rgba(139, 94, 60, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.quick-nav-item:hover {
+  border-color: rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 12px 32px rgba(45, 40, 35, 0.14),
+    0 0 0 1px rgba(139, 94, 60, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  transform: translateY(-2px);
+}
+.quick-nav-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary-dark);
+  box-shadow:
+    0 4px 12px rgba(45, 40, 35, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+}
+.quick-nav-icon--herb {
+  background: linear-gradient(155deg, #fff9ed, #f2e6cc 55%, #e8dcc0);
+}
+.quick-nav-icon--acu {
+  background: linear-gradient(155deg, #faf4eb, #ebe0d4 55%, #ddd2c4);
+}
+.quick-nav-icon--hist {
+  background: linear-gradient(155deg, #f5efe6, #e5dcd0 55%, #d9cfc2);
+}
+.quick-nav-svg {
+  width: 22px;
+  height: 22px;
+}
+.quick-nav-title {
+  font-family: 'Ma Shan Zheng', cursive;
+  font-size: 0.88rem;
+  font-weight: 400;
+  color: var(--primary-dark);
+  letter-spacing: 0.1em;
+  line-height: 1.2;
+}
+.quick-nav-motto {
+  font-family: 'Ma Shan Zheng', cursive;
+  font-size: 0.58rem;
+  color: rgba(61, 56, 48, 0.7);
+  letter-spacing: 0.08em;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 100%;
+}
+.seasonal-mini-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 0.55rem;
+}
+.seasonal-mini-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.seasonal-mini-eyebrow {
+  font-family: 'Ma Shan Zheng', cursive;
+  font-size: 1.02rem;
+  color: var(--primary-dark);
+  letter-spacing: 0.12em;
+}
+.seasonal-mini-motto {
+  font-family: 'Ma Shan Zheng', cursive;
+  font-size: 0.62rem;
+  color: rgba(61, 56, 48, 0.65);
+  letter-spacing: 0.13em;
+  line-height: 1.4;
+}
+.today-pill--mini {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  background: rgba(139, 94, 60, 0.1);
+  border-radius: 999px;
+  border: 1px solid rgba(139, 94, 60, 0.16);
+  color: var(--primary-dark);
+}
+.seasonal-mini-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.seasonal-mini-term-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 12px;
+}
+.term-name-mini {
+  font-family: 'Ma Shan Zheng', serif;
+  font-size: clamp(1.28rem, 3vw, 1.72rem);
+  color: var(--primary-dark);
+  letter-spacing: 0.08em;
+}
+.term-count-mini {
+  font-size: 0.72rem;
+  color: rgba(61, 56, 48, 0.72);
+  letter-spacing: 0.06em;
+}
+.term-principle-mini {
+  margin: 0;
+  font-size: 0.74rem;
+  color: rgba(61, 56, 48, 0.78);
+  line-height: 1.55;
+  letter-spacing: 0.04em;
+}
+.advice-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  font-size: 0.68rem;
+  line-height: 1.45;
+  letter-spacing: 0.03em;
+}
+.advice-inline-good {
+  color: #3d5c28;
+}
+.advice-inline-bad {
+  color: #8b3a3a;
+}
+.advice-inline b {
+  margin-right: 4px;
+  font-weight: 700;
+}
+.seasonal-mini-recipes {
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid rgba(139, 94, 60, 0.12);
+}
+.seasonal-mini-recipes-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-bottom: 8px;
+}
+.seasonal-mini-soup-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--primary);
+  flex-shrink: 0;
+}
+.seasonal-mini-recipes-label {
+  font-family: 'Ma Shan Zheng', cursive;
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--primary-dark);
+  letter-spacing: 0.1em;
+}
+.seasonal-mini-recipes-hint {
+  font-size: 0.6rem;
+  color: rgba(61, 56, 48, 0.55);
+  letter-spacing: 0.1em;
+}
+@media (min-width: 480px) {
+  .seasonal-mini-recipes-hint {
+    margin-left: auto;
+  }
+}
+.mini-recipe-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.mini-recipe-chip {
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.mini-recipe-chip:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+.mini-recipe-chip.mini-recipe-chip--bento:hover {
+  box-shadow:
+    0 4px 14px rgba(45, 40, 35, 0.14),
+    0 0 0 1px rgba(139, 94, 60, 0.12) inset;
+}
+.mini-recipe-chip-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.home-card-title {
+  font-family: 'Ma Shan Zheng', cursive;
+  font-size: clamp(1.65rem, 2.7vw, 2.2rem);
+  color: var(--primary-dark);
+  margin: 0 0 0.32rem;
+  letter-spacing: 0.14em;
+  line-height: 1.25;
+  font-weight: 400;
+}
+.home-card-motto {
+  margin: 0;
+  font-family: 'Ma Shan Zheng', cursive;
+  font-size: 0.8rem;
+  color: rgba(61, 56, 48, 0.78);
+  letter-spacing: 0.16em;
+  line-height: 1.55;
+}
+.home-card-motto--platform {
+  font-size: 0.72rem;
+  letter-spacing: 0.065em;
+  line-height: 1.65;
+}
+.home-card-deco {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0.55rem 0 0.45rem;
+}
+.home-card-deco-line {
+  width: 26px;
+  height: 1px;
+  background: rgba(139, 94, 60, 0.38);
+}
+.home-card-deco-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.8;
+}
+.home-card-meta {
+  margin: 0;
+}
+.today-pill--inset {
+  background: rgba(139, 94, 60, 0.09);
+  color: var(--primary-dark);
+  border: 1px solid rgba(139, 94, 60, 0.16);
+  box-shadow: none;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+}
+
+.ai-mentor-inner {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+}
+.bento-tile--ai-tall .ai-mentor-inner {
+  padding: 0 12px;
+}
+.bento-tile--ai .ai-mentor-icon {
+  width: 34px;
+  height: 34px;
+  color: rgba(255, 255, 255, 0.95);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.12));
+}
+.bento-tile--ai-tall .ai-mentor-icon {
+  width: clamp(48px, 8vw, 58px);
+  height: clamp(48px, 8vw, 58px);
+}
+.bento-tile--ai .ai-mentor-label {
+  font-family: 'Ma Shan Zheng', cursive;
+  font-size: 0.82rem;
+  font-weight: 400;
+  color: #fffdfb;
+  letter-spacing: 0.1em;
+  text-shadow: 0 1px 4px rgba(45, 30, 22, 0.35);
+}
+.bento-tile--ai-tall .ai-mentor-label {
+  font-size: clamp(1rem, 2.2vw, 1.18rem);
+  letter-spacing: 0.08em;
+}
+.bento-tile--ai .ai-mentor-sub {
+  font-family: 'Ma Shan Zheng', cursive;
+  font-size: 0.56rem;
+  color: rgba(255, 246, 235, 0.92);
+  letter-spacing: 0.1em;
+  line-height: 1.35;
+  max-width: 11em;
+  text-align: center;
+}
+.bento-tile--ai-tall .ai-mentor-sub {
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  line-height: 1.45;
+  max-width: 12em;
+}
+.recipe-spotlight {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 4px;
+  padding: 0.85rem 0.9rem 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 20px;
+  background: linear-gradient(
+    162deg,
+    rgba(255, 254, 251, 0.96) 0%,
+    rgba(252, 244, 232, 0.92) 45%,
+    rgba(245, 230, 210, 0.9) 100%
+  );
+  box-shadow:
+    0 12px 40px rgba(139, 94, 60, 0.14),
+    0 0 0 1px rgba(196, 77, 54, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    inset 0 0 24px rgba(232, 210, 180, 0.22);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.bento-tile--recipe-tall.recipe-spotlight {
+  padding: 1.1rem 1rem 2.25rem;
+}
+.recipe-spotlight:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.75);
+  box-shadow:
+    0 16px 44px rgba(139, 94, 60, 0.18),
+    0 0 0 1px rgba(196, 77, 54, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    inset 0 0 28px rgba(228, 200, 165, 0.35);
+}
+.recipe-spotlight-icon {
+  width: 40px;
+  height: 40px;
+  color: #8b5e3c;
+}
+.recipe-spotlight-title {
+  font-family: 'Ma Shan Zheng', cursive;
+  font-size: 1.02rem;
+  font-weight: 400;
+  color: var(--primary-dark);
+  letter-spacing: 0.12em;
+}
+.recipe-spotlight-motto {
+  font-family: 'Ma Shan Zheng', cursive;
+  font-size: 0.66rem;
+  color: rgba(61, 56, 48, 0.82);
+  letter-spacing: 0.12em;
+  line-height: 1.4;
+  padding: 0 4px;
+}
+.recipe-spotlight-hint {
+  font-family: 'Ma Shan Zheng', cursive;
+  font-size: 0.62rem;
+  color: var(--accent);
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  margin-top: 2px;
+}
+.recipe-spotlight-arrow {
+  position: absolute;
+  bottom: 10px;
+  right: 12px;
+  width: 20px;
+  height: 20px;
+  color: rgba(139, 94, 60, 0.38);
+}
+
+.ai-pulse-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid rgba(196, 154, 108, 0.4);
+  opacity: 0;
+  animation: pulse-ring 3s infinite;
+}
+.ai-pulse-ring--rect {
+  border-radius: 20px;
+  border-color: rgba(255, 240, 228, 0.45);
+}
+.ai-pulse-ring.delay-2 {
+  animation-delay: 1.5s;
+}
+.pulse-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 1px solid var(--primary);
+  opacity: 0;
+  animation: pulse-ring 3s infinite;
+}
+.pulse-ring.delay-2 {
+  animation-delay: 1.5s;
+}
+@keyframes pulse-ring {
+  0% {
+    width: 100%;
+    height: 100%;
+    opacity: 0.5;
+  }
+  100% {
+    width: 160%;
+    height: 160%;
+    opacity: 0;
+  }
+}
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: white;
+  padding: 14px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(139, 94, 60, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: all 0.3s;
+  text-align: left;
+}
+.action-btn:hover {
+  transform: translateX(4px);
+  box-shadow: 0 8px 20px rgba(139, 94, 60, 0.12);
+  border-color: var(--primary);
+}
+.btn-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.btn-text .main {
+  font-size: 0.98rem;
+  font-weight: bold;
+  color: var(--primary-dark);
+  display: block;
+}
+.btn-text .sub {
+  font-size: 0.72rem;
+  color: #6d6560;
+  line-height: 1.35;
+  letter-spacing: 0.12em;
+}
+.arrow {
+  width: 18px;
+  color: #ccc;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.today-pill {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 50px;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+}
 .seasonal-card-enter { animation: seasonal-card-enter 0.6s ease-out; }
 @keyframes seasonal-card-enter { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
-.stamp-decoration { position: absolute; top: 20px; right: 20px; border: 2px solid var(--accent); color: var(--accent); padding: 5px; font-weight: bold; transform: rotate(15deg); opacity: 0.48; font-size: 0.95rem; }
-.term-badge { display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(135deg, var(--primary), var(--accent)); color: white; padding: 4px 12px; border-radius: 50px; font-size: 0.75rem; font-weight: 500; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(139,94,60,0.25); }
-.term-countdown { margin-bottom: 6px; font-size: 0.9rem; color: #666; display: flex; flex-wrap: wrap; gap: 4px; align-items: baseline; }
-.term-countdown-name,
-.term-countdown-days { font-size: 1rem; font-weight: 600; color: #111; }
-.term-name { font-size: 3rem; color: var(--primary-dark); font-family: 'Ma Shan Zheng', serif; margin: 0 0 10px 0; text-shadow: 0 1px 3px rgba(0,0,0,0.06); }
-.term-principle { color: #666; line-height: 1.6; margin-bottom: 20px; }
-.advice-row { display: flex; align-items: center; gap: 10px; background: rgba(245, 240, 230, 0.5); padding: 8px 12px; border-radius: 10px; margin-bottom: 8px; }
-.tag-label { padding: 4px 10px; border-radius: 6px; color: white; font-size: 0.75rem; box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
-.tag-label.good { background: #558B2F; }
-.tag-label.bad { background: #C62828; }
-.card-divider { width: 1px; background: linear-gradient(to bottom, rgba(0,0,0,0.06), rgba(0,0,0,0.12), rgba(0,0,0,0.06)); }
-.card-right { flex: 1.5; }
-.right-title { font-weight: bold; color: var(--primary); margin-bottom: 15px; display: flex; align-items: center; gap: 8px; letter-spacing: 0.5px; }
-.mini-recipe-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-.mini-recipe { position: relative; aspect-ratio: 1; border-radius: 12px; overflow: hidden; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.08); transition: transform 0.3s, box-shadow 0.3s; }
-.recipe-thumb { width: 100%; height: 100%; object-fit: cover; transition: 0.5s; }
-.mini-recipe:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.15); }
-.mini-recipe:hover .recipe-thumb { transform: scale(1.1); }
-.recipe-overlay { position: absolute; bottom: 0; width: 100%; background: linear-gradient(transparent, rgba(0,0,0,0.5), rgba(0,0,0,0.75)); padding: 8px; color: white; text-align: center; }
-.recipe-name { font-size: 0.85rem; font-weight: 500; }
 .bg-overlay-noise { position: absolute; inset: 0; background-image: url("data:image/svg+xml,%3Csvg width='200' height='200' viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E"); z-index: 1; pointer-events: none; }
 .title-decoration { display: flex; align-items: center; gap: 10px; margin: 10px 0; opacity: 0.6; }
 .title-decoration .line { width: 40px; height: 1px; background: var(--primary); }
 .title-decoration .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
 .animate-fade-in-down { animation: fadeInDown 1s ease-out; }
 .animate-fade-in-up { animation: fadeInUp 1s ease-out; }
+.delay-100 { animation-delay: 0.15s; animation-fill-mode: both; }
 @keyframes fadeInDown { from { opacity: 0; transform: translateY(-30px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+
+/* 首页首屏：节气卡与入口方格内文字统一近黑；主入口标题加粗；除「四时之序」眉题外整体略放大 */
+.tcm-home-hero .seasonal-mini-eyebrow {
+  font-size: 1.02rem;
+  color: #0a0a0a;
+}
+.tcm-home-hero .seasonal-mini-motto {
+  font-size: 0.74rem;
+  color: #0a0a0a;
+}
+.tcm-home-hero .term-name-mini {
+  font-size: clamp(1.35rem, 3.2vw, 1.85rem);
+  color: #0a0a0a;
+}
+.tcm-home-hero .term-name-mini--bento {
+  font-size: clamp(1.12rem, 2.6vw, 1.48rem);
+}
+.tcm-home-hero .seasonal-mini-card--left-tall .term-name-mini--bento {
+  font-size: clamp(1.22rem, 2.8vw, 1.62rem);
+}
+.tcm-home-hero .term-count-mini {
+  font-size: 0.8rem;
+  color: #0a0a0a;
+}
+.tcm-home-hero .term-principle-mini {
+  font-size: 0.82rem;
+  color: #0a0a0a;
+}
+.tcm-home-hero .term-principle-mini--bento {
+  font-size: 0.74rem;
+}
+.tcm-home-hero .seasonal-mini-card--left-tall .term-principle-mini--bento {
+  font-size: 0.78rem;
+}
+.tcm-home-hero .advice-inline--bento {
+  font-size: 0.7rem;
+}
+.tcm-home-hero .seasonal-mini-card--left-tall .advice-inline--bento {
+  font-size: 0.73rem;
+}
+.tcm-home-hero .advice-inline-good,
+.tcm-home-hero .advice-inline-bad {
+  color: #0a0a0a;
+}
+.tcm-home-hero .seasonal-mini-recipes-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #0a0a0a;
+}
+.tcm-home-hero .seasonal-mini-recipes-hint {
+  font-size: 0.7rem;
+  color: #0a0a0a;
+}
+.tcm-home-hero .seasonal-mini-soup-icon {
+  color: #0a0a0a;
+}
+.tcm-home-hero .today-pill--mini {
+  font-size: 0.72rem;
+  color: #0a0a0a;
+}
+.tcm-home-hero .quick-nav-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0a0a0a;
+}
+.tcm-home-hero .quick-nav-motto {
+  font-size: 0.72rem;
+  color: #0a0a0a;
+}
+.tcm-home-hero .quick-nav-icon {
+  color: #0a0a0a;
+}
+.tcm-home-hero .quick-nav-svg {
+  width: 24px;
+  height: 24px;
+}
+.tcm-home-hero .recipe-spotlight-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #0a0a0a;
+}
+.tcm-home-hero .recipe-spotlight-motto {
+  font-size: 0.76rem;
+  color: #0a0a0a;
+}
+.tcm-home-hero .recipe-spotlight-hint {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #0a0a0a;
+}
+.tcm-home-hero .recipe-spotlight-icon {
+  color: #0a0a0a;
+}
+.tcm-home-hero .recipe-spotlight-arrow {
+  color: rgba(10, 10, 10, 0.45);
+}
+.tcm-home-hero .bento-tile--ai {
+  border-color: rgba(255, 255, 255, 0.72);
+  background:
+    radial-gradient(ellipse 95% 85% at 18% 12%, rgba(255, 255, 255, 0.55), transparent 52%),
+    linear-gradient(155deg, #fff9f3 0%, #fce8d8 42%, #e8d2b8 78%, #d4b896);
+  box-shadow:
+    0 12px 32px rgba(90, 52, 34, 0.16),
+    0 0 0 1px rgba(255, 255, 255, 0.55) inset,
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+.tcm-home-hero .bento-tile--ai:hover {
+  box-shadow:
+    0 16px 40px rgba(90, 52, 34, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.62) inset,
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+.tcm-home-hero .bento-tile--ai .ai-mentor-label {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0a0a0a;
+  text-shadow: none;
+}
+.tcm-home-hero .bento-tile--ai-tall .ai-mentor-label {
+  font-size: clamp(1.08rem, 2.4vw, 1.28rem);
+}
+.tcm-home-hero .bento-tile--ai .ai-mentor-sub {
+  font-size: 0.68rem;
+  color: #0a0a0a;
+}
+.tcm-home-hero .bento-tile--ai-tall .ai-mentor-sub {
+  font-size: 0.8rem;
+}
+.tcm-home-hero .bento-tile--ai .ai-mentor-icon {
+  color: #0a0a0a;
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.85));
+}
+.tcm-home-hero .home-glass-card--bento .home-card-head--bento .home-card-title {
+  font-size: clamp(2.25rem, 4.3vw, 3.15rem);
+}
+.tcm-home-hero .home-glass-card--bento .home-card-head--bento .home-card-motto--platform {
+  font-size: 0.88rem;
+}
+
+@media (max-width: 1024px) {
+  .home-hero-inner {
+    max-height: none;
+    --home-mid-scale: 1.12;
+    max-width: calc(min(1180px, 100%) / var(--home-mid-scale));
+  }
+  .home-hero-inner .home-glass-card {
+    max-height: none;
+  }
+  .home-glass-card {
+    min-height: 0;
+    max-height: none;
+  }
+  .home-bento-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+  }
+  .bento-tile--seasonal {
+    grid-column: 1;
+    grid-row: auto;
+  }
+  .bento-tile--recipe {
+    grid-column: 1;
+    grid-row: auto;
+  }
+  .bento-tile--recipe-tall {
+    grid-column: 1;
+    grid-row: auto;
+    min-height: 210px;
+  }
+  .bento-tile--ai {
+    grid-column: 1;
+    grid-row: auto;
+    min-height: 156px;
+  }
+  .bento-tile--ai-tall {
+    grid-column: 1;
+    grid-row: auto;
+    min-height: 172px;
+  }
+}
 @media (max-width: 768px) {
-  .menu-entry-grid { flex-direction: column; gap: 40px; }
-  .section-title { font-size: clamp(1.75rem, 5vw, 2.25rem); }
-  .today-pill { padding: 5px 12px; font-size: 0.85rem; }
-  .seasonal-card { flex-direction: column; gap: 24px; padding: 24px; }
-  .card-divider { display: none; }
-  .mini-recipe-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .today-pill { padding: 5px 12px; font-size: 0.8rem; }
+  .mini-recipe-chip {
+    width: 48px;
+    height: 48px;
+  }
+  .mini-recipe-chip--bento {
+    width: 44px;
+    height: 44px;
+  }
+  .home-quick-nav {
+    gap: 8px;
+  }
+  .quick-nav-item {
+    padding: 10px 6px 11px;
+  }
+  .quick-nav-title {
+    font-size: 0.76rem;
+  }
+  .quick-nav-motto {
+    font-size: 0.55rem;
+    -webkit-line-clamp: 3;
+  }
+  .tcm-home-hero .quick-nav-title {
+    font-size: 0.9rem;
+  }
+  .tcm-home-hero .quick-nav-motto {
+    font-size: 0.64rem;
+  }
 }
 </style>

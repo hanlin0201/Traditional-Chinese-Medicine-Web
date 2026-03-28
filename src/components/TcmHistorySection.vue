@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { FEATURE_COPY } from '@/constants/branding'
 
 const router = useRouter()
 const route = useRoute()
@@ -134,6 +135,10 @@ function onPaperWheel(e) {
     :style="{ backgroundImage: `url(${historyBgUrl})` }"
   >
     <div class="tcm-history-inner">
+      <header class="tcm-module-heading" aria-label="中医药历史">
+        <h2 class="tcm-module-heading-title">{{ FEATURE_COPY.history.title }}</h2>
+        <p class="tcm-module-heading-motto">{{ FEATURE_COPY.history.motto }}</p>
+      </header>
       <div class="tcm-scroll-zone">
         <div
           class="tcm-scroll-wrapper"
@@ -205,7 +210,7 @@ function onPaperWheel(e) {
   background-position: center;
   background-repeat: no-repeat;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: flex-start;
   overflow: hidden;
 }
@@ -214,12 +219,41 @@ function onPaperWheel(e) {
   position: relative;
   z-index: 1;
   width: 100%;
+  max-width: 100%;
   display: flex;
-  align-items: center;
-  justify-content: flex-start;
+  flex-direction: column;
+  align-items: flex-start;
+  /* 仅上下居中：标题 + 卷轴作为一整块在视口内垂直居中，卷轴仍从左端起 */
+  justify-content: center;
   min-height: 100%;
-  padding: 0 2vw; 
+  padding: 0.75rem 2vw 0.5rem;
   box-sizing: border-box;
+  gap: clamp(14px, 2vh, 22px);
+}
+
+.tcm-module-heading {
+  flex-shrink: 0;
+  padding-left: 4px;
+  pointer-events: none;
+  text-align: left;
+  width: 100%;
+}
+
+.tcm-module-heading-title {
+  margin: 0;
+  font-family: 'Ma Shan Zheng', 'Noto Serif SC', serif;
+  font-size: clamp(1.85rem, 4.2vw, 2.55rem);
+  color: #3d3830;
+  letter-spacing: 0.14em;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.tcm-module-heading-motto {
+  margin: 6px 0 0;
+  font-family: 'Ma Shan Zheng', cursive;
+  font-size: clamp(0.82rem, 1.9vw, 1rem);
+  color: rgba(61, 56, 48, 0.78);
+  letter-spacing: 0.2em;
 }
 
 .tcm-scroll-zone {
@@ -228,6 +262,9 @@ function onPaperWheel(e) {
   flex-direction: column;
   align-items: flex-start;
   gap: 16px;
+  flex: 0 0 auto;
+  min-height: 0;
+  width: 100%;
 }
 
 .tcm-click-hint {
@@ -236,6 +273,8 @@ function onPaperWheel(e) {
   letter-spacing: 0.2em;
   margin: 0;
   padding-left: 10px;
+  text-align: left;
+  width: 100%;
 }
 
 .tcm-scroll-wrapper {

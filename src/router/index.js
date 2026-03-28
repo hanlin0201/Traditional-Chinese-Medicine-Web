@@ -1,17 +1,18 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { SITE_SHORT_NAME, SITE_TITLE_SUFFIX } from '@/constants/branding'
 
 const routes = [
   {
     path: '/',
     name: 'MenuIndex',
     component: () => import('@/views/MenuIndexView.vue'),
-    meta: { title: '中医药百科' },
+    meta: { title: SITE_SHORT_NAME },
   },
   {
     path: '/herbs',
     name: 'HerbIntro',
     component: () => import('@/views/HomeView.vue'),
-    meta: { title: '药材介绍' },
+    meta: { title: '药材百科' },
   },
   {
     path: '/herb/:name',
@@ -23,7 +24,7 @@ const routes = [
     path: '/acupoints',
     name: 'Acupoints',
     component: () => import('@/views/AcupointView.vue'),
-    meta: { title: '经络穴位导航' },
+    meta: { title: '穴位导航' },
   },
   {
     path: '/dynasty/:id',
@@ -52,7 +53,8 @@ const routes = [
   {
     path: '/recipes', 
     name: 'RecipeMarket',
-    component: () => import('@/views/RecipeMarket.vue') // 使用 @ 符号更稳妥
+    component: () => import('@/views/RecipeMarket.vue'),
+    meta: { title: '食谱推荐' },
   },
 ]
 
@@ -63,7 +65,7 @@ const router = createRouter({
 
 router.afterEach((to) => {
   const t = to.meta?.title
-  if (t) document.title = `${t} · 中药材百科`
+  if (t) document.title = `${t} · ${SITE_TITLE_SUFFIX}`
 })
 
 export default router

@@ -4,6 +4,7 @@ import { X } from 'lucide-vue-next'
 import { useAuth } from '@/composables/useAuth'
 import { getAuthErrorMessage } from '@/auth'
 import { normalizeLoginEmail } from '@/utils/loginEmail'
+import { SITE_SHORT_NAME } from '@/constants/branding'
 
 const props = defineProps({ dismissible: { type: Boolean, default: false } })
 const emit = defineEmits(['close'])
@@ -136,7 +137,7 @@ async function handleAdminQuickLogin() {
     />
     <div class="login-overlay-card">
       <div class="login-overlay-card-head">
-        <h2 class="login-overlay-title">欢迎使用 · 中药材百科</h2>
+        <h2 class="login-overlay-title">欢迎使用 · {{ SITE_SHORT_NAME }}</h2>
         <button
           v-if="dismissible"
           type="button"

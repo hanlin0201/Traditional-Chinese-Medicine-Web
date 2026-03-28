@@ -1,8 +1,9 @@
-】<script setup>
+<script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Link, AlertTriangle, Compass, ArrowRight } from 'lucide-vue-next'
 import { supabase } from '@/supabaseClient'
+import { FEATURE_COPY } from '@/constants/branding'
 
 const router = useRouter()
 const pairs = ref([])
@@ -66,8 +67,8 @@ onMounted(() => {
       
       <div class="match-header">
         <div class="title-area">
-          <h2 class="main-title">百子柜 · 药对配伍</h2>
-          <p class="sub-title">Herbal Pairing Dictionary</p>
+          <h2 class="main-title">百子柜 · {{ FEATURE_COPY.pairing.title }}</h2>
+          <p class="sub-title">{{ FEATURE_COPY.pairing.motto }}</p>
         </div>
 
         <div class="refresh-control" @click="fetchRandomPairings">
@@ -177,16 +178,40 @@ onMounted(() => {
 .match-header {
   display: flex; justify-content: space-between; align-items: flex-end;
   max-width: 1000px; margin: 0 auto 20px;
-  border-bottom: 2px solid #D7CCC8; padding-bottom: 10px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.35);
+  padding-bottom: 10px;
 }
-.main-title { font-size: 1.8rem; color: #3E2723; margin: 0; letter-spacing: 2px; }
-.sub-title { font-size: 0.8rem; color: #8D6E63; text-transform: uppercase; letter-spacing: 1px; }
+.main-title {
+  font-family: 'Ma Shan Zheng', cursive;
+  font-size: 1.85rem;
+  color: #fff;
+  margin: 0;
+  letter-spacing: 0.12em;
+  font-weight: 400;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45), 0 0 24px rgba(0, 0, 0, 0.25);
+}
+.sub-title {
+  font-family: 'Ma Shan Zheng', cursive;
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.88);
+  letter-spacing: 0.12em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
 
 .refresh-control { display: flex; align-items: center; gap: 8px; cursor: pointer; }
-.compass-box { color: #5D4037; transition: transform 0.3s; }
+.compass-box {
+  color: rgba(255, 255, 255, 0.95);
+  transition: transform 0.3s;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+}
 .compass-box.is-loading { animation: spin 0.8s linear infinite; }
 @keyframes spin { 100% { transform: rotate(360deg); } }
-.action-text { font-weight: bold; color: #3E2723; font-size: 0.9rem; }
+.action-text {
+  font-weight: bold;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 0.9rem;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
 
 .cabinet-container {
   max-width: 1000px; margin: 0 auto;
