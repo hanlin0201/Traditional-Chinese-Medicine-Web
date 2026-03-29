@@ -187,8 +187,8 @@ function onPaperWheel(e) {
           </div>
 
           <div v-if="!unfolded" class="tcm-explore-hint">
-            <span class="tcm-explore-line"></span>
             <span class="tcm-explore-arrow"></span>
+            <span class="tcm-explore-line"></span>
             <span class="tcm-explore-text">点击探索·杏林长卷</span>
           </div>
         </div>
@@ -310,8 +310,8 @@ function onPaperWheel(e) {
   width: 0; height: 0;
   border-top: 6px solid transparent;
   border-bottom: 6px solid transparent;
-  border-left: 10px solid rgba(255, 255, 255, 0.7);
-  margin-left: -2px;
+  border-right: 10px solid rgba(255, 255, 255, 0.7);
+  margin-right: 0px;
 }
 .tcm-explore-text {
   font-family: 'Noto Serif SC', serif;
