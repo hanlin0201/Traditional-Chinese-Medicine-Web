@@ -1,0 +1,43 @@
+{
+  "counts": {
+    "tipsDuplicateSentence": 2,
+    "tabooDuplicateSentence": 0,
+    "effectFootnotes": 3,
+    "usageDuplicateSentence": 0,
+    "effectDuplicateSentence": 0
+  },
+  "issues": {
+    "tipsDuplicateSentence": [
+      {
+        "id": 1661,
+        "name": "败酱草",
+        "sample": "脾胃虚弱者慎用。"
+      },
+      {
+        "id": 1808,
+        "name": "红参",
+        "sample": "不宜与藜芦同用。"
+      }
+    ],
+    "tabooDuplicateSentence": [],
+    "effectFootnotes": [
+      {
+        "id": 1661,
+        "name": "败酱草",
+        "count": 1
+      },
+      {
+        "id": 1711,
+        "name": "赤芍",
+        "count": 1
+      },
+      {
+        "id": 2028,
+        "name": "桑叶",
+        "count": 1
+      }
+    ],
+    "usageDuplicateSentence": [],
+    "effectDuplicateSentence": []
+  }
+}

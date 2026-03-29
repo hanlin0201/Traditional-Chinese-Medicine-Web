@@ -9,14 +9,14 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap" rel="stylesheet" />
-    <script type="module" crossorigin src="/assets/index-fMesYxV9.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-XxioT46q.css">
+    <script type="module" crossorigin src="/assets/index-BlvEKP99.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-CTHoQrrK.css">
   </head>
   <body>
     <!-- 根节点：Vue 挂载。登录遮罩层 #login-overlay 由 LoginOverlay 组件渲染于其内；Supabase 通过 npm 引入，见 src/supabaseClient.js -->
     <div id="app"></div>
-    <!-- 入场动画 overlay：泡泡汇聚后白屏，显示首页。首次访问时由 introAnimation.js 控制 -->
-    <div id="intro-overlay">
+    <!-- 入场动画 overlay：已在 main.js 关闭；恢复动画时去掉 hidden、取消 main.js 中相关注释 -->
+    <div id="intro-overlay" hidden>
       <div id="intro-container"></div>
       <div id="intro-white-flash"></div>
     </div>

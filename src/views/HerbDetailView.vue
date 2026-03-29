@@ -36,6 +36,18 @@ const herbTagInfo = computed(() => {
   return getHerbTagDisplayByName(herb.value.name) || null
 })
 
+// 性味归经：归经 → 四气五味，与典籍叙述顺序一致；只拼接非空字段
+const herbNatureMeridianRaw = computed(() => {
+  const h = herb.value
+  if (!h) return ''
+  const parts = [h.channel, h.nature, h.taste]
+    .map((x) => (x != null && String(x).trim() ? String(x).trim() : ''))
+    .filter(Boolean)
+  return parts.join('；').replace(/^；+/, '')
+})
+
+const herbNatureMeridianHtml = computed(() => formatNatureMeridianHtml(herbNatureMeridianRaw.value))
+
 // 入药部位 → 背景图映射（用普通对象，避免类型标注报错）
 const PART_BG_MAP = {
   '根茎类': `${HERB_PART_ART}/根茎类.png`,
@@ -164,18 +176,95 @@ const getDetailEffectClass = (text) => {
   return 'border-sandalwood/20 bg-paper text-sandalwood/90'
 }
 
-/**
- * 核心功能 1：文本美化
- */
-function formatNumberedText(text) {
-  if (!text) return '暂无'
-  let formatted = text
+function escapeHtml(text) {
+  if (text == null || text === '') return ''
+  return String(text)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-  formatted = formatted.replace(/([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])/g, '<br/><span class="text-cinnabar font-medium">$1</span>')
-  formatted = formatted.replace(/([⑴⑵⑶⑷⑸⑹⑺⑻⑼⑽])/g, '<br/><span class="text-cinnabar font-medium">$1</span>')
-  formatted = formatted.replace(/(《[^》]+》[：:]\s*)/g, '<br/><span class="text-bamboo">$1</span>')
+    .replace(/"/g, '&quot;')
+}
+
+/** 《书名》高亮：禁忌用绿色；性味/条文用竹青 */
+function wrapBookTitles(escapedPlain, mode) {
+  const re = /《[^》]+》/g
+  if (mode === 'taboo') {
+    return escapedPlain.replace(re, '<span class="herb-book-taboo">$&</span>')
+  }
+  return escapedPlain.replace(re, '<span class="herb-book-cite">$&</span>')
+}
+
+/**
+ * 性味归经：句号+分号分段、圆圈序号换行；典籍引文小字楷体
+ */
+function formatNatureMeridianHtml(text) {
+  if (!text || !text.trim()) return ''
+  let plain = text.trim().replace(/^；+/, '').replace(/\s+/g, ' ')
+  let t = escapeHtml(plain)
+  t = t.replace(/。\s*；/g, '。\n；')
+  t = t.replace(/；\s*(?=[入《])/g, '；\n')
+  t = t.replace(/\s*([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])/g, '\n$1')
+  const lines = t.split('\n').map((s) => s.trim()).filter(Boolean)
+  return lines
+    .map((line) => {
+      const isCite = /^[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]/.test(line)
+      const inner = wrapBookTitles(line, 'meridian')
+      if (isCite) {
+        return `<p class="herb-kai-note herb-rich-p">${inner}</p>`
+      }
+      return `<p class="herb-meridian-lead herb-rich-p">${inner}</p>`
+    })
+    .join('')
+}
+
+/**
+ * 使用禁忌：首段（至首条序号前）朱色提醒；①②… 分段；典籍名绿色
+ */
+function formatTabooHtml(text) {
+  if (!text || !text.trim()) return ''
+  const raw = text.trim().replace(/\s+/g, ' ')
+  const firstIdx = raw.search(/[①②③④⑤⑥⑦⑧⑨⑩]|\([1-9]\d?\)/)
+  let lead = ''
+  let body = ''
+  if (firstIdx === -1) {
+    lead = raw
+  } else if (firstIdx === 0) {
+    body = raw
+  } else {
+    lead = raw.slice(0, firstIdx).trim()
+    body = raw.slice(firstIdx).trim()
+  }
+  let html = ''
+  if (lead) {
+    html += `<p class="herb-taboo-lead herb-rich-p">${wrapBookTitles(escapeHtml(lead), 'taboo')}</p>`
+  }
+  if (body) {
+    let b = escapeHtml(body)
+    b = b.replace(/。\s*；/g, '。\n；')
+    b = b.replace(/\s*(\([1-9]\d?\))/g, '\n$1')
+    b = b.replace(/\s*([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])/g, '\n$1')
+    const lines = b.split('\n').map((s) => s.trim()).filter(Boolean)
+    for (const line of lines) {
+      const inner = wrapBookTitles(line, 'taboo')
+      const isNum =
+        /^[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]/.test(line) || /^\([1-9]\d?\)/.test(line)
+      const cls = isNum ? 'herb-kai-note herb-rich-p' : 'herb-rich-p text-sandalwood/90'
+      html += `<p class="${cls}">${inner}</p>`
+    }
+  }
+  return html
+}
+
+/**
+ * 功效、用法等：(1)/① 换行；典籍《》竹青色；序号不再用大红以免与禁忌语义混淆
+ */
+function formatClassicListHtml(text) {
+  if (!text || !text.trim()) return '暂无'
+  let formatted = escapeHtml(text.trim())
+  formatted = wrapBookTitles(formatted, 'effect')
+  formatted = formatted.replace(/(\([1-9]\d?\))/g, '<br/><span class="text-sandalwood/90 font-semibold">$1</span>')
+  formatted = formatted.replace(/([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])/g, '<br/><span class="text-sandalwood/90 font-semibold">$1</span>')
+  formatted = formatted.replace(/([⑴⑵⑶⑷⑸⑹⑺⑻⑼⑽])/g, '<br/><span class="text-sandalwood/90 font-semibold">$1</span>')
   formatted = formatted.replace(/^(<br\/>)+/, '')
   return formatted
 }
@@ -298,10 +387,12 @@ onMounted(() => {
 })
 
 // --- 新增：监听器 ---
-// 当 herb 数据加载完成，或者路由变化时，重新检查收藏状态
+// 当 herb 数据加载完成，或登录用户变化时，重新检查收藏状态；未登录时清空收藏 UI
 watch(() => [herb.value, currentUser.value], ([newHerb, newUser]) => {
   if (newHerb && newUser) {
     checkFavoriteStatus()
+  } else {
+    isFavorite.value = false
   }
 })
 
@@ -534,10 +625,12 @@ function goBack() {
             <h2 class="text-cinnabar font-serif font-semibold text-base mb-2 flex items-center gap-2">
               <span class="w-1 h-4 bg-cinnabar rounded" /> 性味归经
             </h2>
-            <p class="text-sandalwood/90 text-sm leading-relaxed text-justify">
-              {{ herb.nature }}；{{ herb.channel }}
-              {{ herb.taste ? '；' + herb.taste : '' }}
-            </p>
+            <div
+              v-if="herbNatureMeridianHtml"
+              class="text-justify herb-rich formatted-content"
+              v-html="herbNatureMeridianHtml"
+            />
+            <p v-else class="text-sandalwood/60 text-sm">暂无</p>
           </section>
 
           <section id="section-function" class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
@@ -549,8 +642,8 @@ function goBack() {
             </p>
             <div 
               v-if="herb.effect"
-              class="text-sandalwood/90 text-sm leading-relaxed text-justify formatted-content"
-              v-html="formatNumberedText(herb.effect)"
+              class="text-sandalwood/90 text-sm leading-relaxed text-justify herb-rich formatted-content"
+              v-html="formatClassicListHtml(herb.effect)"
             ></div>
           </section>
 
@@ -559,8 +652,8 @@ function goBack() {
               <span class="w-1 h-4 bg-bamboo rounded" /> 用法用量
             </h2>
             <div 
-              class="text-sandalwood/90 text-sm leading-relaxed text-justify formatted-content"
-              v-html="formatNumberedText(herb.usage)"
+              class="text-sandalwood/90 text-sm leading-relaxed text-justify herb-rich formatted-content"
+              v-html="formatClassicListHtml(herb.usage)"
             ></div>
           </section>
 
@@ -568,10 +661,12 @@ function goBack() {
             <h2 class="text-cinnabar font-serif font-semibold text-base mb-2 flex items-center gap-2">
               <span class="w-1 h-4 bg-cinnabar rounded" /> 使用禁忌
             </h2>
-            <div 
-              class="text-sandalwood/90 text-sm leading-relaxed text-justify formatted-content"
-              v-html="formatNumberedText(herb.taboo || herb.tips)"
-            ></div>
+            <div
+              v-if="herb.taboo || herb.tips"
+              class="text-sandalwood/90 text-sm leading-relaxed text-justify herb-rich formatted-content"
+              v-html="formatTabooHtml(herb.taboo || herb.tips)"
+            />
+            <p v-else class="text-sandalwood/60 text-sm">暂无</p>
           </div>
         </template>
 
@@ -660,10 +755,48 @@ function goBack() {
 .formatted-content :deep(br) {
   content: '';
   display: block;
-  margin-top: 0.5rem; 
+  margin-top: 0.5rem;
 }
 
 .formatted-content :deep(br:first-child) {
   display: none;
+}
+
+.herb-rich :deep(.herb-rich-p) {
+  margin-bottom: 0.5rem;
+}
+
+.herb-rich :deep(.herb-rich-p:last-child) {
+  margin-bottom: 0;
+}
+
+.herb-rich :deep(.herb-meridian-lead) {
+  font-size: 0.9375rem;
+  line-height: 1.75;
+  color: rgb(74 50 40 / 0.92);
+}
+
+.herb-rich :deep(.herb-kai-note) {
+  font-family: KaiTi, 'Kaiti SC', STKaiti, 'STKaiti', 'FangSong', 'Noto Serif SC', serif;
+  font-size: 0.8125rem;
+  line-height: 1.7;
+  color: rgb(74 50 40 / 0.85);
+}
+
+.herb-rich :deep(.herb-book-cite) {
+  color: #5d7a47;
+  font-weight: 500;
+}
+
+.herb-rich :deep(.herb-taboo-lead) {
+  color: #991b1b;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  line-height: 1.75;
+}
+
+.herb-rich :deep(.herb-book-taboo) {
+  color: #047857;
+  font-weight: 600;
 }
 </style>
