@@ -250,20 +250,17 @@ const fetchSeasonalData = async () => {
   };
 
   try {
-    const { data: info } = await supabase
-      .from("solar_terms")
-      .select("*")
-      .eq("name", termName)
-      .single();
+    const [{ data: info }, { data: recipes }] = await Promise.all([
+      supabase.from("solar_terms").select("*").eq("name", termName).single(),
+      supabase
+        .from("recipes")
+        .select("id, name, image")
+        .eq("solar_term", termName)
+        .or("moderation_status.eq.published,moderation_status.is.null")
+        .limit(3),
+    ]);
     termInfo.value = info || MOCK_DATA.info;
-    const { data: recipes } = await supabase
-      .from("recipes")
-      .select("id, name, image")
-      .eq("solar_term", termName)
-      .or("moderation_status.eq.published,moderation_status.is.null")
-      .limit(3);
-    seasonalRecipes.value =
-      recipes && recipes.length ? recipes : MOCK_DATA.recipes;
+    seasonalRecipes.value = recipes && recipes.length ? recipes : MOCK_DATA.recipes;
   } catch (e) {
     termInfo.value = MOCK_DATA.info;
     seasonalRecipes.value = MOCK_DATA.recipes;
@@ -414,7 +411,7 @@ onUnmounted(() => {
                 <button
                   type="button"
                   class="bento-tile bento-tile--ai"
-                  :class="{ 'bento-tile--ai-tall': !termInfo }"
+                  :class="{ 'bento-tile--ai-tall': !termInfo && !loading }"
                   @click="openAiCompanion"
                 >
                   <div class="ai-pulse-ring ai-pulse-ring--rect"></div>
