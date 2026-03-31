@@ -1,15 +1,33 @@
 <script setup>
-import { ref, onMounted, onUnmounted, watch, computed, nextTick, inject } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import gsap from 'gsap'
-import { Soup, ArrowRight, BookOpen, Utensils, ScrollText, ChevronDown, ArrowUp, MessageCircle, Activity } from 'lucide-vue-next'
+import {
+  ref,
+  onMounted,
+  onUnmounted,
+  watch,
+  computed,
+  nextTick,
+  inject,
+} from "vue";
+import { useRouter, useRoute } from "vue-router";
+import gsap from "gsap";
+import {
+  Soup,
+  ArrowRight,
+  BookOpen,
+  Utensils,
+  ScrollText,
+  ChevronDown,
+  ArrowUp,
+  MessageCircle,
+  Activity,
+} from "lucide-vue-next";
 
-import TcmHistorySection from '@/components/TcmHistorySection.vue'
-import HerbalPairing from '@/components/home/HerbalPairing.vue'
-import MythBuster from '@/components/home/MythBuster.vue'
+import TcmHistorySection from "@/components/TcmHistorySection.vue";
+import HerbalPairing from "@/components/home/HerbalPairing.vue";
+import MythBuster from "@/components/home/MythBuster.vue";
 // 注意：移除了 getNearestSolarTerm 的引入
-import { supabase } from '@/supabaseClient'
-import { preloadHomeFeaturePages } from '@/composables/usePagePreload'
+import { supabase } from "@/supabaseClient";
+import { preloadHomeFeaturePages } from "@/composables/usePagePreload";
 import {
   FEATURE_COPY,
   SITE_SHORT_NAME,
@@ -17,221 +35,289 @@ import {
   AI_TUTOR_LABEL,
   AI_TUTOR_MOTTO,
   homeNextHintText,
-} from '@/constants/branding'
+} from "@/constants/branding";
 
-const router = useRouter()
-const route = useRoute()
-const openAiCompanion = inject('openAiCompanion', () => {})
+const router = useRouter();
+const route = useRoute();
+const openAiCompanion = inject("openAiCompanion", () => {});
 
 // --- 数据状态 ---
-const currentTermName = ref('')
-const termInfo = ref(null)
-const seasonalRecipes = ref([])
-const loading = ref(true)
-const nearestDaysDiff = ref(0)
+const currentTermName = ref("");
+const termInfo = ref(null);
+const seasonalRecipes = ref([]);
+const loading = ref(true);
+const nearestDaysDiff = ref(0);
 
 const todayLabel = (() => {
-  const d = new Date()
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
-})()
+  const d = new Date();
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+})();
 
 // --- 核心翻页逻辑 ---
-const activeIndex = ref(0)
-const isAnimating = ref(false)
-const totalSections = 4
+const activeIndex = ref(0);
+const isAnimating = ref(false);
+const totalSections = 4;
 
 // --- 底部指引文案 ---
 const nextSectionLabels = [
-  { text: homeNextHintText('pairing'), target: 1 },
-  { text: homeNextHintText('mythBuster'), target: 2 },
-  { text: homeNextHintText('history'), target: 3 },
-  { text: '', target: -1 },
-]
+  { text: homeNextHintText("pairing"), target: 1 },
+  { text: homeNextHintText("mythBuster"), target: 2 },
+  { text: homeNextHintText("history"), target: 3 },
+  { text: "", target: -1 },
+];
 
 const currentNextLabel = computed(() => {
-  return nextSectionLabels[activeIndex.value] || { text: '', target: -1 }
-})
+  return nextSectionLabels[activeIndex.value] || { text: "", target: -1 };
+});
 
 // --- 动画跳转逻辑 ---
 const moveTo = (index) => {
-  if (index < 0 || index >= totalSections) return
-  if (isAnimating.value) return
+  if (index < 0 || index >= totalSections) return;
+  if (isAnimating.value) return;
 
-  isAnimating.value = true
-  activeIndex.value = index
+  isAnimating.value = true;
+  activeIndex.value = index;
 
-  gsap.to('.scroll-container', {
-    y: `-${index * 100}%`, 
-    duration: 1.0,          
-    ease: "power2.out", 
-    overwrite: true 
-  })
+  gsap.to(".scroll-container", {
+    y: `-${index * 100}%`,
+    duration: 1.0,
+    ease: "power2.out",
+    overwrite: true,
+  });
 
   setTimeout(() => {
-    isAnimating.value = false
-  }, 800)
-}
+    isAnimating.value = false;
+  }, 800);
+};
 
 const handleWheel = (e) => {
-  e.preventDefault() 
-  if (isAnimating.value) return 
-  if (Math.abs(e.deltaY) < 20) return 
-  if (e.deltaY > 0) moveTo(activeIndex.value + 1)
-  else moveTo(activeIndex.value - 1)
-}
+  e.preventDefault();
+  if (isAnimating.value) return;
+  if (Math.abs(e.deltaY) < 20) return;
+  if (e.deltaY > 0) moveTo(activeIndex.value + 1);
+  else moveTo(activeIndex.value - 1);
+};
 
-let touchStartY = 0
-const handleTouchStart = (e) => { touchStartY = e.touches[0].clientY }
+let touchStartY = 0;
+const handleTouchStart = (e) => {
+  touchStartY = e.touches[0].clientY;
+};
 const handleTouchEnd = (e) => {
-  if (isAnimating.value) return
-  const touchEndY = e.changedTouches[0].clientY
-  const diff = touchStartY - touchEndY
+  if (isAnimating.value) return;
+  const touchEndY = e.changedTouches[0].clientY;
+  const diff = touchStartY - touchEndY;
   if (Math.abs(diff) > 50) {
-    if (diff > 0) moveTo(activeIndex.value + 1)
-    else moveTo(activeIndex.value - 1)
+    if (diff > 0) moveTo(activeIndex.value + 1);
+    else moveTo(activeIndex.value - 1);
   }
-}
+};
 
 // --- 业务跳转 ---
-function goToHistory() { moveTo(3) }
-function handleMainPanelClick() { router.push('/acupoints') }
-function goToHerbs() { router.push('/herbs') }
-function goToRecipes() { router.push('/recipes') }
-function goToRecipeDetail(id) { router.push({ path: '/recipes', query: { open_id: id } }) }
+function goToHistory() {
+  moveTo(3);
+}
+function handleMainPanelClick() {
+  router.push("/acupoints");
+}
+function goToHerbs() {
+  router.push("/herbs");
+}
+function goToRecipes() {
+  router.push("/recipes");
+}
+function goToRecipeDetail(id) {
+  router.push({ path: "/recipes", query: { open_id: id } });
+}
 // --- UI 控制逻辑（来自 main）---
 watch(activeIndex, (newVal) => {
-  if (newVal > 0) document.body.classList.add('hide-global-nav')
-  else document.body.classList.remove('hide-global-nav')
-})
+  if (newVal > 0) document.body.classList.add("hide-global-nav");
+  else document.body.classList.remove("hide-global-nav");
+});
 
 watch(
   () => ({ path: route.path, history: route.query.history }),
   (curr) => {
-    if (curr.path === '/' && curr.history === 'open') nextTick(() => moveTo(3))
+    if (curr.path === "/" && curr.history === "open") nextTick(() => moveTo(3));
   },
-  { immediate: true }
-)
+  { immediate: true },
+);
 
 // ==========================================
 // 核心修改：增加本地节气计算逻辑，永远指向下一个节气
 // ==========================================
 const SOLAR_TERMS_LOOKUP = [
-  { name: '小寒', month: 1, day: 5 }, { name: '大寒', month: 1, day: 20 },
-  { name: '立春', month: 2, day: 3 }, { name: '雨水', month: 2, day: 18 },
-  { name: '惊蛰', month: 3, day: 5 }, { name: '春分', month: 3, day: 20 },
-  { name: '清明', month: 4, day: 4 }, { name: '谷雨', month: 4, day: 19 },
-  { name: '立夏', month: 5, day: 5 }, { name: '小满', month: 5, day: 20 },
-  { name: '芒种', month: 6, day: 5 }, { name: '夏至', month: 6, day: 21 },
-  { name: '小暑', month: 7, day: 6 }, { name: '大暑', month: 7, day: 22 },
-  { name: '立秋', month: 8, day: 7 }, { name: '处暑', month: 8, day: 22 },
-  { name: '白露', month: 9, day: 7 }, { name: '秋分', month: 9, day: 22 },
-  { name: '寒露', month: 10, day: 8 }, { name: '霜降', month: 10, day: 23 },
-  { name: '立冬', month: 11, day: 7 }, { name: '小雪', month: 11, day: 22 },
-  { name: '大雪', month: 12, day: 6 }, { name: '冬至', month: 12, day: 21 }
-]
+  { name: "小寒", month: 1, day: 5 },
+  { name: "大寒", month: 1, day: 20 },
+  { name: "立春", month: 2, day: 3 },
+  { name: "雨水", month: 2, day: 18 },
+  { name: "惊蛰", month: 3, day: 5 },
+  { name: "春分", month: 3, day: 20 },
+  { name: "清明", month: 4, day: 4 },
+  { name: "谷雨", month: 4, day: 19 },
+  { name: "立夏", month: 5, day: 5 },
+  { name: "小满", month: 5, day: 20 },
+  { name: "芒种", month: 6, day: 5 },
+  { name: "夏至", month: 6, day: 21 },
+  { name: "小暑", month: 7, day: 6 },
+  { name: "大暑", month: 7, day: 22 },
+  { name: "立秋", month: 8, day: 7 },
+  { name: "处暑", month: 8, day: 22 },
+  { name: "白露", month: 9, day: 7 },
+  { name: "秋分", month: 9, day: 22 },
+  { name: "寒露", month: 10, day: 8 },
+  { name: "霜降", month: 10, day: 23 },
+  { name: "立冬", month: 11, day: 7 },
+  { name: "小雪", month: 11, day: 22 },
+  { name: "大雪", month: 12, day: 6 },
+  { name: "冬至", month: 12, day: 21 },
+];
 
 const calculateSeasonalState = () => {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = now.getMonth() + 1
-  const day = now.getDate()
-  
-  const sorted = [...SOLAR_TERMS_LOOKUP].sort((a, b) => a.month !== b.month ? a.month - b.month : a.day - b.day)
-  
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  const day = now.getDate();
+
+  const sorted = [...SOLAR_TERMS_LOOKUP].sort((a, b) =>
+    a.month !== b.month ? a.month - b.month : a.day - b.day,
+  );
+
   // 查找当前所处的节气
-  let activeTerm = sorted[sorted.length - 1]
+  let activeTerm = sorted[sorted.length - 1];
   for (let i = sorted.length - 1; i >= 0; i--) {
-    if (month > sorted[i].month || (month === sorted[i].month && day >= sorted[i].day)) {
-      activeTerm = sorted[i]
-      break
+    if (
+      month > sorted[i].month ||
+      (month === sorted[i].month && day >= sorted[i].day)
+    ) {
+      activeTerm = sorted[i];
+      break;
     }
   }
-  
+
   // 查找下一个节气并计算倒计时
-  let nextTerm = sorted.find(t => t.month > month || (t.month === month && t.day > day))
-  let targetYear = year
+  let nextTerm = sorted.find(
+    (t) => t.month > month || (t.month === month && t.day > day),
+  );
+  let targetYear = year;
   if (!nextTerm) {
-    nextTerm = sorted[0]
-    targetYear += 1
+    nextTerm = sorted[0];
+    targetYear += 1;
   }
 
-  const todayReset = new Date(year, now.getMonth(), day) 
-  const targetDate = new Date(targetYear, nextTerm.month - 1, nextTerm.day)
-  const diffDays = Math.ceil((targetDate - todayReset) / (1000 * 60 * 60 * 24))
+  const todayReset = new Date(year, now.getMonth(), day);
+  const targetDate = new Date(targetYear, nextTerm.month - 1, nextTerm.day);
+  const diffDays = Math.ceil((targetDate - todayReset) / (1000 * 60 * 60 * 24));
 
-  nearestDaysDiff.value = diffDays
-  return activeTerm.name
-}
+  nearestDaysDiff.value = diffDays;
+  return activeTerm.name;
+};
 
 // --- 数据获取：Supabase ---
 const fetchSeasonalData = async () => {
-  loading.value = true
-  
+  loading.value = true;
+
   // 使用本地计算函数获取节气名称
-  const termName = calculateSeasonalState()
-  currentTermName.value = termName
+  const termName = calculateSeasonalState();
+  currentTermName.value = termName;
 
   const MOCK_DATA = {
-    info: { name: termName, principle: '省酸增甘，以养脾气；疏肝理气，顺应春阳。', recommend_text: '韭菜、香椿、百合', avoid_text: '酸辣食物、生冷海鲜' },
+    info: {
+      name: termName,
+      principle: "省酸增甘，以养脾气；疏肝理气，顺应春阳。",
+      recommend_text: "韭菜、香椿、百合",
+      avoid_text: "酸辣食物、生冷海鲜",
+    },
     recipes: [
-      { id: 1, name: '春笋炖排骨', image: 'https://images.unsplash.com/photo-1547592180-85f173990554?q=80&w=2070&auto=format&fit=crop' },
-      { id: 2, name: '枸杞菊花茶', image: 'https://images.unsplash.com/photo-1623912852230-e374bb36934c?q=80&w=2070&auto=format&fit=crop' },
-      { id: 3, name: '香椿炒鸡蛋', image: 'https://plus.unsplash.com/premium_photo-1661775179532-6ae372740922?q=80&w=2070&auto=format&fit=crop' }
-    ]
-  }
+      {
+        id: 1,
+        name: "春笋炖排骨",
+        image:
+          "https://images.unsplash.com/photo-1547592180-85f173990554?q=80&w=2070&auto=format&fit=crop",
+      },
+      {
+        id: 2,
+        name: "枸杞菊花茶",
+        image:
+          "https://images.unsplash.com/photo-1623912852230-e374bb36934c?q=80&w=2070&auto=format&fit=crop",
+      },
+      {
+        id: 3,
+        name: "香椿炒鸡蛋",
+        image:
+          "https://plus.unsplash.com/premium_photo-1661775179532-6ae372740922?q=80&w=2070&auto=format&fit=crop",
+      },
+    ],
+  };
 
   try {
-    const { data: info } = await supabase.from('solar_terms').select('*').eq('name', termName).single()
-    termInfo.value = info || MOCK_DATA.info
+    const { data: info } = await supabase
+      .from("solar_terms")
+      .select("*")
+      .eq("name", termName)
+      .single();
+    termInfo.value = info || MOCK_DATA.info;
     const { data: recipes } = await supabase
-      .from('recipes')
-      .select('id, name, image')
-      .eq('solar_term', termName)
-      .or('moderation_status.eq.published,moderation_status.is.null')
-      .limit(3)
-    seasonalRecipes.value = (recipes && recipes.length) ? recipes : MOCK_DATA.recipes
+      .from("recipes")
+      .select("id, name, image")
+      .eq("solar_term", termName)
+      .or("moderation_status.eq.published,moderation_status.is.null")
+      .limit(3);
+    seasonalRecipes.value =
+      recipes && recipes.length ? recipes : MOCK_DATA.recipes;
   } catch (e) {
-    termInfo.value = MOCK_DATA.info; 
-    seasonalRecipes.value = MOCK_DATA.recipes
-  } finally { 
-    loading.value = false 
+    termInfo.value = MOCK_DATA.info;
+    seasonalRecipes.value = MOCK_DATA.recipes;
+  } finally {
+    loading.value = false;
   }
-}
+};
 
-onMounted(() => { 
-  fetchSeasonalData()
+onMounted(() => {
+  fetchSeasonalData();
   // 用户停留首页时，在空闲时段预加载药材页/食谱页代码与首屏数据
-  if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-    window.requestIdleCallback(() => { preloadHomeFeaturePages() }, { timeout: 2000 })
+  if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+    window.requestIdleCallback(
+      () => {
+        preloadHomeFeaturePages();
+      },
+      { timeout: 2000 },
+    );
   } else {
-    setTimeout(() => { preloadHomeFeaturePages() }, 300)
+    setTimeout(() => {
+      preloadHomeFeaturePages();
+    }, 300);
   }
-  window.addEventListener('wheel', handleWheel, { passive: false })
-  window.addEventListener('touchstart', handleTouchStart, { passive: true })
-  window.addEventListener('touchend', handleTouchEnd, { passive: true })
-})
+  window.addEventListener("wheel", handleWheel, { passive: false });
+  window.addEventListener("touchstart", handleTouchStart, { passive: true });
+  window.addEventListener("touchend", handleTouchEnd, { passive: true });
+});
 
 onUnmounted(() => {
-  window.removeEventListener('wheel', handleWheel)
-  window.removeEventListener('touchstart', handleTouchStart)
-  window.removeEventListener('touchend', handleTouchEnd)
-  document.body.classList.remove('hide-global-nav')
-})
+  window.removeEventListener("wheel", handleWheel);
+  window.removeEventListener("touchstart", handleTouchStart);
+  window.removeEventListener("touchend", handleTouchEnd);
+  document.body.classList.remove("hide-global-nav");
+});
 </script>
 
 <template>
   <div class="viewport">
-    
     <div class="scroll-container">
-      
       <div class="page-section">
         <section class="tcm-section tcm-home-hero">
           <div class="home-hero-inner">
-            <div class="home-glass-card home-glass-card--primary home-glass-card--bento animate-fade-in-up delay-100">
+            <div
+              class="home-glass-card home-glass-card--primary home-glass-card--bento animate-fade-in-up delay-100"
+            >
               <header class="home-card-head home-card-head--bento">
                 <h2 class="home-card-title">{{ SITE_SHORT_NAME }}</h2>
-                <p class="home-card-motto home-card-motto--platform">{{ SITE_PLATFORM_TAGLINE }}</p>
-                <div class="home-card-deco home-card-deco--bento" aria-hidden="true">
+                <p class="home-card-motto home-card-motto--platform">
+                  {{ SITE_PLATFORM_TAGLINE }}
+                </p>
+                <div
+                  class="home-card-deco home-card-deco--bento"
+                  aria-hidden="true"
+                >
                   <span class="home-card-deco-line"></span>
                   <span class="home-card-deco-dot"></span>
                   <span class="home-card-deco-line"></span>
@@ -245,25 +331,45 @@ onUnmounted(() => {
                 >
                   <div class="seasonal-mini-head seasonal-mini-head--bento">
                     <div class="seasonal-mini-titles">
-                      <span class="seasonal-mini-eyebrow">{{ FEATURE_COPY.seasonal.title }}</span>
-                      <span class="seasonal-mini-motto">{{ FEATURE_COPY.seasonal.motto }}</span>
+                      <span class="seasonal-mini-eyebrow">{{
+                        FEATURE_COPY.seasonal.title
+                      }}</span>
+                      <span class="seasonal-mini-motto">{{
+                        FEATURE_COPY.seasonal.motto
+                      }}</span>
                     </div>
-                    <span class="today-pill today-pill--mini">{{ todayLabel }}</span>
+                    <span class="today-pill today-pill--mini">{{
+                      todayLabel
+                    }}</span>
                   </div>
                   <div class="seasonal-mini-main seasonal-mini-main--bento">
                     <div class="seasonal-mini-term-row">
-                      <span class="term-name-mini term-name-mini--bento">{{ termInfo.name }}</span>
+                      <span class="term-name-mini term-name-mini--bento">{{
+                        termInfo.name
+                      }}</span>
                       <span class="term-count-mini">
-                        {{ nearestDaysDiff > 0 ? `距下一节气 ${nearestDaysDiff} 天` : '今日交节' }}
+                        {{
+                          nearestDaysDiff > 0
+                            ? `距下一节气 ${nearestDaysDiff} 天`
+                            : "今日交节"
+                        }}
                       </span>
                     </div>
-                    <p class="term-principle-mini term-principle-mini--bento">{{ termInfo.principle }}</p>
+                    <p class="term-principle-mini term-principle-mini--bento">
+                      {{ termInfo.principle }}
+                    </p>
                     <div class="advice-inline advice-inline--bento">
-                      <span class="advice-inline-good"><b>宜</b> {{ termInfo.recommend_text }}</span>
-                      <span class="advice-inline-bad"><b>忌</b> {{ termInfo.avoid_text }}</span>
+                      <span class="advice-inline-good"
+                        ><b>宜</b> {{ termInfo.recommend_text }}</span
+                      >
+                      <span class="advice-inline-bad"
+                        ><b>忌</b> {{ termInfo.avoid_text }}</span
+                      >
                     </div>
                   </div>
-                  <div class="seasonal-mini-recipes seasonal-mini-recipes--bento">
+                  <div
+                    class="seasonal-mini-recipes seasonal-mini-recipes--bento"
+                  >
                     <div class="seasonal-mini-recipes-head">
                       <Soup class="seasonal-mini-soup-icon" />
                       <span class="seasonal-mini-recipes-label">当季甄选</span>
@@ -277,7 +383,12 @@ onUnmounted(() => {
                         :title="recipe.name"
                         @click="goToRecipeDetail(recipe.id)"
                       >
-                        <img :src="recipe.image" class="mini-recipe-chip-img" alt="" loading="lazy" />
+                        <img
+                          :src="recipe.image"
+                          class="mini-recipe-chip-img"
+                          alt=""
+                          loading="lazy"
+                        />
                       </button>
                     </div>
                   </div>
@@ -286,12 +397,16 @@ onUnmounted(() => {
                 <button
                   type="button"
                   class="bento-tile bento-tile--recipe recipe-spotlight"
-                  :class="{ 'bento-tile--recipe-tall': !termInfo }"
+                  :class="{ 'bento-tile--recipe-tall': !termInfo && !loading }"
                   @click.stop="goToRecipes"
                 >
                   <Utensils class="recipe-spotlight-icon" stroke-width="1.75" />
-                  <span class="recipe-spotlight-title">{{ FEATURE_COPY.recipes.title }}</span>
-                  <span class="recipe-spotlight-motto">{{ FEATURE_COPY.recipes.motto }}</span>
+                  <span class="recipe-spotlight-title">{{
+                    FEATURE_COPY.recipes.title
+                  }}</span>
+                  <span class="recipe-spotlight-motto">{{
+                    FEATURE_COPY.recipes.motto
+                  }}</span>
                   <span class="recipe-spotlight-hint">进入养生膳食广场</span>
                   <ArrowRight class="recipe-spotlight-arrow" />
                 </button>
@@ -313,26 +428,59 @@ onUnmounted(() => {
               </div>
 
               <nav class="home-quick-nav" aria-label="主要功能入口">
-                <button type="button" class="quick-nav-item" @click.stop="goToHerbs">
-                  <div class="quick-nav-icon quick-nav-icon--herb" aria-hidden="true">
+                <button
+                  type="button"
+                  class="quick-nav-item"
+                  @click.stop="goToHerbs"
+                >
+                  <div
+                    class="quick-nav-icon quick-nav-icon--herb"
+                    aria-hidden="true"
+                  >
                     <BookOpen class="quick-nav-svg" stroke-width="1.75" />
                   </div>
-                  <span class="quick-nav-title">{{ FEATURE_COPY.herbs.title }}</span>
-                  <span class="quick-nav-motto">{{ FEATURE_COPY.herbs.motto }}</span>
+                  <span class="quick-nav-title">{{
+                    FEATURE_COPY.herbs.title
+                  }}</span>
+                  <span class="quick-nav-motto">{{
+                    FEATURE_COPY.herbs.motto
+                  }}</span>
                 </button>
-                <button type="button" class="quick-nav-item" @click.stop="handleMainPanelClick">
-                  <div class="quick-nav-icon quick-nav-icon--acu" aria-hidden="true">
+                <button
+                  type="button"
+                  class="quick-nav-item"
+                  @click.stop="handleMainPanelClick"
+                >
+                  <div
+                    class="quick-nav-icon quick-nav-icon--acu"
+                    aria-hidden="true"
+                  >
                     <Activity class="quick-nav-svg" stroke-width="1.75" />
                   </div>
-                  <span class="quick-nav-title">{{ FEATURE_COPY.acupoints.title }}</span>
-                  <span class="quick-nav-motto">{{ FEATURE_COPY.acupoints.motto }}</span>
+                  <span class="quick-nav-title">{{
+                    FEATURE_COPY.acupoints.title
+                  }}</span>
+                  <span class="quick-nav-motto">{{
+                    FEATURE_COPY.acupoints.motto
+                  }}</span>
                 </button>
-                <button type="button" class="quick-nav-item" @click.stop="goToHistory">
-                  <div class="quick-nav-icon quick-nav-icon--hist" aria-hidden="true">
+                <button
+                  type="button"
+                  class="quick-nav-item"
+                  @click.stop="goToHistory"
+                >
+                  <div
+                    class="quick-nav-icon quick-nav-icon--hist"
+                    aria-hidden="true"
+                  >
                     <ScrollText class="quick-nav-svg" stroke-width="1.75" />
                   </div>
-                  <span class="quick-nav-title">{{ FEATURE_COPY.history.title }}</span>
-                  <span class="quick-nav-motto">{{ FEATURE_COPY.history.motto }}</span>
+                  <span class="quick-nav-title">{{
+                    FEATURE_COPY.history.title
+                  }}</span>
+                  <span class="quick-nav-motto">{{
+                    FEATURE_COPY.history.motto
+                  }}</span>
                 </button>
               </nav>
             </div>
@@ -341,18 +489,17 @@ onUnmounted(() => {
       </div>
 
       <div class="page-section"><HerbalPairing /></div>
-      
-      <div class="page-section"><MythBuster /></div>
-      
-      <div class="page-section"><TcmHistorySection /></div>
 
+      <div class="page-section"><MythBuster /></div>
+
+      <div class="page-section"><TcmHistorySection /></div>
     </div>
-    
+
     <div class="pagination">
-      <div 
-        v-for="(n, index) in totalSections" 
+      <div
+        v-for="(n, index) in totalSections"
         :key="index"
-        class="dot-indicator" 
+        class="dot-indicator"
         :class="{ active: activeIndex === index }"
         @click="moveTo(index)"
       ></div>
@@ -368,16 +515,15 @@ onUnmounted(() => {
     </transition>
 
     <transition name="fade">
-      <div 
-        v-if="currentNextLabel.text" 
-        class="next-page-hint" 
+      <div
+        v-if="currentNextLabel.text"
+        class="next-page-hint"
         @click="moveTo(currentNextLabel.target)"
       >
         <span class="hint-text">{{ currentNextLabel.text }}</span>
         <ChevronDown class="hint-chevron animate-bounce" stroke-width="2.25" />
       </div>
     </transition>
-
   </div>
 </template>
 
@@ -387,8 +533,10 @@ onUnmounted(() => {
    ========================================= */
 .viewport {
   position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100vh;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
   overflow: hidden;
   overscroll-behavior: none;
   touch-action: none;
@@ -400,15 +548,38 @@ onUnmounted(() => {
 }
 
 .scroll-container {
-  width: 100%; height: 100%;
+  width: 100%;
+  height: 100%;
 }
 
-.page-section { width: 100%; height: 100vh; }
+.page-section {
+  width: 100%;
+  height: 100vh;
+}
 
 /* 侧边导航 */
-.pagination { position: fixed; right: 20px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 15px; z-index: 100; }
-.dot-indicator { width: 10px; height: 10px; background: rgba(0,0,0,0.2); border-radius: 50%; cursor: pointer; transition: all 0.3s; }
-.dot-indicator.active { background: #8B5E3C; transform: scale(1.4); }
+.pagination {
+  position: fixed;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  z-index: 100;
+}
+.dot-indicator {
+  width: 10px;
+  height: 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.dot-indicator.active {
+  background: #8b5e3c;
+  transform: scale(1.4);
+}
 
 /* =========================================
    侧边隐藏式导航条
@@ -436,7 +607,7 @@ onUnmounted(() => {
   backdrop-filter: blur(5px);
   padding: 10px 12px 10px 18px;
   border-radius: 30px 0 0 30px;
-  box-shadow: -4px 4px 15px rgba(0,0,0,0.1);
+  box-shadow: -4px 4px 15px rgba(0, 0, 0, 0.1);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -483,7 +654,11 @@ onUnmounted(() => {
   z-index: 999;
   cursor: pointer;
   color: #fff;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.12) 0%, rgba(0, 0, 0, 0.22) 100%);
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.12) 0%,
+    rgba(0, 0, 0, 0.22) 100%
+  );
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   border: 1px solid rgba(255, 255, 255, 0.28);
@@ -492,7 +667,10 @@ onUnmounted(() => {
   box-shadow:
     0 8px 28px rgba(0, 0, 0, 0.2),
     0 0 0 1px rgba(0, 0, 0, 0.06) inset;
-  transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    background 0.25s ease;
   opacity: 1;
   animation: next-hint-breathe 2.8s ease-in-out infinite;
 }
@@ -513,14 +691,18 @@ onUnmounted(() => {
 
 .next-page-hint:hover {
   transform: translateX(-50%) translateY(-4px);
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.18) 0%, rgba(0, 0, 0, 0.3) 100%);
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.18) 0%,
+    rgba(0, 0, 0, 0.3) 100%
+  );
 }
 
 .hint-text {
   font-size: clamp(1.05rem, 2.6vw, 1.28rem);
   font-weight: 400;
   letter-spacing: 0.14em;
-  font-family: 'Ma Shan Zheng', cursive;
+  font-family: "Ma Shan Zheng", cursive;
   text-shadow:
     0 2px 16px rgba(0, 0, 0, 0.45),
     0 1px 3px rgba(0, 0, 0, 0.35);
@@ -549,23 +731,31 @@ onUnmounted(() => {
 /* =========================================
    2. 内容样式
    ========================================= */
-.tcm-section { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+.tcm-section {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .tcm-home-hero.tcm-section {
   align-items: center;
   justify-content: center;
   min-height: 100%;
-  padding: calc(var(--main-nav-h) + 0.75rem) clamp(14px, 3.2vw, 32px) max(1rem, env(safe-area-inset-bottom));
+  padding: calc(var(--main-nav-h) + 0.75rem) clamp(14px, 3.2vw, 32px)
+    max(1rem, env(safe-area-inset-bottom));
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
   box-sizing: border-box;
-  background-image: url('/photo/title_background.jpg');
+  background-image: url("/photo/title_background.jpg");
   background-size: cover;
   background-position: center;
 }
 .tcm-home-hero.tcm-section::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
   background: rgba(0, 0, 0, 0.25);
@@ -573,7 +763,7 @@ onUnmounted(() => {
   pointer-events: none;
 }
 .tcm-home-hero.tcm-section::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: 0;
   left: 0;
@@ -593,22 +783,18 @@ onUnmounted(() => {
   z-index: 2;
   min-width: 0;
   overflow-x: hidden;
-  /* 中间主区域等比例放大：布局尺寸先缩小再 scale，视觉约占满略放大后的 max-width */
-  --home-mid-scale: 1.5;
-  width: calc(100% / var(--home-mid-scale));
-  max-width: calc(min(1680px, 100%) / var(--home-mid-scale));
-  max-height: calc((100vh - var(--main-nav-h) - 1.75rem) / var(--home-mid-scale));
+  width: 100%;
+  max-width: min(1200px, 100%);
+  max-height: calc(100vh - var(--main-nav-h) - 1.75rem);
   padding: 0;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   align-self: center;
-  transform: scale(var(--home-mid-scale));
-  transform-origin: center center;
 }
 .home-hero-inner .home-glass-card {
-  max-height: calc((100vh - var(--main-nav-h) - 1.75rem) / var(--home-mid-scale));
+  max-height: calc(100vh - var(--main-nav-h) - 1.75rem);
 }
 .home-glass-card {
   flex: 1;
@@ -709,13 +895,26 @@ onUnmounted(() => {
   justify-content: center;
   /* 暖赭 / 琥珀 / 檀褐 — 与全站纸色、朱砂点缀统一 */
   background:
-    radial-gradient(ellipse 95% 85% at 18% 12%, rgba(255, 255, 255, 0.32), transparent 52%),
-    radial-gradient(ellipse 120% 100% at 30% 22%, #fdf6ec, #e8c9a0 42%, #b88354 72%, #7a4f32);
+    radial-gradient(
+      ellipse 95% 85% at 18% 12%,
+      rgba(255, 255, 255, 0.32),
+      transparent 52%
+    ),
+    radial-gradient(
+      ellipse 120% 100% at 30% 22%,
+      #fdf6ec,
+      #e8c9a0 42%,
+      #b88354 72%,
+      #7a4f32
+    );
   box-shadow:
     0 12px 36px rgba(90, 52, 34, 0.28),
     0 0 0 1px rgba(255, 255, 255, 0.18) inset,
     inset 0 1px 0 rgba(255, 255, 255, 0.5);
-  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease;
 }
 .bento-tile--ai-tall {
   grid-column: 1;
@@ -765,7 +964,11 @@ onUnmounted(() => {
   margin: 4px 0 14px;
   padding: 0.85rem 1rem;
   border-radius: 14px;
-  background: linear-gradient(145deg, rgba(255, 252, 247, 0.96), rgba(242, 237, 228, 0.78));
+  background: linear-gradient(
+    145deg,
+    rgba(255, 252, 247, 0.96),
+    rgba(242, 237, 228, 0.78)
+  );
   border: 1px solid rgba(255, 255, 255, 0.45);
   box-shadow:
     0 8px 28px rgba(45, 40, 35, 0.1),
@@ -882,7 +1085,10 @@ onUnmounted(() => {
     rgba(236, 228, 215, 0.86) 100%
   );
   cursor: pointer;
-  transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s,
+    transform 0.15s;
   box-shadow:
     0 8px 28px rgba(45, 40, 35, 0.1),
     0 1px 4px rgba(139, 94, 60, 0.06),
@@ -925,7 +1131,7 @@ onUnmounted(() => {
   height: 22px;
 }
 .quick-nav-title {
-  font-family: 'Ma Shan Zheng', cursive;
+  font-family: "Ma Shan Zheng", cursive;
   font-size: 0.88rem;
   font-weight: 400;
   color: var(--primary-dark);
@@ -933,7 +1139,7 @@ onUnmounted(() => {
   line-height: 1.2;
 }
 .quick-nav-motto {
-  font-family: 'Ma Shan Zheng', cursive;
+  font-family: "Ma Shan Zheng", cursive;
   font-size: 0.58rem;
   color: rgba(61, 56, 48, 0.7);
   letter-spacing: 0.08em;
@@ -958,13 +1164,13 @@ onUnmounted(() => {
   min-width: 0;
 }
 .seasonal-mini-eyebrow {
-  font-family: 'Ma Shan Zheng', cursive;
+  font-family: "Ma Shan Zheng", cursive;
   font-size: 1.02rem;
   color: var(--primary-dark);
   letter-spacing: 0.12em;
 }
 .seasonal-mini-motto {
-  font-family: 'Ma Shan Zheng', cursive;
+  font-family: "Ma Shan Zheng", cursive;
   font-size: 0.62rem;
   color: rgba(61, 56, 48, 0.65);
   letter-spacing: 0.13em;
@@ -992,7 +1198,7 @@ onUnmounted(() => {
   gap: 8px 12px;
 }
 .term-name-mini {
-  font-family: 'Ma Shan Zheng', serif;
+  font-family: "Ma Shan Zheng", serif;
   font-size: clamp(1.28rem, 3vw, 1.72rem);
   color: var(--primary-dark);
   letter-spacing: 0.08em;
@@ -1046,7 +1252,7 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 .seasonal-mini-recipes-label {
-  font-family: 'Ma Shan Zheng', cursive;
+  font-family: "Ma Shan Zheng", cursive;
   font-size: 0.72rem;
   font-weight: 400;
   color: var(--primary-dark);
@@ -1077,7 +1283,9 @@ onUnmounted(() => {
   height: 52px;
   flex-shrink: 0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
 }
 .mini-recipe-chip:hover {
   transform: translateY(-2px);
@@ -1095,7 +1303,7 @@ onUnmounted(() => {
   display: block;
 }
 .home-card-title {
-  font-family: 'Ma Shan Zheng', cursive;
+  font-family: "Ma Shan Zheng", cursive;
   font-size: clamp(1.65rem, 2.7vw, 2.2rem);
   color: var(--primary-dark);
   margin: 0 0 0.32rem;
@@ -1105,7 +1313,7 @@ onUnmounted(() => {
 }
 .home-card-motto {
   margin: 0;
-  font-family: 'Ma Shan Zheng', cursive;
+  font-family: "Ma Shan Zheng", cursive;
   font-size: 0.8rem;
   color: rgba(61, 56, 48, 0.78);
   letter-spacing: 0.16em;
@@ -1169,7 +1377,7 @@ onUnmounted(() => {
   height: clamp(48px, 8vw, 58px);
 }
 .bento-tile--ai .ai-mentor-label {
-  font-family: 'Ma Shan Zheng', cursive;
+  font-family: "Ma Shan Zheng", cursive;
   font-size: 0.82rem;
   font-weight: 400;
   color: #fffdfb;
@@ -1181,7 +1389,7 @@ onUnmounted(() => {
   letter-spacing: 0.08em;
 }
 .bento-tile--ai .ai-mentor-sub {
-  font-family: 'Ma Shan Zheng', cursive;
+  font-family: "Ma Shan Zheng", cursive;
   font-size: 0.56rem;
   color: rgba(255, 246, 235, 0.92);
   letter-spacing: 0.1em;
@@ -1220,7 +1428,10 @@ onUnmounted(() => {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
 }
 .bento-tile--recipe-tall.recipe-spotlight {
   padding: 1.1rem 1rem 2.25rem;
@@ -1240,14 +1451,14 @@ onUnmounted(() => {
   color: #8b5e3c;
 }
 .recipe-spotlight-title {
-  font-family: 'Ma Shan Zheng', cursive;
+  font-family: "Ma Shan Zheng", cursive;
   font-size: 1.02rem;
   font-weight: 400;
   color: var(--primary-dark);
   letter-spacing: 0.12em;
 }
 .recipe-spotlight-motto {
-  font-family: 'Ma Shan Zheng', cursive;
+  font-family: "Ma Shan Zheng", cursive;
   font-size: 0.66rem;
   color: rgba(61, 56, 48, 0.82);
   letter-spacing: 0.12em;
@@ -1255,7 +1466,7 @@ onUnmounted(() => {
   padding: 0 4px;
 }
 .recipe-spotlight-hint {
-  font-family: 'Ma Shan Zheng', cursive;
+  font-family: "Ma Shan Zheng", cursive;
   font-size: 0.62rem;
   color: var(--accent);
   font-weight: 400;
@@ -1369,17 +1580,74 @@ onUnmounted(() => {
   font-size: 0.85rem;
   letter-spacing: 0.08em;
 }
-.seasonal-card-enter { animation: seasonal-card-enter 0.6s ease-out; }
-@keyframes seasonal-card-enter { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
-.bg-overlay-noise { position: absolute; inset: 0; background-image: url("data:image/svg+xml,%3Csvg width='200' height='200' viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E"); z-index: 1; pointer-events: none; }
-.title-decoration { display: flex; align-items: center; gap: 10px; margin: 10px 0; opacity: 0.6; }
-.title-decoration .line { width: 40px; height: 1px; background: var(--primary); }
-.title-decoration .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
-.animate-fade-in-down { animation: fadeInDown 1s ease-out; }
-.animate-fade-in-up { animation: fadeInUp 1s ease-out; }
-.delay-100 { animation-delay: 0.15s; animation-fill-mode: both; }
-@keyframes fadeInDown { from { opacity: 0; transform: translateY(-30px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+.seasonal-card-enter {
+  animation: seasonal-card-enter 0.6s ease-out;
+}
+@keyframes seasonal-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.bg-overlay-noise {
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg width='200' height='200' viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+  z-index: 1;
+  pointer-events: none;
+}
+.title-decoration {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+  opacity: 0.6;
+}
+.title-decoration .line {
+  width: 40px;
+  height: 1px;
+  background: var(--primary);
+}
+.title-decoration .dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.animate-fade-in-down {
+  animation: fadeInDown 1s ease-out;
+}
+.animate-fade-in-up {
+  animation: fadeInUp 1s ease-out;
+}
+.delay-100 {
+  animation-delay: 0.15s;
+  animation-fill-mode: both;
+}
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
 /* 首页首屏：节气卡与入口方格内文字统一近黑；主入口标题加粗；除「四时之序」眉题外整体略放大 */
 .tcm-home-hero .seasonal-mini-eyebrow {
@@ -1479,7 +1747,11 @@ onUnmounted(() => {
 .tcm-home-hero .bento-tile--ai {
   border-color: rgba(255, 255, 255, 0.72);
   background:
-    radial-gradient(ellipse 95% 85% at 18% 12%, rgba(255, 255, 255, 0.55), transparent 52%),
+    radial-gradient(
+      ellipse 95% 85% at 18% 12%,
+      rgba(255, 255, 255, 0.55),
+      transparent 52%
+    ),
     linear-gradient(155deg, #fff9f3 0%, #fce8d8 42%, #e8d2b8 78%, #d4b896);
   box-shadow:
     0 12px 32px rgba(90, 52, 34, 0.16),
@@ -1515,7 +1787,10 @@ onUnmounted(() => {
 .tcm-home-hero .home-glass-card--bento .home-card-head--bento .home-card-title {
   font-size: clamp(2.25rem, 4.3vw, 3.15rem);
 }
-.tcm-home-hero .home-glass-card--bento .home-card-head--bento .home-card-motto--platform {
+.tcm-home-hero
+  .home-glass-card--bento
+  .home-card-head--bento
+  .home-card-motto--platform {
   font-size: 0.88rem;
 }
 
@@ -1561,7 +1836,10 @@ onUnmounted(() => {
   }
 }
 @media (max-width: 768px) {
-  .today-pill { padding: 5px 12px; font-size: 0.8rem; }
+  .today-pill {
+    padding: 5px 12px;
+    font-size: 0.8rem;
+  }
   .mini-recipe-chip {
     width: 48px;
     height: 48px;
