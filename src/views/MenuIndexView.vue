@@ -1,3 +1,8 @@
+<script>
+// 模块级缓存：setup 重新执行也不会重置
+const _seasonalCache = { info: null, recipes: null };
+</script>
+
 <script setup>
 import {
   ref,
@@ -43,9 +48,9 @@ const openAiCompanion = inject("openAiCompanion", () => {});
 
 // --- 数据状态 ---
 const currentTermName = ref("");
-const termInfo = ref(null);
-const seasonalRecipes = ref([]);
-const loading = ref(true);
+const termInfo = ref(_seasonalCache.info);
+const seasonalRecipes = ref(_seasonalCache.recipes || []);
+const loading = ref(!_seasonalCache.info);
 const nearestDaysDiff = ref(0);
 
 const todayLabel = (() => {
@@ -214,40 +219,20 @@ const calculateSeasonalState = () => {
 
 // --- 数据获取：Supabase ---
 const fetchSeasonalData = async () => {
-  loading.value = true;
-
-  // 使用本地计算函数获取节气名称
+  // 同步计算节气名与倒计时，立即渲染
   const termName = calculateSeasonalState();
   currentTermName.value = termName;
 
-  const MOCK_DATA = {
-    info: {
-      name: termName,
-      principle: "省酸增甘，以养脾气；疏肝理气，顺应春阳。",
-      recommend_text: "韭菜、香椿、百合",
-      avoid_text: "酸辣食物、生冷海鲜",
-    },
-    recipes: [
-      {
-        id: 1,
-        name: "春笋炖排骨",
-        image:
-          "https://images.unsplash.com/photo-1547592180-85f173990554?q=80&w=2070&auto=format&fit=crop",
-      },
-      {
-        id: 2,
-        name: "枸杞菊花茶",
-        image:
-          "https://images.unsplash.com/photo-1623912852230-e374bb36934c?q=80&w=2070&auto=format&fit=crop",
-      },
-      {
-        id: 3,
-        name: "香椿炒鸡蛋",
-        image:
-          "https://plus.unsplash.com/premium_photo-1661775179532-6ae372740922?q=80&w=2070&auto=format&fit=crop",
-      },
-    ],
-  };
+  // 有缓存直接用，不再请求
+  if (_seasonalCache.info) {
+    termInfo.value = _seasonalCache.info;
+    seasonalRecipes.value = _seasonalCache.recipes;
+    loading.value = false;
+    return;
+  }
+
+  termInfo.value = { name: termName };
+  loading.value = false;
 
   try {
     const [{ data: info }, { data: recipes }] = await Promise.all([
@@ -259,13 +244,16 @@ const fetchSeasonalData = async () => {
         .or("moderation_status.eq.published,moderation_status.is.null")
         .limit(3),
     ]);
-    termInfo.value = info || MOCK_DATA.info;
-    seasonalRecipes.value = recipes && recipes.length ? recipes : MOCK_DATA.recipes;
+    if (info) {
+      termInfo.value = info;
+      _seasonalCache.info = info;
+    }
+    if (recipes && recipes.length) {
+      seasonalRecipes.value = recipes;
+      _seasonalCache.recipes = recipes;
+    }
   } catch (e) {
-    termInfo.value = MOCK_DATA.info;
-    seasonalRecipes.value = MOCK_DATA.recipes;
-  } finally {
-    loading.value = false;
+    // 网络失败时节气名与倒计时仍正常显示
   }
 };
 

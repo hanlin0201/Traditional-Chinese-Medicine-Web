@@ -13,7 +13,7 @@ import { supabase } from '@/supabaseClient'
 import { useAuth } from '@/composables/useAuth'
 import { SOLAR_TERMS_LOOKUP } from '@/constants/solarTerms'
 import { BODY_TYPES, EFFICACY_OPTIONS, TIME_RANGES, parseTimeToMinutes } from '@/constants/recipeFilters'
-import { getRecipeMarketCachedData, setRecipeMarketCachedData } from '@/composables/usePagePreload'
+import { getRecipeMarketCachedData, setRecipeMarketCachedData, interactionsCache } from '@/composables/usePagePreload'
 import { getUserDisplayInfo, DEFAULT_USER_DISPLAY_NAME } from '@/utils/userDisplay'
 import { FEATURE_COPY } from '@/constants/branding'
 
@@ -236,14 +236,44 @@ const fetchRecipes = async () => {
 }
 
 // --- 2. 获取互动数据 ---
+const applyInteractions = (recipeId) => {
+  comments.value = interactionsCache.comments[recipeId] || []
+  homeworks.value = interactionsCache.homeworks[recipeId] || []
+  const count = homeworks.value.length
+  const recipeInList = recipes.value.find(r => r.id === recipeId)
+  if (recipeInList) recipeInList.cooked_count = count
+  if (selectedRecipe.value?.id === recipeId) selectedRecipe.value.cooked_count = count
+  const pendingHomeworkId = route.query.homework_id
+  if (pendingHomeworkId) {
+    const targetHomework = homeworks.value.find(h => String(h.id) === String(pendingHomeworkId))
+    if (targetHomework) openHomeworkPage(targetHomework)
+  }
+}
+
 const fetchInteractions = async (recipeId) => {
-  const { data: cData } = await supabase.from('comments').select('*').eq('recipe_id', recipeId).order('created_at', { ascending: false })
+  // 缓存命中：直接渲染，无需网络请求
+  if (interactionsCache.loaded) {
+    applyInteractions(recipeId)
+    return
+  }
+
+  // 缓存尚未就绪（极少情况）：走网络请求
+  const [{ data: cData }, { data: hData }] = await Promise.all([
+    supabase.from('comments').select('*').eq('recipe_id', recipeId).order('created_at', { ascending: false }),
+    supabase.from('homeworks').select('*').eq('recipe_id', recipeId).order('created_at', { ascending: false }),
+  ])
+
+  // 竞态保护：若用户已切换到其他食谱，丢弃本次结果
+  if (selectedRecipe.value?.id !== recipeId) return
+
   comments.value = cData || []
 
-  // 作业按时间倒序
-  const { data: hData } = await supabase.from('homeworks').select('*').eq('recipe_id', recipeId).order('created_at', { ascending: false })
   const rawHomeworks = hData || []
   const profilesById = await fetchProfilesMap(rawHomeworks.map(hw => hw.user_id))
+
+  // 获取 profiles 期间用户可能再次切换，再次校验
+  if (selectedRecipe.value?.id !== recipeId) return
+
   homeworks.value = rawHomeworks.map(hw => {
     const display = getHomeworkDisplayInfo(hw, profilesById)
     return {
@@ -253,23 +283,15 @@ const fetchInteractions = async (recipeId) => {
     }
   })
 
-  // 统一用作业条数回填“已交作业数”，避免刷新后又变成 0
   const count = homeworks.value.length
   const recipeInList = recipes.value.find(r => r.id === recipeId)
-  if (recipeInList) {
-    recipeInList.cooked_count = count
-  }
-  if (selectedRecipe.value && selectedRecipe.value.id === recipeId) {
-    selectedRecipe.value.cooked_count = count
-  }
+  if (recipeInList) recipeInList.cooked_count = count
+  if (selectedRecipe.value?.id === recipeId) selectedRecipe.value.cooked_count = count
 
-  // 如果路由上带了指定的作业 ID，则自动打开对应详情页（用于「我的作品」跳转）
   const pendingHomeworkId = route.query.homework_id
   if (pendingHomeworkId) {
     const targetHomework = homeworks.value.find(h => String(h.id) === String(pendingHomeworkId))
-    if (targetHomework) {
-      openHomeworkPage(targetHomework)
-    }
+    if (targetHomework) openHomeworkPage(targetHomework)
   }
 }
 
@@ -492,6 +514,8 @@ const formatDate = (isoStr) => {
 
 const openRecipe = (recipe) => {
   selectedRecipe.value = recipe;
+  comments.value = [];
+  homeworks.value = [];
   router.replace({ query: { ...route.query, open_id: recipe.id } })
   fetchInteractions(recipe.id)
 };
