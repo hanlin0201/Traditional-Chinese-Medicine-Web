@@ -13,7 +13,7 @@ import { supabase } from '@/supabaseClient'
 import { useAuth } from '@/composables/useAuth'
 import { SOLAR_TERMS_LOOKUP } from '@/constants/solarTerms'
 import { BODY_TYPES, EFFICACY_OPTIONS, TIME_RANGES, parseTimeToMinutes } from '@/constants/recipeFilters'
-import { getRecipeMarketCachedData, setRecipeMarketCachedData, interactionsCache } from '@/composables/usePagePreload'
+import { getRecipeMarketCachedData, setRecipeMarketCachedData, interactionsCache, onInteractionsLoaded } from '@/composables/usePagePreload'
 import { getUserDisplayInfo, DEFAULT_USER_DISPLAY_NAME } from '@/utils/userDisplay'
 import { FEATURE_COPY } from '@/constants/branding'
 
@@ -227,6 +227,7 @@ const fetchRecipes = async () => {
       const normalized = data.map(item => normalizeRecipe(item, myFavorites, profilesById))
       recipes.value = normalized
       setRecipeMarketCachedData(normalized)
+      syncCookedCounts()
     }
   } catch (error) {
     console.error('获取食谱失败:', error)
@@ -234,6 +235,17 @@ const fetchRecipes = async () => {
     loading.value = false
   }
 }
+
+const syncCookedCounts = () => {
+  if (!interactionsCache.loaded) return
+  for (const recipe of recipes.value) {
+    const hws = interactionsCache.homeworks[recipe.id]
+    if (hws !== undefined) recipe.cooked_count = hws.length
+  }
+}
+
+// 缓存先于食谱列表就绪时，等食谱加载完再同步
+onInteractionsLoaded(() => syncCookedCounts())
 
 // --- 2. 获取互动数据 ---
 const applyInteractions = (recipeId) => {

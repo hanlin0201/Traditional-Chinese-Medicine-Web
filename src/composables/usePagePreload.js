@@ -67,6 +67,12 @@ export const interactionsCache = {
   loaded: false,
 }
 
+const _interactionsLoadedCallbacks = []
+export function onInteractionsLoaded(cb) {
+  if (interactionsCache.loaded) { cb(); return }
+  _interactionsLoadedCallbacks.push(cb)
+}
+
 async function warmInteractions() {
   if (interactionsCache.loaded) return
 
@@ -107,6 +113,8 @@ async function warmInteractions() {
   }
 
   interactionsCache.loaded = true
+  _interactionsLoadedCallbacks.forEach(cb => cb())
+  _interactionsLoadedCallbacks.length = 0
 }
 
 async function warmProfile() {
