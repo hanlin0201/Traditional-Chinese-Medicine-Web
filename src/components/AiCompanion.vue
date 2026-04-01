@@ -1,6 +1,6 @@
 <script setup>
 import { ref, nextTick, watch, onMounted, onUnmounted } from 'vue'
-import { ScrollText, Send, X, ChevronDown, Heart, PlusCircle, Loader2, BookOpen, Coffee, Soup, Pill, MessageCircle, Check } from 'lucide-vue-next'
+import { ScrollText, Send, X, ChevronDown, Heart, PlusCircle, Loader2, BookOpen, Coffee, Soup, Pill, MessageCircle, Check, History, Trash2 } from 'lucide-vue-next'
 import { supabase } from '@/supabaseClient'
 import { useAuth } from '@/composables/useAuth'
 import { AI_TUTOR_LABEL } from '@/constants/branding'
@@ -89,13 +89,122 @@ const SYSTEM_PROMPT = `你是一位经验丰富的中医专家（AI TCM Tutor）
 recipes 需含 tea、meal、classic 三类。acupoints 无合适时可写[{"name": "无", "location": "无", "method": "无"}]。lifestyle 需包含必要的慎用提醒（如孕妇、儿童、过敏体质慎用等）。
 `
 
-const messages = ref([
-  { role: 'assistant', type: 'text', content: '您好，我是 AI 养生导师。请告诉我您哪里不舒服，或者有什么中医药知识问题都可以咨询我。' }
-])
+const WELCOME_MSG = { role: 'assistant', type: 'text', content: '您好，我是 AI 养生导师。请告诉我您哪里不舒服，或者有什么中医药知识问题都可以咨询我。' }
+const messages = ref([{ ...WELCOME_MSG }])
+
+// ── 会话管理 ──────────────────────────────────────────
+const SESSIONS_KEY = 'tcm_chat_sessions'
+const sessions = ref([])
+const activeSessionId = ref(null)
+const showSessionList = ref(false)
+
+function serializeMessages(msgs) {
+  // 过滤掉未完成的流式消息，其余全部保存
+  return msgs.filter(m => m.type !== 'streaming').map(m => ({ ...m }))
+}
+
+function persistSessions() {
+  try { localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions.value)) } catch {}
+}
+
+function saveActiveSession() {
+  const idx = sessions.value.findIndex(s => s.id === activeSessionId.value)
+  if (idx === -1) return
+  const serialized = serializeMessages(messages.value)
+  sessions.value[idx].messages = serialized
+  sessions.value[idx].updatedAt = new Date().toISOString()
+  // 用第一条用户消息自动生成标题
+  if (sessions.value[idx].title === '新对话') {
+    const firstUser = serialized.find(m => m.role === 'user')
+    if (firstUser) {
+      const t = firstUser.content || ''
+      sessions.value[idx].title = t.length > 18 ? t.slice(0, 18) + '…' : t
+    }
+  }
+  persistSessions()
+}
+
+function createNewSession() {
+  saveActiveSession()
+  const id = String(Date.now())
+  sessions.value.unshift({
+    id,
+    title: '新对话',
+    messages: [{ ...WELCOME_MSG }],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  })
+  activeSessionId.value = id
+  messages.value = [{ ...WELCOME_MSG }]
+  showSessionList.value = false
+  persistSessions()
+  nextTick(() => scrollToBottom())
+}
+
+function switchToSession(id) {
+  if (id === activeSessionId.value) { showSessionList.value = false; return }
+  saveActiveSession()
+  activeSessionId.value = id
+  const s = sessions.value.find(s => s.id === id)
+  messages.value = s?.messages?.length ? [...s.messages] : [{ ...WELCOME_MSG }]
+  showSessionList.value = false
+  nextTick(() => scrollToBottom())
+}
+
+function deleteSession(id, e) {
+  e?.stopPropagation()
+  sessions.value = sessions.value.filter(s => s.id !== id)
+  if (activeSessionId.value === id) {
+    if (sessions.value.length) {
+      activeSessionId.value = sessions.value[0].id
+      messages.value = sessions.value[0].messages?.length ? [...sessions.value[0].messages] : [{ ...WELCOME_MSG }]
+    } else {
+      // 全部删完则自动新建一个
+      const newId = String(Date.now())
+      sessions.value.push({ id: newId, title: '新对话', messages: [{ ...WELCOME_MSG }], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+      activeSessionId.value = newId
+      messages.value = [{ ...WELCOME_MSG }]
+    }
+  }
+  persistSessions()
+}
+
+function formatSessionDate(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const now = new Date()
+  const diffDays = Math.floor((now - d) / 86400000)
+  if (diffDays === 0) return '今天'
+  if (diffDays === 1) return '昨天'
+  return `${d.getMonth() + 1}月${d.getDate()}日`
+}
+
+function loadSessions() {
+  try {
+    const raw = localStorage.getItem(SESSIONS_KEY)
+    if (raw) sessions.value = JSON.parse(raw)
+  } catch {}
+  if (sessions.value.length) {
+    activeSessionId.value = sessions.value[0].id
+    messages.value = sessions.value[0].messages?.length ? [...sessions.value[0].messages] : [{ ...WELCOME_MSG }]
+  } else {
+    const id = String(Date.now())
+    sessions.value = [{ id, title: '新对话', messages: [{ ...WELCOME_MSG }], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }]
+    activeSessionId.value = id
+    persistSessions()
+  }
+}
+// ─────────────────────────────────────────────────────
 
 function toggle() { open.value = !open.value; if(open.value) scrollToBottom() }
 function scrollToBottom() { nextTick(() => { if (messagesContainer.value) messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight }) }
 watch(messages, scrollToBottom, { deep: true })
+// 消息变化时自动保存（跳过流式中间状态）
+watch(messages, () => {
+  if (!activeSessionId.value) return
+  if (messages.value.some(m => m.type === 'streaming')) return
+  saveActiveSession()
+}, { deep: true })
 
 /*function isNewConversationAfterPrescription() {
   const list = messages.value.filter(m => m.type !== 'streaming')
@@ -600,6 +709,7 @@ function onViewportResize() {
 
 onMounted(() => {
   loadPanelSize()
+  loadSessions()
   window.addEventListener('resize', onViewportResize)
 })
 
@@ -619,7 +729,7 @@ defineExpose({ openPanel })
     <Transition enter-active-class="transition duration-200 ease-out" enter-from-class="opacity-0 translate-y-4" enter-to-class="opacity-100 translate-y-0" leave-active-class="transition duration-150 ease-in" leave-from-class="opacity-100 translate-y-0" leave-to-class="opacity-0 translate-y-4">
       <div
         v-show="open"
-        class="ai-panel-shell fixed bottom-24 right-6 z-50 rounded-xl shadow-card border border-sandalwood/20 flex flex-col bg-[#FDFBF7] overflow-hidden"
+        class="ai-panel-shell fixed bottom-24 right-6 z-50 rounded-xl shadow-card border border-sandalwood/20 flex flex-col bg-[#FDFBF7] overflow-hidden relative"
         :style="{ width: `${panelW}px`, height: `${panelH}px`, maxHeight: `${panelMaxH()}px` }"
       >
         <div
@@ -630,8 +740,50 @@ defineExpose({ openPanel })
         />
 
         <div class="px-4 py-3 border-b border-sandalwood/15 flex justify-between items-center bg-[#FBF8F2] shrink-0">
-          <h3 class="font-serif font-semibold text-sandalwood">{{ AI_TUTOR_LABEL }}</h3>
-          <X class="w-5 h-5 cursor-pointer text-sandalwood/70" @click="open = false" />
+          <h3 class="font-serif font-semibold text-sandalwood truncate max-w-[55%]">
+            {{ sessions.find(s => s.id === activeSessionId)?.title || AI_TUTOR_LABEL }}
+          </h3>
+          <div class="flex items-center gap-1.5">
+            <button @click="createNewSession" title="新建对话" class="p-1.5 rounded-lg hover:bg-sandalwood/10 text-sandalwood/60 hover:text-sandalwood transition">
+              <PlusCircle class="w-4 h-4" />
+            </button>
+            <button @click="showSessionList = !showSessionList" title="历史对话" class="p-1.5 rounded-lg hover:bg-sandalwood/10 transition" :class="showSessionList ? 'text-sandalwood bg-sandalwood/10' : 'text-sandalwood/60 hover:text-sandalwood'">
+              <History class="w-4 h-4" />
+            </button>
+            <X class="w-5 h-5 cursor-pointer text-sandalwood/70 ml-1" @click="open = false" />
+          </div>
+        </div>
+
+        <!-- 历史会话列表面板 -->
+        <div v-if="showSessionList" class="absolute left-0 right-0 bottom-0 z-10 bg-[#FDFBF7] flex flex-col border-t border-sandalwood/15 overflow-hidden" style="top: 52px">
+          <div class="px-4 py-2.5 border-b border-sandalwood/10 flex items-center justify-between shrink-0">
+            <span class="text-xs font-semibold text-sandalwood/70 uppercase tracking-wide">历史对话</span>
+            <button @click="createNewSession" class="flex items-center gap-1 text-xs text-sandalwood bg-sandalwood/10 px-2.5 py-1 rounded-lg hover:bg-sandalwood/20 transition">
+              <PlusCircle class="w-3.5 h-3.5" /> 新建对话
+            </button>
+          </div>
+          <div class="flex-1 overflow-y-auto">
+            <div v-if="!sessions.length" class="p-6 text-center text-xs text-gray-400">暂无历史记录</div>
+            <div
+              v-for="s in sessions" :key="s.id"
+              @click="switchToSession(s.id)"
+              class="px-4 py-3 border-b border-sandalwood/10 cursor-pointer hover:bg-sandalwood/5 flex items-center gap-3 group transition"
+              :class="s.id === activeSessionId ? 'bg-sandalwood/10' : ''"
+            >
+              <MessageCircle class="w-4 h-4 text-sandalwood/40 shrink-0" />
+              <div class="flex-1 min-w-0">
+                <p class="text-sm text-gray-800 truncate">{{ s.title }}</p>
+                <p class="text-xs text-gray-400 mt-0.5">{{ formatSessionDate(s.updatedAt) }}</p>
+              </div>
+              <button
+                @click="deleteSession(s.id, $event)"
+                title="删除对话"
+                class="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 text-gray-300 hover:text-red-400 transition"
+              >
+                <Trash2 class="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
         </div>
 
         <div ref="messagesContainer" class="flex-1 overflow-y-auto p-4 space-y-4 bg-[#FAF6ED]">
