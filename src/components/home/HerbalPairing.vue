@@ -20,12 +20,12 @@ const fetchRandomPairings = async () => {
     const { data, error } = await supabase
       .from("herbal_pairings")
       .select("*")
-      .limit(30);
+      .limit(120);
 
     if (error) throw error;
 
     const shuffled = [...data].sort(() => Math.random() - 0.5);
-    pairs.value = shuffled.slice(0, 15).map((item) => ({
+    pairs.value = shuffled.slice(0, 16).map((item) => ({
       ...item,
       isOpen: false,
     }));
@@ -79,6 +79,106 @@ const fetchRandomPairings = async () => {
         effect: "补气消食",
         description:
           "虽有人参恶莱菔子之说，但临床上二者同用可防补气太过导致的腹胀。",
+        isOpen: false,
+      },
+      {
+        id: 6,
+        type: "good",
+        left_herb: "麦冬",
+        right_herb: "五味子",
+        effect: "敛肺生津",
+        description:
+          "麦冬养阴，五味子敛肺，合用适于气阴两虚之咳喘口干。",
+        isOpen: false,
+      },
+      {
+        id: 7,
+        type: "good",
+        left_herb: "白芍",
+        right_herb: "甘草",
+        effect: "缓急止痛",
+        description: "芍药甘草汤意，酸甘化阴，舒筋缓急。",
+        isOpen: false,
+      },
+      {
+        id: 8,
+        type: "good",
+        left_herb: "茯苓",
+        right_herb: "白术",
+        effect: "健脾利湿",
+        description: "健脾与渗湿相配，适于脾虚湿困。",
+        isOpen: false,
+      },
+      {
+        id: 9,
+        type: "good",
+        left_herb: "桂枝",
+        right_herb: "白芍",
+        effect: "调和营卫",
+        description: "一散一收，调和营卫，为桂枝汤核心配伍。",
+        isOpen: false,
+      },
+      {
+        id: 10,
+        type: "good",
+        left_herb: "川芎",
+        right_herb: "白芷",
+        effect: "祛风止痛",
+        description: "上行头目，祛风止痛，多用于风寒头痛。",
+        isOpen: false,
+      },
+      {
+        id: 11,
+        type: "good",
+        left_herb: "地黄",
+        right_herb: "山茱萸",
+        effect: "补益肝肾",
+        description: "滋阴固精，常用于肾虚腰酸、遗精等。",
+        isOpen: false,
+      },
+      {
+        id: 12,
+        type: "good",
+        left_herb: "知母",
+        right_herb: "黄柏",
+        effect: "滋阴降火",
+        description: "知母清热滋阴，黄柏泻火，相须用于阴虚火旺。",
+        isOpen: false,
+      },
+      {
+        id: 13,
+        type: "good",
+        left_herb: "柴胡",
+        right_herb: "黄芩",
+        effect: "和解少阳",
+        description: "表里兼顾，和解少阳，小柴胡汤要药。",
+        isOpen: false,
+      },
+      {
+        id: 14,
+        type: "good",
+        left_herb: "桔梗",
+        right_herb: "枳壳",
+        effect: "升降气机",
+        description: "一升一降，宣肺宽中，气机调畅。",
+        isOpen: false,
+      },
+      {
+        id: 15,
+        type: "good",
+        left_herb: "石膏",
+        right_herb: "知母",
+        effect: "清气分热",
+        description: "清热泻火力强，适用于气分大热。",
+        isOpen: false,
+      },
+      {
+        id: 16,
+        type: "good",
+        left_herb: "玄参",
+        right_herb: "麦冬",
+        effect: "养阴润燥",
+        description: "增液润燥，多用于热病伤阴、咽干口燥。",
         isOpen: false,
       },
     ];

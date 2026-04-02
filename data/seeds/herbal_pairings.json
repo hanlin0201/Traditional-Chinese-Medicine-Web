@@ -1,0 +1,1101 @@
+[
+  {
+    "type": "good",
+    "left_herb": "麻黄",
+    "right_herb": "桂枝",
+    "effect": "发汗解表",
+    "description": "麻黄开宣肺气、发汗解表，桂枝助阳通脉、解肌发表，相须用于风寒表实证，加强散寒解表之力。"
+  },
+  {
+    "type": "good",
+    "left_herb": "金银花",
+    "right_herb": "连翘",
+    "effect": "清热解毒",
+    "description": "二者均为清热解毒要药，疏风清热，常相须用于外感风热与疮痈初起。"
+  },
+  {
+    "type": "good",
+    "left_herb": "石膏",
+    "right_herb": "知母",
+    "effect": "清气分热",
+    "description": "石膏清气分大热，知母滋阴润燥、泻火，相合清热生津，适用于气分实热壮渴。"
+  },
+  {
+    "type": "good",
+    "left_herb": "黄连",
+    "right_herb": "木香",
+    "effect": "清热止痢",
+    "description": "黄连清热燥湿止痢，木香行气化滞，寒温合用治湿热痢疾里急后重。"
+  },
+  {
+    "type": "good",
+    "left_herb": "栀子",
+    "right_herb": "淡豆豉",
+    "effect": "透邪清热",
+    "description": "栀子泻火除烦，豆豉宣郁透热，适用于热郁胸膈所致烦闷不寐等症，辨证使用。"
+  },
+  {
+    "type": "good",
+    "left_herb": "柴胡",
+    "right_herb": "黄芩",
+    "effect": "和解少阳",
+    "description": "柴胡透泄少阳之邪，黄芩清少阳郁热，为小柴胡汤类方核心配伍之一。"
+  },
+  {
+    "type": "good",
+    "left_herb": "当归",
+    "right_herb": "川芎",
+    "effect": "活血养血",
+    "description": "当归养血，川芎活血行气，为养血调经与化瘀基础药对。"
+  },
+  {
+    "type": "good",
+    "left_herb": "赤芍",
+    "right_herb": "牡丹皮",
+    "effect": "凉血散瘀",
+    "description": "清热凉血、活血散瘀，常用于血热瘀滞之吐衄、经闭、痈肿。"
+  },
+  {
+    "type": "good",
+    "left_herb": "桃仁",
+    "right_herb": "红花",
+    "effect": "破血逐瘀",
+    "description": "活血化瘀力强，多用于瘀血阻滞之经闭、癥瘕、损伤瘀痛。"
+  },
+  {
+    "type": "good",
+    "left_herb": "乳香",
+    "right_herb": "没药",
+    "effect": "活血止痛",
+    "description": "行气活血、消肿止痛，外伤瘀痛与气血瘀滞疼痛常并用。"
+  },
+  {
+    "type": "good",
+    "left_herb": "三棱",
+    "right_herb": "莪术",
+    "effect": "行气破血",
+    "description": "破血行气、消癥散结，体虚者宜配补益，孕妇忌用。"
+  },
+  {
+    "type": "good",
+    "left_herb": "蒲黄",
+    "right_herb": "五灵脂",
+    "effect": "化瘀止痛",
+    "description": "失笑散经典配伍，祛瘀止痛，用于瘀血作痛。"
+  },
+  {
+    "type": "good",
+    "left_herb": "茯苓",
+    "right_herb": "白术",
+    "effect": "健脾渗湿",
+    "description": "健脾益气与利水渗湿相济，为参苓白术散等方常用基础。"
+  },
+  {
+    "type": "good",
+    "left_herb": "陈皮",
+    "right_herb": "半夏",
+    "effect": "理气化痰",
+    "description": "陈皮理气和中，半夏燥湿化痰，加强化痰止咳、和胃降逆之功。"
+  },
+  {
+    "type": "good",
+    "left_herb": "半夏",
+    "right_herb": "生姜",
+    "effect": "和胃止呕",
+    "description": "半夏降逆止呕，生姜温胃散寒、制半夏之毒，呕恶多缓解。"
+  },
+  {
+    "type": "good",
+    "left_herb": "旋覆花",
+    "right_herb": "代赭石",
+    "effect": "降逆止呕",
+    "description": "降气化痰、重镇止呕，胃气虚弱者宜配补益药。"
+  },
+  {
+    "type": "good",
+    "left_herb": "天麻",
+    "right_herb": "钩藤",
+    "effect": "平肝息风",
+    "description": "平肝潜阳、息风止痉，肝阳化风之眩晕、抽搐常用。"
+  },
+  {
+    "type": "good",
+    "left_herb": "龙骨",
+    "right_herb": "牡蛎",
+    "effect": "重镇安神",
+    "description": "敛镇安神、平肝潜阳，兼能收涩，用于惊悸失眠与虚阳浮越。"
+  },
+  {
+    "type": "good",
+    "left_herb": "酸枣仁",
+    "right_herb": "柏子仁",
+    "effect": "养心安神",
+    "description": "养心血、安心神，虚烦不眠、心悸常相伍。"
+  },
+  {
+    "type": "good",
+    "left_herb": "远志",
+    "right_herb": "石菖蒲",
+    "effect": "开窍安神",
+    "description": "化痰开窍、安神益智，用于痰浊蒙蔽或心神不宁兼健忘。"
+  },
+  {
+    "type": "good",
+    "left_herb": "黄芪",
+    "right_herb": "防风",
+    "effect": "益气固表",
+    "description": "黄芪固表，防风疏风，玉屏风散思路益气御风、防外邪。"
+  },
+  {
+    "type": "good",
+    "left_herb": "黄芪",
+    "right_herb": "当归",
+    "effect": "补气生血",
+    "description": "气旺则血生，气血双补，常用于失血或气血两虚之体。"
+  },
+  {
+    "type": "good",
+    "left_herb": "人参",
+    "right_herb": "麦冬",
+    "effect": "益气养阴",
+    "description": "益气生津，适用于热伤气阴之渴乏，常再伍五味子成生脉意。"
+  },
+  {
+    "type": "good",
+    "left_herb": "人参",
+    "right_herb": "五味子",
+    "effect": "敛气生津",
+    "description": "一补一敛，防气阴外散。"
+  },
+  {
+    "type": "good",
+    "left_herb": "麦冬",
+    "right_herb": "半夏",
+    "effect": "润燥化痰",
+    "description": "麦冬滋阴润燥，半夏化痰降逆，润燥不伤正。"
+  },
+  {
+    "type": "good",
+    "left_herb": "沙参",
+    "right_herb": "麦冬",
+    "effect": "滋阴润肺",
+    "description": "养阴清热、润肺生津，肺胃阴伤之干咳少痰常用。"
+  },
+  {
+    "type": "good",
+    "left_herb": "天冬",
+    "right_herb": "麦冬",
+    "effect": "滋阴清热",
+    "description": "金水相生、润肺生津，阴伤燥渴者宜。"
+  },
+  {
+    "type": "good",
+    "left_herb": "石斛",
+    "right_herb": "玉竹",
+    "effect": "养胃生津",
+    "description": "滋养胃阴、清虚热，口干咽燥、舌红少津者常用。"
+  },
+  {
+    "type": "good",
+    "left_herb": "百合",
+    "right_herb": "生地黄",
+    "effect": "养阴清心",
+    "description": "养阴清热、宁心安神，阴虚火旺之失眠烦热可参考百合地黄思路。"
+  },
+  {
+    "type": "good",
+    "left_herb": "玄参",
+    "right_herb": "麦冬",
+    "effect": "滋阴降火",
+    "description": "滋阴润燥、利咽，阴虚咽痛、口渴常用。"
+  },
+  {
+    "type": "good",
+    "left_herb": "桑叶",
+    "right_herb": "菊花",
+    "effect": "疏散风热",
+    "description": "清利头目、散风热，风热头痛目赤常并用。"
+  },
+  {
+    "type": "good",
+    "left_herb": "桑叶",
+    "right_herb": "黑芝麻",
+    "effect": "补肝明目",
+    "description": "一扶一散，桑麻丸思路治眩晕目昏。"
+  },
+  {
+    "type": "good",
+    "left_herb": "枸杞子",
+    "right_herb": "菊花",
+    "effect": "清肝明目",
+    "description": "枸杞补肝肾，菊花清利头目，补泻兼施。"
+  },
+  {
+    "type": "good",
+    "left_herb": "决明子",
+    "right_herb": "青葙子",
+    "effect": "清肝明目",
+    "description": "清肝火、明目退翳，肝火上炎目赤可伍。"
+  },
+  {
+    "type": "good",
+    "left_herb": "羌活",
+    "right_herb": "独活",
+    "effect": "祛风除湿",
+    "description": "上下表里之风寒湿痹常合用，通络止痛。"
+  },
+  {
+    "type": "good",
+    "left_herb": "薏苡仁",
+    "right_herb": "茯苓",
+    "effect": "健脾利湿",
+    "description": "渗湿健脾，湿浊困脾之浮肿、便溏常用。"
+  },
+  {
+    "type": "good",
+    "left_herb": "藿香",
+    "right_herb": "佩兰",
+    "effect": "化湿和中",
+    "description": "芳香化湿、醒脾和中，暑湿或湿阻中焦胸闷纳呆常伍。"
+  },
+  {
+    "type": "good",
+    "left_herb": "苍术",
+    "right_herb": "厚朴",
+    "effect": "燥湿行气",
+    "description": "燥湿运脾与行气除满相伍，湿阻气滞脘腹胀满宜之。"
+  },
+  {
+    "type": "good",
+    "left_herb": "木香",
+    "right_herb": "槟榔",
+    "effect": "行气导滞",
+    "description": "行气与导滞并行，食积气滞脘腹胀痛可辨证使用。"
+  },
+  {
+    "type": "good",
+    "left_herb": "大腹皮",
+    "right_herb": "陈皮",
+    "effect": "理气宽中",
+    "description": "理气消胀、和中化湿。"
+  },
+  {
+    "type": "good",
+    "left_herb": "枳实",
+    "right_herb": "白术",
+    "effect": "消补兼施",
+    "description": "枳实消痞，白术健脾，枳术丸思路。"
+  },
+  {
+    "type": "good",
+    "left_herb": "葛根",
+    "right_herb": "黄芩",
+    "effect": "解表清里",
+    "description": "升清止泻兼清里热，表证未解而有热痢者可辨证配伍。"
+  },
+  {
+    "type": "good",
+    "left_herb": "葛根",
+    "right_herb": "升麻",
+    "effect": "升阳举陷",
+    "description": "升举清阳，气虚下陷之久泻脱肛常在大剂补益方中伍。"
+  },
+  {
+    "type": "good",
+    "left_herb": "桔梗",
+    "right_herb": "甘草",
+    "effect": "宣肺利咽",
+    "description": "开宣肺气、清利咽喉。"
+  },
+  {
+    "type": "good",
+    "left_herb": "杏仁",
+    "right_herb": "紫苏叶",
+    "effect": "宣肺解表",
+    "description": "宣肺降气兼疏表，风寒咳喘初起可辨证配伍。"
+  },
+  {
+    "type": "good",
+    "left_herb": "紫菀",
+    "right_herb": "款冬花",
+    "effect": "止咳下气",
+    "description": "温润止咳，久咳可相须。"
+  },
+  {
+    "type": "good",
+    "left_herb": "百部",
+    "right_herb": "桔梗",
+    "effect": "润肺止咳",
+    "description": "百部润肺，桔梗宣肺祛痰。"
+  },
+  {
+    "type": "good",
+    "left_herb": "贝母",
+    "right_herb": "知母",
+    "effect": "清热润肺",
+    "description": "清热化痰、滋阴润肺，肺热燥咳或少痰者宜。"
+  },
+  {
+    "type": "good",
+    "left_herb": "瓜蒌",
+    "right_herb": "薤白",
+    "effect": "宽胸通阳",
+    "description": "通阳散结、行气宽胸，胸痹闷痛属痰浊阻络者常用。"
+  },
+  {
+    "type": "good",
+    "left_herb": "茵陈",
+    "right_herb": "栀子",
+    "effect": "清热利湿",
+    "description": "利胆退黄要伍，湿热黄疸辨证使用。"
+  },
+  {
+    "type": "good",
+    "left_herb": "金钱草",
+    "right_herb": "海金沙",
+    "effect": "利尿排石",
+    "description": "清利湿热、通淋排石，石淋可辨证配伍。"
+  },
+  {
+    "type": "good",
+    "left_herb": "瞿麦",
+    "right_herb": "滑石",
+    "effect": "清热通淋",
+    "description": "利水通淋，湿热淋证可参考。"
+  },
+  {
+    "type": "good",
+    "left_herb": "车前子",
+    "right_herb": "茯苓",
+    "effect": "利水渗湿",
+    "description": "渗湿利尿，水湿内停浮肿尿少可配。"
+  },
+  {
+    "type": "good",
+    "left_herb": "泽泻",
+    "right_herb": "白术",
+    "effect": "健脾利湿",
+    "description": "健脾与渗湿并施，脾虚湿盛痰饮常用。"
+  },
+  {
+    "type": "good",
+    "left_herb": "桂枝",
+    "right_herb": "茯苓",
+    "effect": "温阳化饮",
+    "description": "温通心阳、渗湿化饮，痰饮胸闷可参考苓桂剂思路。"
+  },
+  {
+    "type": "good",
+    "left_herb": "附子",
+    "right_herb": "干姜",
+    "effect": "回阳救逆",
+    "description": "大热回阳、温中散寒，阴寒内盛重证须急救辨证施治。"
+  },
+  {
+    "type": "good",
+    "left_herb": "肉桂",
+    "right_herb": "附子",
+    "effect": "补火助阳",
+    "description": "增强温肾助阳、散寒止痛，峻剂须医师把握。"
+  },
+  {
+    "type": "good",
+    "left_herb": "吴茱萸",
+    "right_herb": "生姜",
+    "effect": "温中止呕",
+    "description": "温胃散寒、降逆止呕。"
+  },
+  {
+    "type": "good",
+    "left_herb": "丁香",
+    "right_herb": "柿蒂",
+    "effect": "降逆止呃",
+    "description": "温中降逆，胃寒气逆呃逆可辨证。"
+  },
+  {
+    "type": "good",
+    "left_herb": "杜仲",
+    "right_herb": "续断",
+    "effect": "强筋健骨",
+    "description": "补肝肾、强筋骨，腰痛脚弱常用。"
+  },
+  {
+    "type": "good",
+    "left_herb": "续断",
+    "right_herb": "菟丝子",
+    "effect": "固肾安胎",
+    "description": "补肝肾、固冲任，肾虚胎动不安可参考。"
+  },
+  {
+    "type": "good",
+    "left_herb": "菟丝子",
+    "right_herb": "枸杞子",
+    "effect": "补肝益肾",
+    "description": "平补阴阳、益精明目。"
+  },
+  {
+    "type": "good",
+    "left_herb": "山茱萸",
+    "right_herb": "山药",
+    "effect": "补益固涩",
+    "description": "补益脾肾、收涩精气。"
+  },
+  {
+    "type": "good",
+    "left_herb": "熟地黄",
+    "right_herb": "何首乌",
+    "effect": "养血益精",
+    "description": "滋阴养血，精血亏虚须发早白可辨证参考。"
+  },
+  {
+    "type": "good",
+    "left_herb": "女贞子",
+    "right_herb": "墨旱莲",
+    "effect": "补益肝肾",
+    "description": "二至丸思路，补肝肾、清虚热。"
+  },
+  {
+    "type": "good",
+    "left_herb": "龟甲",
+    "right_herb": "鳖甲",
+    "effect": "滋阴潜阳",
+    "description": "滋阴潜阳、退虚热，阴虚风动骨蒸可参考。"
+  },
+  {
+    "type": "good",
+    "left_herb": "沙苑子",
+    "right_herb": "芡实",
+    "effect": "固肾摄精",
+    "description": "补肾固精、收涩。"
+  },
+  {
+    "type": "good",
+    "left_herb": "金樱子",
+    "right_herb": "覆盆子",
+    "effect": "固涩缩尿",
+    "description": "固肾涩精、缩尿止遗。"
+  },
+  {
+    "type": "good",
+    "left_herb": "人参",
+    "right_herb": "熟地黄",
+    "effect": "气血双补",
+    "description": "益气养血，气血两虚大剂补益方中常见。"
+  },
+  {
+    "type": "good",
+    "left_herb": "党参",
+    "right_herb": "黄芪",
+    "effect": "补中益气",
+    "description": "健脾益气，乏力食少常相须。"
+  },
+  {
+    "type": "good",
+    "left_herb": "白术",
+    "right_herb": "山药",
+    "effect": "健脾益气",
+    "description": "补脾止泻、益肺肾。"
+  },
+  {
+    "type": "good",
+    "left_herb": "莲子",
+    "right_herb": "芡实",
+    "effect": "健脾止泻",
+    "description": "补脾益肾、固涩止泻。"
+  },
+  {
+    "type": "good",
+    "left_herb": "五味子",
+    "right_herb": "乌梅",
+    "effect": "敛肺止咳",
+    "description": "敛肺涩肠、生津。"
+  },
+  {
+    "type": "good",
+    "left_herb": "诃子",
+    "right_herb": "肉豆蔻",
+    "effect": "涩肠止泻",
+    "description": "温涩固脱，脾肾虚寒久泻。"
+  },
+  {
+    "type": "good",
+    "left_herb": "白及",
+    "right_herb": "海螵蛸",
+    "effect": "制酸止血",
+    "description": "收敛止血、制酸止痛，胃脘痛泛酸辨证使用。"
+  },
+  {
+    "type": "good",
+    "left_herb": "三七",
+    "right_herb": "丹参",
+    "effect": "活血祛瘀",
+    "description": "化瘀通络，胸痹心痛瘀血证现代常伍，须遵医嘱。"
+  },
+  {
+    "type": "good",
+    "left_herb": "益母草",
+    "right_herb": "泽兰",
+    "effect": "活血调经",
+    "description": "活血调经、利水消肿。"
+  },
+  {
+    "type": "good",
+    "left_herb": "鸡血藤",
+    "right_herb": "当归",
+    "effect": "养血通络",
+    "description": "活血养血，血虚兼瘀痹痛、月经不调。"
+  },
+  {
+    "type": "good",
+    "left_herb": "络石藤",
+    "right_herb": "忍冬藤",
+    "effect": "祛风通络",
+    "description": "清热祛风、通络，热痹关节红肿。"
+  },
+  {
+    "type": "good",
+    "left_herb": "地龙",
+    "right_herb": "僵蚕",
+    "effect": "息风通络",
+    "description": "清热息风、化痰通络。"
+  },
+  {
+    "type": "good",
+    "left_herb": "桑叶",
+    "right_herb": "杏仁",
+    "effect": "宣肺润燥",
+    "description": "桑叶清宣，杏仁降气润肺，咳嗽燥咳辨证常用配伍。"
+  },
+  {
+    "type": "good",
+    "left_herb": "枇杷叶",
+    "right_herb": "竹茹",
+    "effect": "清肺和胃",
+    "description": "清胃降逆、化痰，胃热呕逆咳嗽可参考。"
+  },
+  {
+    "type": "good",
+    "left_herb": "芦根",
+    "right_herb": "天花粉",
+    "effect": "清热生津",
+    "description": "清热生津、润肺，热病伤津口渴。"
+  },
+  {
+    "type": "good",
+    "left_herb": "决明子",
+    "right_herb": "山楂",
+    "effect": "消食降脂",
+    "description": "辅助食疗调节血脂，不能替代规范治疗。"
+  },
+  {
+    "type": "good",
+    "left_herb": "泽泻",
+    "right_herb": "猪苓",
+    "effect": "利水渗湿",
+    "description": "增强利水消肿，水湿壅盛辨证用。"
+  },
+  {
+    "type": "good",
+    "left_herb": "车前子",
+    "right_herb": "玉米须",
+    "effect": "利尿消肿",
+    "description": "食疗辅助利湿消肿，肾病患者须医师指导。"
+  },
+  {
+    "type": "good",
+    "left_herb": "佛手",
+    "right_herb": "香橼",
+    "effect": "疏肝理气",
+    "description": "疏肝理气、和胃，肝胃气滞胀痛。"
+  },
+  {
+    "type": "good",
+    "left_herb": "香附",
+    "right_herb": "川芎",
+    "effect": "行气活血",
+    "description": "行气活血调经，气滞血瘀痛经。"
+  },
+  {
+    "type": "good",
+    "left_herb": "丹参",
+    "right_herb": "檀香",
+    "effect": "行气活血",
+    "description": "活血行气止痛，心胸闷痛气滞血瘀。"
+  },
+  {
+    "type": "good",
+    "left_herb": "牡丹皮",
+    "right_herb": "赤芍",
+    "effect": "凉血化瘀",
+    "description": "清热凉血散瘀。"
+  },
+  {
+    "type": "good",
+    "left_herb": "知母",
+    "right_herb": "黄柏",
+    "effect": "滋阴降火",
+    "description": "泻肾火、退骨蒸，阴虚火旺。"
+  },
+  {
+    "type": "good",
+    "left_herb": "青蒿",
+    "right_herb": "鳖甲",
+    "effect": "养阴透热",
+    "description": "青蒿鳖甲汤思路，阴伤夜热早凉。"
+  },
+  {
+    "type": "good",
+    "left_herb": "青蒿",
+    "right_herb": "黄芩",
+    "effect": "清暑化湿",
+    "description": "清热解暑、化湿，暑湿发热可辨证。"
+  },
+  {
+    "type": "good",
+    "left_herb": "薄荷",
+    "right_herb": "菊花",
+    "effect": "疏散风热",
+    "description": "清头目、散风热，头痛目赤。"
+  },
+  {
+    "type": "good",
+    "left_herb": "牛蒡子",
+    "right_herb": "桔梗",
+    "effect": "宣肺利咽",
+    "description": "宣肺祛痰、利咽消肿，风热咽痛。"
+  },
+  {
+    "type": "good",
+    "left_herb": "牛膝",
+    "right_herb": "杜仲",
+    "effect": "补益下焦",
+    "description": "补肝肾、引血下行，腰膝酸痛。"
+  },
+  {
+    "type": "good",
+    "left_herb": "牛膝",
+    "right_herb": "石膏",
+    "effect": "引火下行",
+    "description": "清热并用牛膝引热下行，胃火上炎牙痛可辨证。"
+  },
+  {
+    "type": "good",
+    "left_herb": "白芷",
+    "right_herb": "细辛",
+    "effect": "散寒止痛",
+    "description": "祛风散寒止痛，风寒头痛牙痛。"
+  },
+  {
+    "type": "good",
+    "left_herb": "白芷",
+    "right_herb": "川芎",
+    "effect": "祛风止痛",
+    "description": "祛风止痛，阳明头痛。"
+  },
+  {
+    "type": "good",
+    "left_herb": "防风",
+    "right_herb": "荆芥",
+    "effect": "祛风解表",
+    "description": "祛风解表，风寒风热表证皆可配伍调整。"
+  },
+  {
+    "type": "good",
+    "left_herb": "柴胡",
+    "right_herb": "白芍",
+    "effect": "疏肝解郁",
+    "description": "疏肝柔肝，肝郁胁痛。"
+  },
+  {
+    "type": "good",
+    "left_herb": "白术",
+    "right_herb": "枳壳",
+    "effect": "升降气机",
+    "description": "健脾与理气消胀并用，脾虚气滞。"
+  },
+  {
+    "type": "good",
+    "left_herb": "莱菔子",
+    "right_herb": "山楂",
+    "effect": "消食导滞",
+    "description": "消食化积，食滞脘胀。"
+  },
+  {
+    "type": "good",
+    "left_herb": "神曲",
+    "right_herb": "麦芽",
+    "effect": "消食和胃",
+    "description": "消食健脾开胃，食积不化。"
+  },
+  {
+    "type": "good",
+    "left_herb": "谷芽",
+    "right_herb": "稻芽",
+    "effect": "健脾消食",
+    "description": "甘平消食，脾虚食少。"
+  },
+  {
+    "type": "good",
+    "left_herb": "荷叶",
+    "right_herb": "冬瓜皮",
+    "effect": "利湿消肿",
+    "description": "利湿消暑，浮肿肥胖辅助调理。"
+  },
+  {
+    "type": "good",
+    "left_herb": "夏枯草",
+    "right_herb": "玄参",
+    "effect": "散结消肿",
+    "description": "清热散结，瘰疬痰核可参辨证。"
+  },
+  {
+    "type": "good",
+    "left_herb": "连翘",
+    "right_herb": "薄荷",
+    "effect": "疏散风热",
+    "description": "清热解毒兼透表。"
+  },
+  {
+    "type": "good",
+    "left_herb": "板蓝根",
+    "right_herb": "大青叶",
+    "effect": "清热解毒",
+    "description": "凉血解毒利咽，温热病咽喉肿痛。"
+  },
+  {
+    "type": "good",
+    "left_herb": "白头翁",
+    "right_herb": "黄连",
+    "effect": "清热止痢",
+    "description": "清热燥湿止痢，湿热痢疾。"
+  },
+  {
+    "type": "good",
+    "left_herb": "马齿苋",
+    "right_herb": "赤小豆",
+    "effect": "利湿止痢",
+    "description": "清热利湿，泻痢辅助食疗须辨证。"
+  },
+  {
+    "type": "good",
+    "left_herb": "鸡内金",
+    "right_herb": "山药",
+    "effect": "健脾消积",
+    "description": "健脾消食，小儿脾虚疳积可调。"
+  },
+  {
+    "type": "good",
+    "left_herb": "砂仁",
+    "right_herb": "木香",
+    "effect": "行气化湿",
+    "description": "行气和中、化湿醒脾，湿阻气滞。"
+  },
+  {
+    "type": "good",
+    "left_herb": "草果",
+    "right_herb": "豆蔻",
+    "effect": "温中化湿",
+    "description": "温中化湿行气，寒湿中阻。"
+  },
+  {
+    "type": "good",
+    "left_herb": "高良姜",
+    "right_herb": "香附",
+    "effect": "行气止痛",
+    "description": "良附丸思路，胃寒气滞疼痛。"
+  },
+  {
+    "type": "good",
+    "left_herb": "小茴香",
+    "right_herb": "吴茱萸",
+    "effect": "温肾散寒",
+    "description": "温肝肾、散寒止痛，寒疝腹痛。"
+  },
+  {
+    "type": "good",
+    "left_herb": "黑胡椒",
+    "right_herb": "高良姜",
+    "effect": "温中散寒",
+    "description": "温中止痛，胃寒脘痛食疗级参考。"
+  },
+  {
+    "type": "good",
+    "left_herb": "大枣",
+    "right_herb": "生姜",
+    "effect": "调和营卫",
+    "description": "补脾和营、调和脾胃，桂枝汤类思路。"
+  },
+  {
+    "type": "good",
+    "left_herb": "蜂蜜",
+    "right_herb": "甘草",
+    "effect": "甘缓和中",
+    "description": "润肺缓急，咳嗽咽痛食疗辅助。"
+  },
+  {
+    "type": "good",
+    "left_herb": "蜂蜜",
+    "right_herb": "萝卜汁",
+    "effect": "润肺化痰",
+    "description": "民间润燥化痰，辨证热咳为宜。"
+  },
+  {
+    "type": "good",
+    "left_herb": "黑芝麻",
+    "right_herb": "核桃仁",
+    "effect": "润肠补肾",
+    "description": "润肠通便、补益肾精，老年性便秘可辅以食疗。"
+  },
+  {
+    "type": "good",
+    "left_herb": "肉苁蓉",
+    "right_herb": "当归",
+    "effect": "温阳润肠",
+    "description": "温阳益精、润肠通便，阳虚冷秘可辨证。"
+  },
+  {
+    "type": "good",
+    "left_herb": "补骨脂",
+    "right_herb": "胡桃肉",
+    "effect": "补肾纳气",
+    "description": "温肾纳气，肾虚喘嗽参考。"
+  },
+  {
+    "type": "good",
+    "left_herb": "冬虫夏草",
+    "right_herb": "鸭肉",
+    "effect": "养阴润肺",
+    "description": "药膳辅助，贵细药材须正规渠道与辨证。"
+  },
+  {
+    "type": "good",
+    "left_herb": "银耳",
+    "right_herb": "百合",
+    "effect": "滋阴润肺",
+    "description": "食疗润肺生津，燥咳咽干。"
+  },
+  {
+    "type": "good",
+    "left_herb": "绿豆",
+    "right_herb": "甘草",
+    "effect": "清热解毒",
+    "description": "解暑毒、利小便，药食两用清热。"
+  },
+  {
+    "type": "good",
+    "left_herb": "赤小豆",
+    "right_herb": "薏苡仁",
+    "effect": "利湿解毒",
+    "description": "利湿消肿解毒，湿热黄疸水肿辅助。"
+  },
+  {
+    "type": "bad",
+    "left_herb": "甘草",
+    "right_herb": "甘遂",
+    "effect": "十八反",
+    "description": "【危险】《本草纲目》载十八反：藻戟遂芫俱战草。甘草反甘遂，同用属配伍禁忌，毒性或副反应风险显著升高。"
+  },
+  {
+    "type": "bad",
+    "left_herb": "甘草",
+    "right_herb": "大戟",
+    "effect": "十八反",
+    "description": "【危险】甘草与大戟相反，不宜同方。"
+  },
+  {
+    "type": "bad",
+    "left_herb": "甘草",
+    "right_herb": "海藻",
+    "effect": "十八反",
+    "description": "【危险】海藻与甘草相反，不宜配伍。"
+  },
+  {
+    "type": "bad",
+    "left_herb": "甘草",
+    "right_herb": "芫花",
+    "effect": "十八反",
+    "description": "【危险】芫花与甘草相反。"
+  },
+  {
+    "type": "bad",
+    "left_herb": "川乌",
+    "right_herb": "半夏",
+    "effect": "十八反",
+    "description": "【危险】乌头类反半夏，毒性风险高。"
+  },
+  {
+    "type": "bad",
+    "left_herb": "川乌",
+    "right_herb": "瓜蒌",
+    "effect": "十八反",
+    "description": "【危险】乌头类反瓜蒌（瓜蒌皮、子、根等）。"
+  },
+  {
+    "type": "bad",
+    "left_herb": "川乌",
+    "right_herb": "川贝母",
+    "effect": "十八反",
+    "description": "【危险】乌头类反贝母。"
+  },
+  {
+    "type": "bad",
+    "left_herb": "川乌",
+    "right_herb": "浙贝母",
+    "effect": "十八反",
+    "description": "【危险】乌头类反浙贝母。"
+  },
+  {
+    "type": "bad",
+    "left_herb": "川乌",
+    "right_herb": "白蔹",
+    "effect": "十八反",
+    "description": "【危险】乌头类反白蔹。"
+  },
+  {
+    "type": "bad",
+    "left_herb": "川乌",
+    "right_herb": "白及",
+    "effect": "十八反",
+    "description": "【危险】乌头类反白及。"
+  },
+  {
+    "type": "bad",
+    "left_herb": "草乌",
+    "right_herb": "半夏",
+    "effect": "十八反",
+    "description": "【危险】草乌属乌头类，反半夏。"
+  },
+  {
+    "type": "bad",
+    "left_herb": "附子",
+    "right_herb": "半夏",
+    "effect": "十八反",
+    "description": "【慎用】附子为乌头加工品，传统归入乌头反半夏，忌随意合用。"
+  },
+  {
+    "type": "bad",
+    "left_herb": "草乌",
+    "right_herb": "瓜蒌",
+    "effect": "十八反",
+    "description": "【危险】草乌反瓜蒌。"
+  },
+  {
+    "type": "bad",
+    "left_herb": "附子",
+    "right_herb": "瓜蒌",
+    "effect": "十八反",
+    "description": "【慎用】附子反瓜蒌类。"
+  },
+  {
+    "type": "bad",
+    "left_herb": "附子",
+    "right_herb": "川贝母",
+    "effect": "十八反",
+    "description": "【慎用】附子反川贝母。"
+  },
+  {
+    "type": "bad",
+    "left_herb": "藜芦",
+    "right_herb": "人参",
+    "effect": "十八反",
+    "description": "【危险】诸参辛芍叛藜芦。人参与藜芦不宜同用。"
+  },
+  {
+    "type": "bad",
+    "left_herb": "藜芦",
+    "right_herb": "沙参",
+    "effect": "十八反",
+    "description": "【危险】沙参（南/北）反藜芦。"
+  },
+  {
+    "type": "bad",
+    "left_herb": "藜芦",
+    "right_herb": "玄参",
+    "effect": "十八反",
+    "description": "【危险】玄参反藜芦。"
+  },
+  {
+    "type": "bad",
+    "left_herb": "藜芦",
+    "right_herb": "丹参",
+    "effect": "十八反",
+    "description": "【危险】丹参反藜芦。"
+  },
+  {
+    "type": "bad",
+    "left_herb": "藜芦",
+    "right_herb": "苦参",
+    "effect": "十八反",
+    "description": "【危险】苦参反藜芦。"
+  },
+  {
+    "type": "bad",
+    "left_herb": "藜芦",
+    "right_herb": "细辛",
+    "effect": "十八反",
+    "description": "【危险】细辛反藜芦。"
+  },
+  {
+    "type": "bad",
+    "left_herb": "藜芦",
+    "right_herb": "白芍",
+    "effect": "十八反",
+    "description": "【危险】白芍反藜芦。"
+  },
+  {
+    "type": "bad",
+    "left_herb": "藜芦",
+    "right_herb": "赤芍",
+    "effect": "十八反",
+    "description": "【危险】赤芍反藜芦。"
+  },
+  {
+    "type": "bad",
+    "left_herb": "巴豆",
+    "right_herb": "牵牛子",
+    "effect": "十九畏",
+    "description": "【危险】巴豆畏牵牛子，峻下相激可致剧烈泻下。"
+  },
+  {
+    "type": "bad",
+    "left_herb": "丁香",
+    "right_herb": "郁金",
+    "effect": "十九畏",
+    "description": "【慎用】丁香莫与郁金见，传统十九畏。"
+  },
+  {
+    "type": "bad",
+    "left_herb": "芒硝",
+    "right_herb": "三棱",
+    "effect": "十九畏",
+    "description": "【慎用】十九畏：牙硝难合京三棱。"
+  },
+  {
+    "type": "bad",
+    "left_herb": "肉桂",
+    "right_herb": "赤石脂",
+    "effect": "十九畏",
+    "description": "【慎用】官桂善能调冷气，若逢石脂便相欺。"
+  },
+  {
+    "type": "bad",
+    "left_herb": "人参",
+    "right_herb": "五灵脂",
+    "effect": "十九畏",
+    "description": "【慎用】人参畏五灵脂，相畏传统记载；临床应用有争议，勿自行合用。"
+  },
+  {
+    "type": "bad",
+    "left_herb": "硫黄",
+    "right_herb": "朴硝",
+    "effect": "十九畏",
+    "description": "【危险】硫黄原是火中精，朴硝一见便相争。属配伍大忌。"
+  },
+  {
+    "type": "bad",
+    "left_herb": "狼毒",
+    "right_herb": "密陀僧",
+    "effect": "十九畏",
+    "description": "【危险】狼毒最怕密陀僧，二者毒烈，禁止自行配伍。"
+  }
+]

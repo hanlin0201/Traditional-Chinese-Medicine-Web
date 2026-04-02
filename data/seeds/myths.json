@@ -1,0 +1,1094 @@
+[
+  {
+    "emoji": "❌",
+    "question": "喝醋能软化血管、预防心梗？",
+    "answer_text": "夸大",
+    "detail": "动脉硬化是长期代谢与炎症过程，<span class=\"hl\">没有可靠证据</span>证明喝醋能“软化血管”。控制血压血脂血糖、戒烟和遵医嘱才是关键。",
+    "type": "danger"
+  },
+  {
+    "emoji": "🚫",
+    "question": "中药没有任何副作用，纯天然就一定安全？",
+    "answer_text": "误区",
+    "detail": "中药同样可能引发<span class=\"hl\">过敏、肝肾负担、药物相互作用</span>。是否服用、剂量与疗程应交医师或药师评估。",
+    "type": "warning"
+  },
+  {
+    "emoji": "💡",
+    "question": "体寒就要多吃辛辣，越辣越暖？",
+    "answer_text": "看情况",
+    "detail": "辛辣可辛温发散，但<span class=\"hl\">阴虚火旺或实热</span>者过辣反耗阴助热。调理寒证还需辨证与时令。",
+    "type": "safe"
+  },
+  {
+    "emoji": "👀",
+    "question": "每天泡脚时间越长越好、水温越烫越好？",
+    "answer_text": "不必刻板",
+    "detail": "久泡与过烫易致<span class=\"hl\">皮肤损伤、低血压眩晕</span>。一般15–20分钟、温热为宜，糖尿病足等需遵医嘱。",
+    "type": "warning"
+  },
+  {
+    "emoji": "🌀",
+    "question": "所有的“发物”生病都不能吃？",
+    "answer_text": "片面",
+    "detail": "“发物”因人而异，<span class=\"hl\">不是绝对禁食清单</span>。过敏或特定疾病急性期才需个体化忌口。",
+    "type": "warning"
+  },
+  {
+    "emoji": "❌",
+    "question": "何首乌磨成粉长期当保健品黑发？",
+    "answer_text": "危险",
+    "detail": "制何首乌与<span class=\"hl\">肝损伤风险</span>相关报道并非罕见，不宜自行长期大量服用。想调理须正规辨证与监测。",
+    "type": "danger"
+  },
+  {
+    "emoji": "🚫",
+    "question": "孕妇多喝红糖水就能补血？",
+    "answer_text": "不够",
+    "detail": "红糖以糖为主，<span class=\"hl\">补铁效率有限</span>。贫血应查明原因，必要时铁剂与膳食指导。",
+    "type": "warning"
+  },
+  {
+    "emoji": "💡",
+    "question": "起床后必须马上喝一大杯淡盐水排毒？",
+    "answer_text": "非必要",
+    "detail": "多数现代人钠摄入已足，淡盐水<span class=\"hl\">不具特殊“排毒”功效</span>，高血压人群尤其不宜。",
+    "type": "safe"
+  },
+  {
+    "emoji": "🌀",
+    "question": "所有人群都适合“每天一杯柠檬水抗癌”？",
+    "answer_text": "无依据",
+    "detail": "柠檬是健康水果，但<span class=\"hl\">不能替代正规防癌与抗癌治疗</span>。胃酸过多者过量还可能不适。",
+    "type": "danger"
+  },
+  {
+    "emoji": "👀",
+    "question": "拔罐颜色越深瘀毒越多？",
+    "answer_text": "不科学",
+    "detail": "罐印深浅与<span class=\"hl\">负压、皮肤厚度、毛细血管脆性</span>有关，不能简单等同于“毒素多少”。",
+    "type": "warning"
+  },
+  {
+    "emoji": "❌",
+    "question": "发烧就应立刻捂汗，汗出发烧就好？",
+    "answer_text": "错！",
+    "detail": "捂汗仅适用于部分<span class=\"hl\">风寒表证</span>初期，儿童、高热或疑似感染重者捂汗可能加重病情。",
+    "type": "warning"
+  },
+  {
+    "emoji": "❌",
+    "question": "上火就吃牛黄解毒片当家常便饭？",
+    "answer_text": "慎用",
+    "detail": "牛黄解毒片含毒性成分（如雄黄）不宜<span class=\"hl\">长期大量</span>服用，可能导致砷蓄积等风险。",
+    "type": "danger"
+  },
+  {
+    "emoji": "🚫",
+    "question": "阿胶越贵越有效，所有人都要吃？",
+    "answer_text": "不必",
+    "detail": "阿胶偏滋腻，<span class=\"hl\">脾虚湿盛、感冒发热</span>者不合适。是否进补应辨证。",
+    "type": "warning"
+  },
+  {
+    "emoji": "💡",
+    "question": "饭后百步走活到九十九，刚吃完就走？",
+    "answer_text": "看情况",
+    "detail": "饱餐后剧烈运动影响消化，<span class=\"hl\">散散步即可</span>，避免空腹或饱食后立即剧烈运动。",
+    "type": "safe"
+  },
+  {
+    "emoji": "🌀",
+    "question": "经络排毒贴变黑就是吸出毒素？",
+    "answer_text": "谣言",
+    "detail": "多因敷贴成分与<span class=\"hl\">汗液反应或色素</span>，并非真实“排毒”。",
+    "type": "danger"
+  },
+  {
+    "emoji": "👀",
+    "question": "枸杞一把泡水喝，越多越好？",
+    "answer_text": "过量不好",
+    "detail": "过量易<span class=\"hl\">滋腻碍胃</span>，外感发热或腹泻时不宜盲目大量进补。",
+    "type": "warning"
+  },
+  {
+    "emoji": "❌",
+    "question": "三七粉当阿司匹林替代品防心梗？",
+    "answer_text": "危险",
+    "detail": "三七不能替代<span class=\"hl\">抗血小板/抗凝规范治疗</span>，擅自停药可能致命。",
+    "type": "danger"
+  },
+  {
+    "emoji": "🚫",
+    "question": "儿童捏脊可以随意很重很频繁？",
+    "answer_text": "不宜",
+    "detail": "手法过重或不当可能<span class=\"hl\">损伤软组织</span>，发热、皮肤破损、重症应就医。",
+    "type": "warning"
+  },
+  {
+    "emoji": "💡",
+    "question": "不吃主食只吃水果减肥养生？",
+    "answer_text": "失衡",
+    "detail": "长期<span class=\"hl\">碳水过低</span>可致月经紊乱、乏力、酮体升高，并非健康减脂。",
+    "type": "safe"
+  },
+  {
+    "emoji": "🌀",
+    "question": "蜂蜜结晶就是掺假？",
+    "answer_text": "误会",
+    "detail": "结晶多与<span class=\"hl\">葡萄糖比例与温度</span>有关，不能单独证明掺假。",
+    "type": "safe"
+  },
+  {
+    "emoji": "👀",
+    "question": "按摩脚底痛点一定是内脏有病？",
+    "answer_text": "不绝对",
+    "detail": "痛点可能来自<span class=\"hl\">局部劳损或神经反射</span>，不能代替体检与诊断。",
+    "type": "warning"
+  },
+  {
+    "emoji": "❌",
+    "question": "长期喝浓茶能解油腻、护胃？",
+    "answer_text": "片面",
+    "detail": "浓茶刺激胃酸，<span class=\"hl\">空腹与胃病患者</span>可能加重不适。",
+    "type": "warning"
+  },
+  {
+    "emoji": "🚫",
+    "question": "刮痧一定要出痧才有效？",
+    "answer_text": "不必",
+    "detail": "疗效与手法经络辨证有关，<span class=\"hl\">出痧多少</span>不是唯一标准。",
+    "type": "warning"
+  },
+  {
+    "emoji": "💡",
+    "question": "春捂就是春天一直多穿不减？",
+    "answer_text": "灵活",
+    "detail": "春捂强调<span class=\"hl\">循序渐进减衣</span>，避免忽冷忽热，并非永远不脱。",
+    "type": "safe"
+  },
+  {
+    "emoji": "🌀",
+    "question": "红豆薏米水所有人都能祛湿消肿？",
+    "answer_text": "看体质",
+    "detail": "薏米偏凉，<span class=\"hl\">脾胃虚寒</span>者不宜长期大量冷饮配方。",
+    "type": "warning"
+  },
+  {
+    "emoji": "👀",
+    "question": "人参鸡汤适合术后所有人大补？",
+    "answer_text": "辨证",
+    "detail": "术后若<span class=\"hl\">发热、感染未控</span>，大补可能碍邪，应遵医嘱。",
+    "type": "warning"
+  },
+  {
+    "emoji": "❌",
+    "question": "板蓝根当饮料预防感冒？",
+    "answer_text": "不宜",
+    "detail": "无适应证长期服用可能<span class=\"hl\">伤脾胃</span>，并不能可靠预防感冒。",
+    "type": "danger"
+  },
+  {
+    "emoji": "🚫",
+    "question": "手脚冰凉就等于阳虚一定要鹿茸？",
+    "answer_text": "片面",
+    "detail": "也可与<span class=\"hl\">循环、贫血、甲状腺</span>等有关，需排查而非盲目壮阳。",
+    "type": "warning"
+  },
+  {
+    "emoji": "💡",
+    "question": "睡前喝牛奶一定助眠？",
+    "answer_text": "因人而异",
+    "detail": "对部分人有心理上的舒缓，但<span class=\"hl\">乳糖不耐</span>反而腹胀影响睡眠。",
+    "type": "safe"
+  },
+  {
+    "emoji": "🌀",
+    "question": "艾草烟熏房间可以消灭新冠病毒？",
+    "answer_text": "无据",
+    "detail": "不能替代<span class=\"hl\">通风、疫苗与规范防护</span>。",
+    "type": "danger"
+  },
+  {
+    "emoji": "👀",
+    "question": "日行一万步膝盖一定更健康？",
+    "answer_text": "看情况",
+    "detail": "体重过大或已有<span class=\"hl\">膝关节病</span>者应循序渐进，避免机械损伤。",
+    "type": "warning"
+  },
+  {
+    "emoji": "❌",
+    "question": "芦荟胶囊可以长期通便无依赖？",
+    "answer_text": "慎用",
+    "detail": "部分产品含蒽醌类可致<span class=\"hl\">结肠黑变</span>，不宜长期依赖。",
+    "type": "danger"
+  },
+  {
+    "emoji": "🚫",
+    "question": "银耳隔夜会产生剧毒亚硝酸盐？",
+    "answer_text": "不必恐慌",
+    "detail": "妥善冷藏、再充分加热，<span class=\"hl\">正常量风险很低</span>；变味变质则弃。",
+    "type": "safe"
+  },
+  {
+    "emoji": "💡",
+    "question": "决明子茶当水喝治近视？",
+    "answer_text": "辅助",
+    "detail": "决明子清肝明目有一定理论依据，但<span class=\"hl\">不能逆转真性近视</span>。",
+    "type": "warning"
+  },
+  {
+    "emoji": "🌀",
+    "question": "吃啥补啥，骨折多喝骨头汤就够？",
+    "answer_text": "不够",
+    "detail": "骨头汤<span class=\"hl\">钙含量有限</span>，康复还需蛋白、维D与康复训练。",
+    "type": "warning"
+  },
+  {
+    "emoji": "👀",
+    "question": "三伏贴贴越久起泡越好？",
+    "answer_text": "错误",
+    "detail": "起泡属<span class=\"hl\">皮肤损伤</span>，应按规范时间与皮肤反应处理。",
+    "type": "danger"
+  },
+  {
+    "emoji": "❌",
+    "question": "温泉泡得越久越想养生？",
+    "answer_text": "不宜久",
+    "detail": "久泡易<span class=\"hl\">低血压、虚脱</span>，心脑血管病患者尤应注意。",
+    "type": "danger"
+  },
+  {
+    "emoji": "🚫",
+    "question": "薏米生熟都可以随便换？",
+    "answer_text": "有区别",
+    "detail": "炒制可减寒凉，<span class=\"hl\">脾胃虚寒</span>者常用炒薏米更稳妥（辨证）。",
+    "type": "warning"
+  },
+  {
+    "emoji": "💡",
+    "question": "不吃盐才养生？",
+    "answer_text": "不对",
+    "detail": "钠过低可致<span class=\"hl\">乏力、低钠血症</span>，应适量而非极端戒盐。",
+    "type": "safe"
+  },
+  {
+    "emoji": "🌀",
+    "question": "口臭一定是胃火，清胃就行？",
+    "answer_text": "多因",
+    "detail": "口腔病、鼻窦、幽门螺杆菌等都可致口臭，需<span class=\"hl\">找原因</span>。",
+    "type": "warning"
+  },
+  {
+    "emoji": "👀",
+    "question": "吃黑芝麻头发一定变黑？",
+    "answer_text": "夸大",
+    "detail": "与遗传、营养、疾病有关，<span class=\"hl\">不能指望单一食物“变黑发”</span>。",
+    "type": "warning"
+  },
+  {
+    "emoji": "❌",
+    "question": "拔罐后立刻冲冷水澡没问题？",
+    "answer_text": "不宜",
+    "detail": "毛孔开放时<span class=\"hl\">易受风寒</span>，建议保暖避风短时间后再沐浴。",
+    "type": "warning"
+  },
+  {
+    "emoji": "🚫",
+    "question": "五味子五味子泡水治失眠人人有效？",
+    "answer_text": "辨证",
+    "detail": "实热、外感未清者不合适，<span class=\"hl\">长期失眠</span>应就医评估。",
+    "type": "warning"
+  },
+  {
+    "emoji": "💡",
+    "question": "黄芪泡水所有人都可天天喝？",
+    "answer_text": "看体质",
+    "detail": "表实邪盛、气滞湿阻等<span class=\"hl\">非虚证</span>不宜盲目黄芪。",
+    "type": "safe"
+  },
+  {
+    "emoji": "🌀",
+    "question": "吃红枣补血，贫血靠枣就行？",
+    "answer_text": "不够",
+    "detail": "植物铁吸收率低，<span class=\"hl\">缺铁性贫血</span>需铁剂与肉类等。",
+    "type": "warning"
+  },
+  {
+    "emoji": "👀",
+    "question": "龙眼肉桂圆多吃无碍？",
+    "answer_text": "适量",
+    "detail": "甘温易<span class=\"hl\">助火生痰</span>，湿热、痰火者不宜过量。",
+    "type": "warning"
+  },
+  {
+    "emoji": "❌",
+    "question": "黄连素可以长期当“清火药”？",
+    "answer_text": "不宜",
+    "detail": "可能肠道<span class=\"hl\">菌群紊乱</span>，应短期对症并找病因。",
+    "type": "danger"
+  },
+  {
+    "emoji": "🚫",
+    "question": "陈皮越陈越好，发霉也算陈化？",
+    "answer_text": "错误",
+    "detail": "发霉是<span class=\"hl\">霉菌毒素</span>风险，与陈化无关，应丢弃。",
+    "type": "danger"
+  },
+  {
+    "emoji": "💡",
+    "question": "早起冷水洗脸能治过敏性鼻炎？",
+    "answer_text": "辅助有限",
+    "detail": "可能短期提神，但<span class=\"hl\">不能替代规范治疗</span>。",
+    "type": "safe"
+  },
+  {
+    "emoji": "🌀",
+    "question": "山楂红糖水流产后期“排恶露更快”？",
+    "answer_text": "危险",
+    "detail": "产后用药与食疗须<span class=\"hl\">医生指导</span>，勿信偏方。",
+    "type": "danger"
+  },
+  {
+    "emoji": "👀",
+    "question": "所有体质都适合艾灸？",
+    "answer_text": "未必",
+    "detail": "实热、阴虚火旺、局部皮肤破损等<span class=\"hl\">不适合</span>或需调整。",
+    "type": "warning"
+  },
+  {
+    "emoji": "❌",
+    "question": "何首乌与决明子同用一定安全？",
+    "answer_text": "须辨证",
+    "detail": "二者均关联<span class=\"hl\">肝监测</span>话题，长期合用勿自行。",
+    "type": "danger"
+  },
+  {
+    "emoji": "🚫",
+    "question": "人参和萝卜绝对不能吃在一起？",
+    "answer_text": "不必刻板",
+    "detail": "“莱菔泄气”之说存在，但<span class=\"hl\">非所有场景</span>都禁忌，应看方剂与体质。",
+    "type": "warning"
+  },
+  {
+    "emoji": "💡",
+    "question": "绿豆汤解百药之毒？",
+    "answer_text": "夸大",
+    "detail": "并无科学证据支持能解<span class=\"hl\">所有药物毒性</span>，中毒应就医。",
+    "type": "safe"
+  },
+  {
+    "emoji": "🌀",
+    "question": "按摩淋巴就能排毒瘦脸？",
+    "answer_text": "夸大",
+    "detail": "不当手法可能<span class=\"hl\">损伤淋巴管</span>，瘦脸多与体脂骨骼有关。",
+    "type": "warning"
+  },
+  {
+    "emoji": "👀",
+    "question": "生姜擦头皮一定能生发？",
+    "answer_text": "不保证",
+    "detail": "或对局部循环有轻微刺激，但<span class=\"hl\">雄激素脱发</span>等需正规治疗。",
+    "type": "warning"
+  },
+  {
+    "emoji": "❌",
+    "question": "喝大量红豆水代替白开水？",
+    "answer_text": "不宜",
+    "detail": "增加<span class=\"hl\">胃肠负担与钾摄入</span>，肾功能异常者尤需谨慎。",
+    "type": "warning"
+  },
+  {
+    "emoji": "🚫",
+    "question": "艾灸烟雾完全无害可以多吸？",
+    "answer_text": "不宜",
+    "detail": "烟雾含颗粒物，<span class=\"hl\">哮喘与慢阻肺</span>患者应通风并控烟。",
+    "type": "warning"
+  },
+  {
+    "emoji": "💡",
+    "question": "冬天穿得少能“锻炼耐寒体质”？",
+    "answer_text": "看年龄",
+    "detail": "老人儿童不宜，易诱发<span class=\"hl\">感冒与关节痛</span>。",
+    "type": "safe"
+  },
+  {
+    "emoji": "🌀",
+    "question": "蜂王浆孩子吃了长得更高？",
+    "answer_text": "无据",
+    "detail": "生长受遗传营养睡眠激素影响，<span class=\"hl\">蜂王浆不能替代均衡饮食</span>。",
+    "type": "warning"
+  },
+  {
+    "emoji": "👀",
+    "question": "冬虫夏草所有人都能进补？",
+    "answer_text": "未必",
+    "detail": "价格高昂且<span class=\"hl\">实热、儿童滥用</span>不推荐，应遵医嘱。",
+    "type": "warning"
+  },
+  {
+    "emoji": "❌",
+    "question": "晚上不吃饭只喝果汁养胃？",
+    "answer_text": "伤胃",
+    "detail": "夜间空腹胃酸刺激，<span class=\"hl\">反流</span>风险可能增加。",
+    "type": "warning"
+  },
+  {
+    "emoji": "🚫",
+    "question": "乌梅汤当药治幽门螺杆菌？",
+    "answer_text": "不能",
+    "detail": "需<span class=\"hl\">规范抗菌方案</span>与医生评估。",
+    "type": "danger"
+  },
+  {
+    "emoji": "💡",
+    "question": "菊花枸杞茶天天喝不会寒凉？",
+    "answer_text": "看体质",
+    "detail": "脾胃虚寒者长期大量可能<span class=\"hl\">腹泻怕冷</span>。",
+    "type": "safe"
+  },
+  {
+    "emoji": "🌀",
+    "question": "拍打胳膊出现淤青就是排毒？",
+    "answer_text": "危险",
+    "detail": "可能是<span class=\"hl\">毛细血管破裂</span>，并非排毒。",
+    "type": "danger"
+  },
+  {
+    "emoji": "👀",
+    "question": "吃木瓜一定丰胸？",
+    "answer_text": "无据",
+    "detail": "胸部大小主要与<span class=\"hl\">激素与脂肪</span>相关。",
+    "type": "warning"
+  },
+  {
+    "emoji": "❌",
+    "question": "金银花凉茶当水喝治慢性咽炎？",
+    "answer_text": "不宜",
+    "detail": "长期寒凉可能<span class=\"hl\">伤脾阳</span>，咽炎需分虚实。",
+    "type": "warning"
+  },
+  {
+    "emoji": "🚫",
+    "question": "马蹄荸荠生吃越多越好？",
+    "answer_text": "寄生虫",
+    "detail": "生水污染可能<span class=\"hl\">寄生虫</span>风险，应洗净煮熟更安全。",
+    "type": "warning"
+  },
+  {
+    "emoji": "💡",
+    "question": "午休越久越养生？",
+    "answer_text": "不宜过长",
+    "detail": "一般20–30分钟为宜，过久可能<span class=\"hl\">进入深睡反昏沉</span>。",
+    "type": "safe"
+  },
+  {
+    "emoji": "🌀",
+    "question": "生吃泥鳅补精壮阳？",
+    "answer_text": "危险",
+    "detail": "寄生虫风险极高，<span class=\"hl\">禁止生食</span>。",
+    "type": "danger"
+  },
+  {
+    "emoji": "👀",
+    "question": "莲子心茶人人都可清心火？",
+    "answer_text": "看体质",
+    "detail": "苦寒伤胃，<span class=\"hl\">脾胃虚寒</span>者不宜长期。",
+    "type": "warning"
+  },
+  {
+    "emoji": "❌",
+    "question": "五味子酒泡越久药效越强越好喝？",
+    "answer_text": "酒精风险",
+    "detail": "酒精摄入有<span class=\"hl\">肝肾与成瘾</span>风险，不以“养生酒”自我麻痹。",
+    "type": "danger"
+  },
+  {
+    "emoji": "🚫",
+    "question": "黑芝麻丸当零食不限量？",
+    "answer_text": "热量",
+    "detail": "高糖高脂配方可能<span class=\"hl\">热量超标</span>。",
+    "type": "warning"
+  },
+  {
+    "emoji": "💡",
+    "question": "春困就要多喝咖啡提神？",
+    "answer_text": "适量",
+    "detail": "过量影响<span class=\"hl\">睡眠与心律</span>，可先调整作息与运动。",
+    "type": "safe"
+  },
+  {
+    "emoji": "🌀",
+    "question": "脚底贴足贴变黑是湿气排出？",
+    "answer_text": "谣言",
+    "detail": "多为<span class=\"hl\">成分遇汗变色</span>。",
+    "type": "danger"
+  },
+  {
+    "emoji": "👀",
+    "question": "艾草洗澡包天天用无害？",
+    "answer_text": "看皮肤",
+    "detail": "长期可能<span class=\"hl\">皮肤干燥刺激</span>，湿疹急性期谨慎。",
+    "type": "warning"
+  },
+  {
+    "emoji": "❌",
+    "question": "生吃鱼胆明目清热？",
+    "answer_text": "剧毒",
+    "detail": "鱼胆含<span class=\"hl\">毒素可致肝衰</span>，禁止尝试。",
+    "type": "danger"
+  },
+  {
+    "emoji": "🚫",
+    "question": "银杏叶泡茶降压替代药物？",
+    "answer_text": "危险",
+    "detail": "可能引起<span class=\"hl\">出血相互作用</span>，不能擅自替代降压药。",
+    "type": "danger"
+  },
+  {
+    "emoji": "💡",
+    "question": "饭后立刻吃水果助消化？",
+    "answer_text": "看量",
+    "detail": "大量果糖可能与正餐叠加致<span class=\"hl\">腹胀</span>，糖尿病患者更应注意时机与量。",
+    "type": "safe"
+  },
+  {
+    "emoji": "🌀",
+    "question": "蜂蜜一岁以内也能吃？",
+    "answer_text": "禁止",
+    "detail": "有肉毒杆菌孢子<span class=\"hl\">婴儿肠道风险</span>，1岁内不建议。",
+    "type": "danger"
+  },
+  {
+    "emoji": "👀",
+    "question": "穿塑身衣收腹等于调理脏腑？",
+    "answer_text": "夸大",
+    "detail": "主要影响<span class=\"hl\">呼吸与循环</span>，不具调理内脏功效。",
+    "type": "warning"
+  },
+  {
+    "emoji": "❌",
+    "question": "艾灸完立刻游泳没问题？",
+    "answer_text": "不宜",
+    "detail": "腠理开放易感<span class=\"hl\">寒湿</span>。",
+    "type": "warning"
+  },
+  {
+    "emoji": "🚫",
+    "question": "黄连与绿茶同服更清火？",
+    "answer_text": "谨慎",
+    "detail": "咖啡因与方剂相互作用需<span class=\"hl\">药师评估</span>。",
+    "type": "warning"
+  },
+  {
+    "emoji": "💡",
+    "question": "小米粥最养胃可以只吃粥？",
+    "answer_text": "营养单一",
+    "detail": "长期只喝粥可能<span class=\"hl\">蛋白不足</span>，应搭配多样食物。",
+    "type": "safe"
+  },
+  {
+    "emoji": "🌀",
+    "question": "吃胎盘大补且无风险？",
+    "answer_text": "不推荐",
+    "detail": "存在<span class=\"hl\">病原微生物与激素</span>担忧，正规医疗不建议食用。",
+    "type": "danger"
+  },
+  {
+    "emoji": "👀",
+    "question": "玫瑰花茶天天喝治乳腺增生？",
+    "answer_text": "辅助",
+    "detail": "情绪疏肝有一定帮助，但<span class=\"hl\">不能替代乳腺检查</span>。",
+    "type": "warning"
+  },
+  {
+    "emoji": "❌",
+    "question": "蜈蚣全蝎泡酒自己抓自己泡？",
+    "answer_text": "极危险",
+    "detail": "毒性中药须<span class=\"hl\">炮制与剂量严控</span>，禁止自制。",
+    "type": "danger"
+  },
+  {
+    "emoji": "🚫",
+    "question": "胖大海当茶润喉人人合适？",
+    "answer_text": "不宜",
+    "detail": "脾胃虚寒、低血压等<span class=\"hl\">慎用</span>，长期服需医师。",
+    "type": "warning"
+  },
+  {
+    "emoji": "💡",
+    "question": "午睡必须趴着才解乏？",
+    "answer_text": "不必",
+    "detail": "趴睡压迫<span class=\"hl\">颈椎与胃</span>，侧卧或后仰更好。",
+    "type": "safe"
+  },
+  {
+    "emoji": "🌀",
+    "question": "吃硫酸亚铁时喝浓茶更好吸收？",
+    "answer_text": "错误",
+    "detail": "鞣酸影响<span class=\"hl\">铁吸收</span>，应避开。",
+    "type": "danger"
+  },
+  {
+    "emoji": "👀",
+    "question": "针灸针越粗越长效果越好？",
+    "answer_text": "错误",
+    "detail": "由<span class=\"hl\">医师选针</span>，粗长不等于疗效。",
+    "type": "warning"
+  },
+  {
+    "emoji": "❌",
+    "question": "三伏天禁止一切冷饮否则伤身？",
+    "answer_text": "不必绝对",
+    "detail": "适量与体质相关，<span class=\"hl\">胃肠敏感</span>者减少即可。",
+    "type": "warning"
+  },
+  {
+    "emoji": "🚫",
+    "question": "灵芝孢子粉能治癌症？",
+    "answer_text": "不能",
+    "detail": "不能替代<span class=\"hl\">手术放化疗靶向</span>等规范治疗。",
+    "type": "danger"
+  },
+  {
+    "emoji": "💡",
+    "question": "酸枣仁膏睡前越多越好？",
+    "answer_text": "辨证",
+    "detail": "痰湿重者滋腻可能<span class=\"hl\">碍脾</span>。",
+    "type": "safe"
+  },
+  {
+    "emoji": "🌀",
+    "question": "口服珍珠粉补钙又美容？",
+    "answer_text": "有限",
+    "detail": "钙吸收与<span class=\"hl\">剂量与配方</span>有关，不宜神话。",
+    "type": "warning"
+  },
+  {
+    "emoji": "👀",
+    "question": "五味子与五倍子名字像就能混用？",
+    "answer_text": "不能",
+    "detail": "功效与毒性<span class=\"hl\">不同</span>，勿混。",
+    "type": "danger"
+  },
+  {
+    "emoji": "❌",
+    "question": "药膳放了药材就可以天天当饭吃？",
+    "answer_text": "不宜",
+    "detail": "长期药食需<span class=\"hl\">辨证与轮换</span>。",
+    "type": "warning"
+  },
+  {
+    "emoji": "🚫",
+    "question": "生姜擦腋下止汗又无毒？",
+    "answer_text": "刺激",
+    "detail": "可能<span class=\"hl\">皮肤刺激过敏</span>。",
+    "type": "warning"
+  },
+  {
+    "emoji": "💡",
+    "question": "早起一杯蜂蜜水人人都适合？",
+    "answer_text": "看血糖",
+    "detail": "糖尿病患者<span class=\"hl\">不宜</span>空腹大量蜜糖水。",
+    "type": "safe"
+  },
+  {
+    "emoji": "🌀",
+    "question": "磁石手链能治高血压？",
+    "answer_text": "无据",
+    "detail": "应<span class=\"hl\">规范测压用药</span>。",
+    "type": "danger"
+  },
+  {
+    "emoji": "👀",
+    "question": "按摩肚子顺时针永远对？",
+    "answer_text": "看病症",
+    "detail": "有些腹痛<span class=\"hl\">忌盲目按揉</span>，需排除急腹症。",
+    "type": "warning"
+  },
+  {
+    "emoji": "❌",
+    "question": "土茯苓煲汤可以代替降尿酸药？",
+    "answer_text": "不能",
+    "detail": "高尿酸与痛风需<span class=\"hl\">规范治疗与饮食</span>综合管理。",
+    "type": "danger"
+  },
+  {
+    "emoji": "🚫",
+    "question": "紫苏叶煮水治所有海鲜中毒？",
+    "answer_text": "不能",
+    "detail": "细菌性中毒应<span class=\"hl\">就医</span>，紫苏并非解毒万能。",
+    "type": "danger"
+  },
+  {
+    "emoji": "💡",
+    "question": "绿豆汤发红就是假绿豆？",
+    "answer_text": "氧化",
+    "detail": "多酚氧化可致,<span class=\"hl\">未必质量问题</span>。",
+    "type": "safe"
+  },
+  {
+    "emoji": "🌀",
+    "question": "枇杷叶不刷毛就煮没事？",
+    "answer_text": "刺激",
+    "detail": "毛可能<span class=\"hl\">刺激咽喉</span>，应处理干净。",
+    "type": "warning"
+  },
+  {
+    "emoji": "👀",
+    "question": "火麻仁多吃无害通便？",
+    "answer_text": "不宜",
+    "detail": "过量可<span class=\"hl\">腹泻电解质紊乱</span>。",
+    "type": "warning"
+  },
+  {
+    "emoji": "❌",
+    "question": "青蒿绞汁自己治疟疾？",
+    "answer_text": "危险",
+    "detail": "疟疾须<span class=\"hl\">规范抗疟治疗</span>，勿自制。",
+    "type": "danger"
+  },
+  {
+    "emoji": "🚫",
+    "question": "鸡内金磨粉当零食无限吃？",
+    "answer_text": "适量",
+    "detail": "消食导滞，<span class=\"hl\">久用耗气</span>应注意。",
+    "type": "warning"
+  },
+  {
+    "emoji": "💡",
+    "question": "春茶越新鲜越好人人宜喝？",
+    "answer_text": "看胃",
+    "detail": "新茶刺激性，<span class=\"hl\">胃病患者</span>可放陈些再饮。",
+    "type": "safe"
+  },
+  {
+    "emoji": "🌀",
+    "question": "土蜂蜜一定比超市蜜更无菌？",
+    "answer_text": "未必",
+    "detail": "野生采集仍有<span class=\"hl\">肉毒孢子风险</span>对婴儿。",
+    "type": "warning"
+  },
+  {
+    "emoji": "👀",
+    "question": "雷公藤偏方治类风湿可靠？",
+    "answer_text": "剧毒",
+    "detail": "雷公藤有<span class=\"hl\">毒副作用</span>须专科监护，禁偏方。",
+    "type": "danger"
+  },
+  {
+    "emoji": "❌",
+    "question": "黄连与牛奶同服更好吸收？",
+    "answer_text": "可能干扰",
+    "detail": "钙与蛋白可能影响<span class=\"hl\">药物吸收</span>，间隔服用更安全。",
+    "type": "warning"
+  },
+  {
+    "emoji": "🚫",
+    "question": "艾草枕对所有鼻炎有效？",
+    "answer_text": "有限",
+    "detail": "与<span class=\"hl\">过敏原控制</span>和药物治疗相比证据弱。",
+    "type": "warning"
+  },
+  {
+    "emoji": "💡",
+    "question": "饭后百步走要吃完饭立刻快跑？",
+    "answer_text": "不宜",
+    "detail": "应轻度活动，<span class=\"hl\">避免剧烈运动</span>。",
+    "type": "safe"
+  },
+  {
+    "emoji": "🌀",
+    "question": "吃鱼胆明目是民间智慧？",
+    "answer_text": "剧毒",
+    "detail": "再次强调：<span class=\"hl\">鱼胆有毒</span>。",
+    "type": "danger"
+  },
+  {
+    "emoji": "👀",
+    "question": "砂仁煲汤放得越多越好？",
+    "answer_text": "过量",
+    "detail": "辛温芳香过量易<span class=\"hl\">耗气动火</span>。",
+    "type": "warning"
+  },
+  {
+    "emoji": "❌",
+    "question": "木通关木通混用没问题？",
+    "answer_text": "危险",
+    "detail": "关木通曾关联<span class=\"hl\">肾毒性</span>，品种混淆须避免。",
+    "type": "danger"
+  },
+  {
+    "emoji": "🚫",
+    "question": "夜交藤名字像就能当安眠药加倍吃？",
+    "answer_text": "辨证",
+    "detail": "需中医师<span class=\"hl\">配伍与剂量</span>。",
+    "type": "warning"
+  },
+  {
+    "emoji": "💡",
+    "question": "银耳与菠菜同吃一定结石？",
+    "answer_text": "夸大",
+    "detail": "草酸问题与<span class=\"hl\">总体饮食量</span>有关，不必过度恐慌。",
+    "type": "safe"
+  },
+  {
+    "emoji": "🌀",
+    "question": "童子尿治病养生？",
+    "answer_text": "无据",
+    "detail": "无科学与伦理依据，<span class=\"hl\">不推荐</span>。",
+    "type": "danger"
+  },
+  {
+    "emoji": "👀",
+    "question": "苦丁茶当水喝降血脂人人适合？",
+    "answer_text": "不宜",
+    "detail": "苦寒伤胃，<span class=\"hl\">阳虚胃寒</span>不适。",
+    "type": "warning"
+  },
+  {
+    "emoji": "❌",
+    "question": "鱼腥草注射液自己能打？",
+    "answer_text": "禁止",
+    "detail": "注射剂曾有<span class=\"hl\">不良反应</span>报道，须医疗机构。",
+    "type": "danger"
+  },
+  {
+    "emoji": "🚫",
+    "question": "蝉蜕磨粉治癫痫？",
+    "answer_text": "不能",
+    "detail": "癫痫须<span class=\"hl\">神经科规范治疗</span>。",
+    "type": "danger"
+  },
+  {
+    "emoji": "💡",
+    "question": "桂花糖渍吃再多也只养生？",
+    "answer_text": "糖分",
+    "detail": "高糖<span class=\"hl\">龋齿与代谢</span>风险。",
+    "type": "safe"
+  },
+  {
+    "emoji": "🌀",
+    "question": "佩戴朱砂饰品养生安神？",
+    "answer_text": "警惕",
+    "detail": "汞化合物，<span class=\"hl\">皮肤接触与儿童误食</span>有风险。",
+    "type": "danger"
+  },
+  {
+    "emoji": "👀",
+    "question": "白果生吃几粒没事润肺？",
+    "answer_text": "有毒",
+    "detail": "白果<span class=\"hl\">有毒成分</span>，需炮制熟食且控量。",
+    "type": "danger"
+  },
+  {
+    "emoji": "❌",
+    "question": "半夏嚼几片就能化痰？",
+    "answer_text": "危险",
+    "detail": "生半夏<span class=\"hl\">刺激咽喉毒性</span>，须炮制与医师处方。",
+    "type": "danger"
+  },
+  {
+    "emoji": "🚫",
+    "question": "马鞭草茶孕妇调经？",
+    "answer_text": "禁止",
+    "detail": "妊娠用药<span class=\"hl\">禁忌多</span>，勿自行。",
+    "type": "danger"
+  },
+  {
+    "emoji": "💡",
+    "question": "小米粥加糖才养胃？",
+    "answer_text": "不必",
+    "detail": "胃食管反流者<span class=\"hl\">高糖</span>可能加重。",
+    "type": "safe"
+  },
+  {
+    "emoji": "🌀",
+    "question": "芦荟胶吞食用美容？",
+    "answer_text": "区分",
+    "detail": "外用与<span class=\"hl\">内服品种</span>不同，勿混。",
+    "type": "danger"
+  },
+  {
+    "emoji": "👀",
+    "question": "桔梗当咸菜天天吃？",
+    "answer_text": "不宜",
+    "detail": "过量可致<span class=\"hl\">恶心反射</span>，药用需控量。",
+    "type": "warning"
+  },
+  {
+    "emoji": "❌",
+    "question": "水蛭活体吸血治血栓？",
+    "answer_text": "危险",
+    "detail": "可感染与出血，<span class=\"hl\">必须医疗环境</span>。",
+    "type": "danger"
+  },
+  {
+    "emoji": "🚫",
+    "question": "苦参洗剂浓度越高越好？",
+    "answer_text": "刺激",
+    "detail": "皮肤<span class=\"hl\">刺激过敏</span>风险。",
+    "type": "warning"
+  },
+  {
+    "emoji": "💡",
+    "question": "山药汁接触皮肤发痒正常不必管？",
+    "answer_text": "过敏",
+    "detail": "有人对<span class=\"hl\">粘液蛋白</span>过敏，应冲洗。",
+    "type": "safe"
+  },
+  {
+    "emoji": "🌀",
+    "question": "罂粟壳煲汤提鲜养生？",
+    "answer_text": "违法",
+    "detail": "涉毒品种，<span class=\"hl\">严禁</span>非法使用。",
+    "type": "danger"
+  },
+  {
+    "emoji": "👀",
+    "question": "罗汉果浓缩液当白开水？",
+    "answer_text": "糖分",
+    "detail": "甜味剂与糖负荷，<span class=\"hl\">糖尿病注意</span>。",
+    "type": "warning"
+  },
+  {
+    "emoji": "❌",
+    "question": "巴豆霜自己炒制的量才够猛？",
+    "answer_text": "极危险",
+    "detail": "峻下药需<span class=\"hl\">严格炮制与剂量</span>。",
+    "type": "danger"
+  },
+  {
+    "emoji": "🚫",
+    "question": "雄黄雄黄酒端午必喝才传统？",
+    "answer_text": "危险",
+    "detail": "砷化合物<span class=\"hl\">毒性强</span>，不建议饮用。",
+    "type": "danger"
+  },
+  {
+    "emoji": "💡",
+    "question": "佛手柑泡茶人人疏肝？",
+    "answer_text": "看体质",
+    "detail": "阴虚火旺<span class=\"hl\">辛温不宜多</span>。",
+    "type": "safe"
+  },
+  {
+    "emoji": "🌀",
+    "question": "何首乌生猪肝同吃黑发？",
+    "answer_text": "无据",
+    "detail": "更应关注<span class=\"hl\">肝安全</span>与正规治疗。",
+    "type": "danger"
+  },
+  {
+    "emoji": "👀",
+    "question": "穿心莲当凉菜天天吃？",
+    "answer_text": "苦寒",
+    "detail": "易伤<span class=\"hl\">脾胃阳气</span>。",
+    "type": "warning"
+  },
+  {
+    "emoji": "❌",
+    "question": "朱砂安神丸可以长期当保健品？",
+    "answer_text": "不宜",
+    "detail": "汞剂风险，<span class=\"hl\">中病即止</span>、监测肝肾功能。",
+    "type": "danger"
+  },
+  {
+    "emoji": "🚫",
+    "question": "半夏与附子绝对永不同方？",
+    "answer_text": "不必绝对",
+    "detail": "古籍亦有配伍讨论，但<span class=\"hl\">现代临床严禁自行合用</span>，须专科。",
+    "type": "warning"
+  },
+  {
+    "emoji": "💡",
+    "question": "橘皮陈皮是同一种随意买？",
+    "answer_text": "加工不同",
+    "detail": "炮制与陈化影响<span class=\"hl\">性味功效</span>。",
+    "type": "safe"
+  },
+  {
+    "emoji": "🌀",
+    "question": "土鳖虫磨成粉当钙片？",
+    "answer_text": "不对",
+    "detail": "药用虫类，<span class=\"hl\">破血逐瘀</span>，非补钙。",
+    "type": "danger"
+  },
+  {
+    "emoji": "👀",
+    "question": "桑螵蛸泡酒小儿尿床？",
+    "answer_text": "需医师",
+    "detail": "小儿用药<span class=\"hl\">剂量极慎</span>。",
+    "type": "warning"
+  },
+  {
+    "emoji": "❌",
+    "question": "蟾酥自己可以采集入药？",
+    "answer_text": "剧毒",
+    "detail": "强心苷类，<span class=\"hl\">极易中毒</span>。",
+    "type": "danger"
+  },
+  {
+    "emoji": "🚫",
+    "question": "马钱子粉止痛多多益善？",
+    "answer_text": "剧毒",
+    "detail": "有<span class=\"hl\">神经毒性</span>，严控剂量。",
+    "type": "danger"
+  },
+  {
+    "emoji": "💡",
+    "question": "芡实薏米粥补肾人人吃？",
+    "answer_text": "看体质",
+    "detail": "便秘与<span class=\"hl\">孕妇</span>等需辨证。",
+    "type": "safe"
+  },
+  {
+    "emoji": "🌀",
+    "question": "僵蚕治癫痫单方根治？",
+    "answer_text": "不能",
+    "detail": "须<span class=\"hl\">规范治疗</span>。",
+    "type": "danger"
+  },
+  {
+    "emoji": "👀",
+    "question": "蛤蚧泡酒壮阳不限量？",
+    "answer_text": "不宜",
+    "detail": "温补助阳过量<span class=\"hl\">血压与失眠</span>风险。",
+    "type": "warning"
+  },
+  {
+    "emoji": "❌",
+    "question": "洋金花曼陀罗泡茶止咳？",
+    "answer_text": "剧毒",
+    "detail": "阿托品类，<span class=\"hl\">可致死</span>。",
+    "type": "danger"
+  },
+  {
+    "emoji": "🚫",
+    "question": "穿心莲与酒同服清火加倍？",
+    "answer_text": "不宜",
+    "detail": "加重<span class=\"hl\">胃肠刺激</span>与肝负担。",
+    "type": "warning"
+  },
+  {
+    "emoji": "💡",
+    "question": "茯苓饼当碳水主食？",
+    "answer_text": "可看成分",
+    "detail": "市售多<span class=\"hl\">糖油</span>，注意热量。",
+    "type": "safe"
+  },
+  {
+    "emoji": "🌀",
+    "question": "蛇胆生吞清热解毒？",
+    "answer_text": "寄生虫与毒",
+    "detail": "<span class=\"hl\">禁止生吞</span>。",
+    "type": "danger"
+  },
+  {
+    "emoji": "👀",
+    "question": "土三七与文山同补血？",
+    "answer_text": "危险",
+    "detail": "土三七可致<span class=\"hl\">肝窦阻塞</span>，勿混。",
+    "type": "danger"
+  }
+]

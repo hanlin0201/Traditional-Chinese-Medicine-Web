@@ -41,14 +41,45 @@ export async function handleLogin(email, password) {
 }
 
 /** 注册 */
-export async function handleRegister(email, password) {
+export async function handleRegister(email, password, username = '') {
   const { data, error } = await supabase.auth.signUp({ email, password })
-  const ok = !error
-  const user = data?.user
+  if (error) return { ok: false, user: null, error, needsEmailConfirmation: false }
+  const user = data?.user || null
+  if (!user) {
+    return {
+      ok: false,
+      user: null,
+      error: { message: '注册失败，请重试' },
+      needsEmailConfirmation: false,
+    }
+  }
+  // Supabase 开启防用户枚举时，已注册邮箱可能返回“匿名 user 且 identities 为空”
+  if (Array.isArray(user.identities) && user.identities.length === 0) {
+    return {
+      ok: false,
+      user: null,
+      error: { message: 'User already registered' },
+      needsEmailConfirmation: false,
+    }
+  }
+  const ok = true
   const session = data?.session
   const needsEmailConfirmation = !!(user && !session)
+  if (ok && user?.id && username?.trim()) {
+    await supabase
+      .from('profiles')
+      .upsert(
+        {
+          id: user.id,
+          username: username.trim(),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'id' },
+      )
+  }
   return { ok, user, error, needsEmailConfirmation }
 }
+
 
 /**
  * 发送登录验证码（邮箱 OTP）

@@ -158,8 +158,9 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen pb-24 bg-[#FDFBF7]">
-    
+  <div class="herb-ency-page min-h-screen">
+    <!-- 固定视口背景：避免整页变长后 cover 按超长画布拉伸发糊 -->
+    <div class="herb-ency-foreground min-h-screen pb-24 relative z-[1]">
     <header class="sticky top-0 z-30 px-4 py-3 transition-all duration-300 bg-[#FDFBF7]/80 backdrop-blur-md border-b border-sandalwood/5">
       <div class="max-w-6xl mx-auto space-y-3">
         <div class="flex flex-col sm:flex-row gap-3">
@@ -324,10 +325,29 @@ onUnmounted(() => {
         </div>
       </div>
     </main>
+    </div>
   </div>
 </template>
 
 <style scoped>
+.herb-ency-page {
+  position: relative;
+  background-color: #f3eee4;
+}
+
+.herb-ency-page::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-color: #f3eee4;
+  background-image: url("/photo/herb_background.jpg");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+}
+
 /* 隐藏滚动条但保留功能 */
 .scrollbar-hide {
   -ms-overflow-style: none;

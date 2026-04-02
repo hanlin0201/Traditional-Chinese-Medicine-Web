@@ -113,8 +113,8 @@ export function useAuth() {
     return res
   }
 
-  async function handleRegister(email, password) {
-    const res = await auth.handleRegister(email, password)
+  async function handleRegister(email, password, username = '') {
+    const res = await auth.handleRegister(email, password, username)
     if (res.ok && res.user && !res.needsEmailConfirmation) {
       user.value = res.user
       isGuest.value = false

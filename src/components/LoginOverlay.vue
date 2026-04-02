@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, nextTick, onUnmounted } from 'vue'
 import { X } from 'lucide-vue-next'
 import { useAuth } from '@/composables/useAuth'
 import { getAuthErrorMessage } from '@/auth'
@@ -15,9 +15,8 @@ const loading = ref(false)
 const errorMsg = ref('')
 const successMsg = ref('')
 
-// 密码登录 / 注册
+// 密码登录
 const password = ref('')
-const isRegister = ref(false)
 
 // 验证码登录
 const isOtpMode = ref(false)
@@ -25,6 +24,15 @@ const otpCode = ref('')
 const otpSending = ref(false)
 const otpCountdown = ref(0)
 let otpTimer = null
+
+// 独立注册弹层
+const showRegisterModal = ref(false)
+const registerEmail = ref('')
+const registerPassword = ref('')
+const registerUsername = ref('')
+const registerLoading = ref(false)
+const registerError = ref('')
+const registerSuccess = ref('')
 
 const { handleLogin, handleRegister, sendLoginOtp, verifyLoginOtp, setGuestMode } = useAuth()
 
@@ -41,7 +49,6 @@ function switchToPassword() {
 
 function switchToOtp() {
   isOtpMode.value = true
-  isRegister.value = false
   password.value = ''
   errorMsg.value = ''
   successMsg.value = ''
@@ -53,21 +60,13 @@ async function handleSubmitPassword() {
   successMsg.value = ''
   loading.value = true
   const mail = normalizeLoginEmail(email.value)
-  const res = isRegister.value
-    ? await handleRegister(mail, password.value)
-    : await handleLogin(mail, password.value)
+  const res = await handleLogin(mail, password.value)
   loading.value = false
   if (res.ok) {
-    if (res.needsEmailConfirmation) {
-      errorMsg.value = ''
-      successMsg.value = '注册成功，请到邮箱查收确认邮件，确认后再登录'
-      password.value = ''
-      return
-    }
     emit('close')
     return
   }
-  errorMsg.value = getAuthErrorMessage(res.error) || (isRegister.value ? '注册失败，请重试' : '登录失败，请重试')
+  errorMsg.value = getAuthErrorMessage(res.error) || '登录失败，请重试'
 }
 
 async function handleSendOtp() {
@@ -115,10 +114,63 @@ function handleGuest() {
   emit('close')
 }
 
+function openRegisterModal() {
+  showRegisterModal.value = true
+  registerEmail.value = normalizeLoginEmail(email.value)
+  registerPassword.value = ''
+  registerUsername.value = ''
+  registerLoading.value = false
+  registerError.value = ''
+  registerSuccess.value = ''
+}
+
+function closeRegisterModal() {
+  showRegisterModal.value = false
+  registerLoading.value = false
+  registerError.value = ''
+  registerSuccess.value = ''
+}
+
+async function handleSubmitRegister() {
+  if (registerLoading.value) return
+  const mail = normalizeLoginEmail(registerEmail.value)
+  const nextPassword = registerPassword.value
+  const nextUsername = String(registerUsername.value || '').trim()
+  if (!mail) {
+    registerError.value = '请先填写邮箱'
+    return
+  }
+  if (!nextPassword || nextPassword.length < 6) {
+    registerError.value = '密码长度不能少于 6 位'
+    return
+  }
+  if (!nextUsername) {
+    registerError.value = '请填写昵称'
+    return
+  }
+  registerLoading.value = true
+  registerError.value = ''
+  registerSuccess.value = ''
+  const res = await handleRegister(mail, nextPassword, nextUsername)
+  registerLoading.value = false
+  if (!res.ok) {
+    const msg = getAuthErrorMessage(res.error) || '注册失败，请重试'
+    registerError.value = msg.includes('已注册') ? '该邮箱已注册，请直接登录' : msg
+    return
+  }
+  if (res.needsEmailConfirmation) {
+    registerSuccess.value = '注册成功，请先到邮箱完成确认后再登录'
+  } else {
+    registerSuccess.value = '注册成功'
+  }
+  successMsg.value = registerSuccess.value
+  closeRegisterModal()
+  emit('close')
+}
+
 /** 测试管理员：请在 Supabase 创建用户 123456@tcm.local / 密码 123456 */
 async function handleAdminQuickLogin() {
   isOtpMode.value = false
-  isRegister.value = false
   email.value = '123456'
   password.value = '123456'
   errorMsg.value = ''
@@ -126,6 +178,13 @@ async function handleAdminQuickLogin() {
   await nextTick()
   await handleSubmitPassword()
 }
+
+onUnmounted(() => {
+  if (otpTimer) {
+    clearInterval(otpTimer)
+    otpTimer = null
+  }
+})
 </script>
 
 <template>
@@ -153,17 +212,10 @@ async function handleAdminQuickLogin() {
       <div class="login-overlay-toggle">
         <button
           type="button"
-          :class="['login-overlay-tab', { active: !isOtpMode && !isRegister }]"
-          @click="switchToPassword(); isRegister = false"
+          :class="['login-overlay-tab', { active: !isOtpMode }]"
+          @click="switchToPassword"
         >
           密码登录
-        </button>
-        <button
-          type="button"
-          :class="['login-overlay-tab', { active: !isOtpMode && isRegister }]"
-          @click="switchToPassword(); isRegister = true"
-        >
-          注册
         </button>
         <button
           type="button"
@@ -174,7 +226,7 @@ async function handleAdminQuickLogin() {
         </button>
       </div>
 
-      <!-- 密码登录 / 注册 -->
+      <!-- 密码登录 -->
       <form v-if="!isOtpMode" class="login-overlay-form" @submit.prevent="handleSubmitPassword">
         <input
           v-model="email"
@@ -188,7 +240,7 @@ async function handleAdminQuickLogin() {
           type="password"
           placeholder="密码（至少 6 位）"
           class="login-overlay-input"
-          :autocomplete="isRegister ? 'new-password' : 'current-password'"
+          autocomplete="current-password"
         />
         <p v-if="errorMsg" class="login-overlay-error">{{ errorMsg }}</p>
         <p
@@ -208,7 +260,7 @@ async function handleAdminQuickLogin() {
           class="login-overlay-btn-primary"
           :disabled="!canSubmitPassword || loading"
         >
-          {{ loading ? '处理中…' : (isRegister ? '注册' : '登录') }}
+          {{ loading ? '处理中…' : '登录' }}
         </button>
       </form>
 
@@ -248,6 +300,10 @@ async function handleAdminQuickLogin() {
         </button>
       </form>
 
+      <button type="button" class="login-overlay-admin-link" @click="openRegisterModal">
+        没有账号？立即注册
+      </button>
+
       <button type="button" class="login-overlay-guest" @click="handleGuest">
         以游客身份试用 (Guest Mode)
       </button>
@@ -259,6 +315,52 @@ async function handleAdminQuickLogin() {
       >
         管理员登录（测试）
       </button>
+    </div>
+
+    <div v-if="showRegisterModal" class="login-overlay register-modal-overlay" @click="closeRegisterModal">
+      <div class="login-overlay-card register-modal-card" @click.stop>
+        <div class="login-overlay-card-head">
+          <h3 class="login-overlay-title">立即注册</h3>
+          <button type="button" class="login-overlay-close" aria-label="关闭" @click="closeRegisterModal">
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+        <p class="login-overlay-desc">完成注册后可同步你的账号数据</p>
+
+        <form class="login-overlay-form" @submit.prevent="handleSubmitRegister">
+          <input
+            v-model="registerEmail"
+            type="text"
+            placeholder="邮箱（用于账号登录）"
+            class="login-overlay-input"
+            autocomplete="email"
+          />
+          <input
+            v-model="registerPassword"
+            type="password"
+            placeholder="设置密码（至少 6 位）"
+            class="login-overlay-input"
+            autocomplete="new-password"
+          />
+          <input
+            v-model="registerUsername"
+            type="text"
+            placeholder="设置昵称"
+            class="login-overlay-input"
+            maxlength="32"
+            autocomplete="nickname"
+          />
+          <p v-if="registerError" class="login-overlay-error">{{ registerError }}</p>
+          <p v-else-if="registerSuccess" class="login-overlay-success">{{ registerSuccess }}</p>
+          <button
+            type="submit"
+            class="login-overlay-btn-primary"
+            :disabled="registerLoading || !registerEmail.trim() || registerPassword.length < 6 || !registerUsername.trim()"
+          >
+            {{ registerLoading ? '注册中…' : '完成注册' }}
+          </button>
+        </form>
+      </div>
     </div>
   </div>
 </template>
