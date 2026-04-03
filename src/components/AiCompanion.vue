@@ -97,6 +97,8 @@ const SESSIONS_KEY = 'tcm_chat_sessions'
 const sessions = ref([])
 const activeSessionId = ref(null)
 const showSessionList = ref(false)
+const editingSessionId = ref(null)
+const editingTitle = ref('')
 
 function serializeMessages(msgs) {
   // 过滤掉未完成的流式消息，其余全部保存
@@ -114,7 +116,7 @@ function saveActiveSession() {
   sessions.value[idx].messages = serialized
   sessions.value[idx].updatedAt = new Date().toISOString()
   // 用第一条用户消息自动生成标题
-  if (sessions.value[idx].title === '新对话') {
+  if (!sessions.value[idx].manualTitle && sessions.value[idx].title === '新对话') {
     const firstUser = serialized.find(m => m.role === 'user')
     if (firstUser) {
       const t = firstUser.content || ''
@@ -130,6 +132,7 @@ function createNewSession() {
   sessions.value.unshift({
     id,
     title: '新对话',
+    manualTitle: false,
     messages: [{ ...WELCOME_MSG }],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -144,11 +147,43 @@ function createNewSession() {
 function switchToSession(id) {
   if (id === activeSessionId.value) { showSessionList.value = false; return }
   saveActiveSession()
+  cancelRenameSession()
   activeSessionId.value = id
   const s = sessions.value.find(s => s.id === id)
   messages.value = s?.messages?.length ? [...s.messages] : [{ ...WELCOME_MSG }]
   showSessionList.value = false
   nextTick(() => scrollToBottom())
+}
+
+function startRenameSession(session, e) {
+  e?.stopPropagation()
+  editingSessionId.value = session.id
+  editingTitle.value = session.title || ''
+}
+
+function cancelRenameSession(e) {
+  e?.stopPropagation()
+  editingSessionId.value = null
+  editingTitle.value = ''
+}
+
+function commitRenameSession(id, e) {
+  e?.stopPropagation()
+  const idx = sessions.value.findIndex(s => s.id === id)
+  if (idx === -1) {
+    cancelRenameSession()
+    return
+  }
+
+  const nextTitle = String(editingTitle.value || '').trim()
+  if (nextTitle) {
+    sessions.value[idx].title = nextTitle.slice(0, 30)
+    sessions.value[idx].manualTitle = true
+    sessions.value[idx].updatedAt = new Date().toISOString()
+    persistSessions()
+  }
+
+  cancelRenameSession()
 }
 
 function deleteSession(id, e) {
@@ -161,11 +196,12 @@ function deleteSession(id, e) {
     } else {
       // 全部删完则自动新建一个
       const newId = String(Date.now())
-      sessions.value.push({ id: newId, title: '新对话', messages: [{ ...WELCOME_MSG }], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+      sessions.value.push({ id: newId, title: '新对话', manualTitle: false, messages: [{ ...WELCOME_MSG }], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
       activeSessionId.value = newId
       messages.value = [{ ...WELCOME_MSG }]
     }
   }
+  if (editingSessionId.value === id) cancelRenameSession()
   persistSessions()
 }
 
@@ -182,14 +218,19 @@ function formatSessionDate(iso) {
 function loadSessions() {
   try {
     const raw = localStorage.getItem(SESSIONS_KEY)
-    if (raw) sessions.value = JSON.parse(raw)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      sessions.value = Array.isArray(parsed)
+        ? parsed.map(s => ({ ...s, manualTitle: !!s.manualTitle }))
+        : []
+    }
   } catch {}
   if (sessions.value.length) {
     activeSessionId.value = sessions.value[0].id
     messages.value = sessions.value[0].messages?.length ? [...sessions.value[0].messages] : [{ ...WELCOME_MSG }]
   } else {
     const id = String(Date.now())
-    sessions.value = [{ id, title: '新对话', messages: [{ ...WELCOME_MSG }], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }]
+    sessions.value = [{ id, title: '新对话', manualTitle: false, messages: [{ ...WELCOME_MSG }], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }]
     activeSessionId.value = id
     persistSessions()
   }
@@ -772,9 +813,26 @@ defineExpose({ openPanel })
             >
               <MessageCircle class="w-4 h-4 text-sandalwood/40 shrink-0" />
               <div class="flex-1 min-w-0">
-                <p class="text-sm text-gray-800 truncate">{{ s.title }}</p>
+                <input
+                  v-if="editingSessionId === s.id"
+                  v-model="editingTitle"
+                  @click.stop
+                  @keyup.enter.stop="commitRenameSession(s.id, $event)"
+                  @keyup.esc.stop="cancelRenameSession($event)"
+                  @blur="commitRenameSession(s.id, $event)"
+                  maxlength="30"
+                  class="w-full text-sm px-2 py-1 border border-sandalwood/20 rounded bg-white text-gray-800 outline-none focus:ring-1 focus:ring-sandalwood/40"
+                />
+                <p v-else class="text-sm text-gray-800 truncate">{{ s.title }}</p>
                 <p class="text-xs text-gray-400 mt-0.5">{{ formatSessionDate(s.updatedAt) }}</p>
               </div>
+              <button
+                @click="startRenameSession(s, $event)"
+                title="重命名对话"
+                class="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-sandalwood/10 text-gray-300 hover:text-sandalwood transition"
+              >
+                重命名
+              </button>
               <button
                 @click="deleteSession(s.id, $event)"
                 title="删除对话"
