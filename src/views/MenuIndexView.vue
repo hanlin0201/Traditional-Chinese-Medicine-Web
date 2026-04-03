@@ -59,7 +59,9 @@ const todayLabel = (() => {
 })();
 
 // --- 核心翻页逻辑 ---
-const activeIndex = ref(0);
+const activeIndex = ref(
+  route.path === "/" && route.query.history === "open" ? 3 : 0,
+);
 const isAnimating = ref(false);
 const totalSections = 4;
 
@@ -76,12 +78,22 @@ const currentNextLabel = computed(() => {
 });
 
 // --- 动画跳转逻辑 ---
-const moveTo = (index) => {
+const moveTo = (index, options = {}) => {
+  const instant = options.instant === true;
   if (index < 0 || index >= totalSections) return;
-  if (isAnimating.value) return;
+  if (!instant && isAnimating.value) return;
+
+  activeIndex.value = index;
+
+  if (instant) {
+    gsap.set(".scroll-container", {
+      y: `-${index * 100}%`,
+    });
+    isAnimating.value = false;
+    return;
+  }
 
   isAnimating.value = true;
-  activeIndex.value = index;
 
   gsap.to(".scroll-container", {
     y: `-${index * 100}%`,
@@ -142,7 +154,9 @@ watch(activeIndex, (newVal) => {
 watch(
   () => ({ path: route.path, history: route.query.history }),
   (curr) => {
-    if (curr.path === "/" && curr.history === "open") nextTick(() => moveTo(3));
+    if (curr.path === "/" && curr.history === "open") {
+      nextTick(() => moveTo(3, { instant: true }));
+    }
   },
   { immediate: true },
 );
@@ -258,6 +272,10 @@ const fetchSeasonalData = async () => {
 };
 
 onMounted(() => {
+  // 从朝代详情 replace 回首页时直接落在历史屏，避免首帧停在首屏再跳转
+  if (route.path === "/" && route.query.history === "open") {
+    gsap.set(".scroll-container", { y: "-300%" });
+  }
   fetchSeasonalData();
   // 用户停留首页时，在空闲时段预加载药材页/食谱页代码与首屏数据
   if (typeof window !== "undefined" && "requestIdleCallback" in window) {

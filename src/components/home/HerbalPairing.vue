@@ -1,38 +1,85 @@
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import { Link, AlertTriangle, Compass, ArrowRight } from "lucide-vue-next";
+import { Link, AlertTriangle, Compass, Search, X } from "lucide-vue-next";
 import { supabase } from "@/supabaseClient";
 import { FEATURE_COPY } from "@/constants/branding";
 
 const router = useRouter();
-const pairs = ref([]);
+const fullPairings = ref([]);
+const browsePairs = ref([]);
+const herbQuery = ref("");
 const loading = ref(false);
+
+const SEARCH_RESULT_CAP = 200;
+
+const isSearching = computed(() => herbQuery.value.trim().length > 0);
+
+const displayedPairs = computed(() => {
+  const q = herbQuery.value.trim();
+  if (!q) return browsePairs.value;
+  const list = fullPairings.value;
+  return list
+    .filter(
+      (p) =>
+        (p.left_herb && String(p.left_herb).includes(q)) ||
+        (p.right_herb && String(p.right_herb).includes(q))
+    )
+    .slice(0, SEARCH_RESULT_CAP)
+    .map((p, i) => ({ ...p, isOpen: false, _key: `s-${p.id ?? i}-${i}` }));
+});
+
+const pairRowKey = (item, index) =>
+  isSearching.value ? item._key ?? `s-${item.id}-${index}` : item.id ?? index;
 
 // --- 背景图设置 ---
 const bgImage =
   "https://img95.699pic.com/video_cover/46/24/21/a_awADQHKSEUjU1630462421.jpg!/fw/820";
 
-// --- 1. 罗盘刷新逻辑 ---
+function mapPairingRow(item) {
+  return {
+    ...item,
+    isOpen: false,
+  };
+}
+
+function pickRandomBrowse() {
+  const list = fullPairings.value;
+  if (!list.length) {
+    browsePairs.value = [];
+    return;
+  }
+  const shuffled = [...list].sort(() => Math.random() - 0.5);
+  browsePairs.value = shuffled.slice(0, 16).map(mapPairingRow);
+}
+
+function clearHerbSearch() {
+  herbQuery.value = "";
+}
+
+function shuffleBrowseBatch() {
+  if (loading.value || isSearching.value) return;
+  pickRandomBrowse();
+}
+
+// --- 1. 加载全量配伍 + 随机浏览 ---
 const fetchRandomPairings = async () => {
   loading.value = true;
   try {
     const { data, error } = await supabase
       .from("herbal_pairings")
       .select("*")
-      .limit(120);
+      .limit(2000);
 
     if (error) throw error;
 
-    const shuffled = [...data].sort(() => Math.random() - 0.5);
-    pairs.value = shuffled.slice(0, 16).map((item) => ({
-      ...item,
-      isOpen: false,
-    }));
+    const rows = Array.isArray(data) ? data : [];
+    fullPairings.value = rows.map(mapPairingRow);
+    pickRandomBrowse();
   } catch (e) {
     console.error("获取失败:", e);
     // 演示数据
-    pairs.value = [
+    const demo = [
       {
         id: 1,
         type: "good",
@@ -182,6 +229,8 @@ const fetchRandomPairings = async () => {
         isOpen: false,
       },
     ];
+    fullPairings.value = demo.map(mapPairingRow);
+    pickRandomBrowse();
   } finally {
     setTimeout(() => {
       loading.value = false;
@@ -218,7 +267,11 @@ onMounted(() => {
           <p class="sub-title">{{ FEATURE_COPY.pairing.motto }}</p>
         </div>
 
-        <div class="refresh-control" @click="fetchRandomPairings">
+        <div
+          class="refresh-control"
+          :class="{ 'is-disabled': isSearching }"
+          @click="shuffleBrowseBatch"
+        >
           <div class="compass-box" :class="{ 'is-loading': loading }">
             <Compass :size="28" />
           </div>
@@ -228,11 +281,43 @@ onMounted(() => {
         </div>
       </div>
 
+      <div class="search-row">
+        <div class="search-field">
+          <Search class="search-icon" :size="18" aria-hidden="true" />
+          <input
+            v-model="herbQuery"
+            type="search"
+            class="herb-search-input"
+            placeholder="输入药材名，查看与之宜 / 忌配伍的药材"
+            enterkeyhint="search"
+            autocomplete="off"
+          />
+          <button
+            v-show="herbQuery.trim()"
+            type="button"
+            class="search-clear"
+            aria-label="清空"
+            @click="clearHerbSearch"
+          >
+            <X :size="16" />
+          </button>
+        </div>
+        <p v-if="isSearching" class="search-hint">
+          <template v-if="displayedPairs.length">
+            共 {{ displayedPairs.length }} 条配伍
+            <span v-if="displayedPairs.length >= SEARCH_RESULT_CAP">
+              （至多展示 {{ SEARCH_RESULT_CAP }} 条）
+            </span>
+          </template>
+          <template v-else> 未找到包含「{{ herbQuery.trim() }}」的配伍记录 </template>
+        </p>
+      </div>
+
       <div class="cabinet-container">
         <div class="cabinet-inner">
           <div
-            v-for="item in pairs"
-            :key="item.id"
+            v-for="(item, idx) in displayedPairs"
+            :key="pairRowKey(item, idx)"
             class="grid-cell"
             @click="toggleFlip(item)"
           >
@@ -363,6 +448,66 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   cursor: pointer;
+}
+.refresh-control.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.search-row {
+  max-width: 1000px;
+  margin: 0 auto 16px;
+}
+.search-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 520px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-sizing: border-box;
+}
+.search-icon {
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.85);
+}
+.herb-search-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: #fff;
+  font-size: 0.95rem;
+  font-family: "Noto Serif SC", serif;
+  outline: none;
+}
+.herb-search-input::placeholder {
+  color: rgba(255, 255, 255, 0.55);
+}
+.search-clear {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.search-clear:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+.search-hint {
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.82);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 .compass-box {
   color: rgba(255, 255, 255, 0.95);

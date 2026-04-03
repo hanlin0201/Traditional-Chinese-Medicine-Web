@@ -479,7 +479,7 @@ function goBack() {
       </div>
 
       <!-- 主体区域：悬浮信息卡片 + 模式切换 + 目录 + 详细内容 -->
-      <main class="flex-1 px-4 pb-10 -mt-10 sm:-mt-16 relative z-0">
+      <main class="flex-1 px-4 sm:px-6 pb-10 -mt-10 sm:-mt-16 relative z-0">
         <!-- 悬浮信息卡片 -->
         <section class="max-w-4xl mx-auto">
           <div
@@ -604,12 +604,11 @@ function goBack() {
           </div>
         </section>
 
-        <!-- 下方标签区与锚点已合并进顶部信息卡片，这里留白以便内容“呼吸” -->
-        <section class="max-w-4xl mx-auto mt-4" />
-        
+        <!-- 详情正文：与顶部卡片同宽居中，避免信息框贴满视口两侧 -->
+        <div class="max-w-4xl mx-auto w-full mt-4 space-y-4 sm:space-y-5">
         <!-- 专业模式：原有 herbs 表内容 -->
         <template v-if="detailMode === 'professional'">
-          <section id="section-basic" class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
+          <section id="section-basic" class="rounded-xl bg-paper-card shadow-paper p-5 sm:p-6 border border-sandalwood/10">
             <h2 class="text-cinnabar font-serif font-semibold text-base mb-3 flex items-center gap-2">
               <span class="w-1 h-4 bg-cinnabar rounded" /> 基本信息
             </h2>
@@ -621,7 +620,7 @@ function goBack() {
             </div>
           </section>
 
-          <section id="section-taste-meridian" class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
+          <section id="section-taste-meridian" class="rounded-xl bg-paper-card shadow-paper p-5 sm:p-6 border border-sandalwood/10">
             <h2 class="text-cinnabar font-serif font-semibold text-base mb-2 flex items-center gap-2">
               <span class="w-1 h-4 bg-cinnabar rounded" /> 性味归经
             </h2>
@@ -633,7 +632,7 @@ function goBack() {
             <p v-else class="text-sandalwood/60 text-sm">暂无</p>
           </section>
 
-          <section id="section-function" class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
+          <section id="section-function" class="rounded-xl bg-paper-card shadow-paper p-5 sm:p-6 border border-sandalwood/10">
             <h2 class="text-cinnabar font-serif font-semibold text-base mb-2 flex items-center gap-2">
               <span class="w-1 h-4 bg-cinnabar rounded" /> 功效与作用
             </h2>
@@ -647,7 +646,7 @@ function goBack() {
             ></div>
           </section>
 
-          <section id="section-usage" class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
+          <section id="section-usage" class="rounded-xl bg-paper-card shadow-paper p-5 sm:p-6 border border-sandalwood/10">
             <h2 class="text-bamboo font-serif font-semibold text-base mb-2 flex items-center gap-2">
               <span class="w-1 h-4 bg-bamboo rounded" /> 用法用量
             </h2>
@@ -657,7 +656,7 @@ function goBack() {
             ></div>
           </section>
 
-          <div class="rounded-xl bg-paper-card shadow-paper p-5 border border-sandalwood/10">
+          <div class="rounded-xl bg-paper-card shadow-paper p-5 sm:p-6 border border-sandalwood/10">
             <h2 class="text-cinnabar font-serif font-semibold text-base mb-2 flex items-center gap-2">
               <span class="w-1 h-4 bg-cinnabar rounded" /> 使用禁忌
             </h2>
@@ -746,6 +745,7 @@ function goBack() {
             </div>
           </template>
         </template>
+        </div>
       </main>
     </template>
   </div>

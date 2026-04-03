@@ -292,7 +292,8 @@ function onPaperWheel(e) {
 /* 引导动画 */
 .tcm-explore-hint {
   position: absolute;
-  left: 56px;
+  /* 卷轴杆 z-index 更高且向左伸出，提示整体右移避免箭头被遮挡 */
+  left: clamp(70px, 12vw, 96px);
   top: 50%;
   transform: translateY(-50%);
   display: flex;
