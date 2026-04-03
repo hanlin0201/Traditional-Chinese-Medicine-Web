@@ -16,6 +16,7 @@ const foldedStates = ref({})
 /*const userTurnCount = ref(0)*/
 const pendingPrescription = ref(null)
 const prescriptionLoading = ref(false)
+const prescriptionLoadingSessionId = ref(null)
 
 // 👇 Supabase Edge Function 地址（API Key 安全存储在服务端，前端无需暴露）
 const TCM_CHAT_URL = 'https://htrtcaswqydnfvgwernh.supabase.co/functions/v1/tcm-chat'
@@ -429,6 +430,9 @@ function stripJsonFromText(text) {
 function cleanDisplayContent(content) {
   if (!content) return content
   let s = String(content).replace(/\s*type\s*:\s*["']?(?:inquiry|prescription)["']?\s*/gi, '').trim()
+  // 兜底：压缩异常连发的感叹号，避免出现刷屏式“!!!!!!”
+  s = s.replace(/([!！])\1{3,}/g, '$1')
+  s = s.replace(/(?:[!！]\s*){4,}/g, '！')
   // 分点作答时每条换行：1. xxx 2. xxx -> 1. xxx\n2. xxx
   s = s.replace(/([^\n])\s*(\d+)[\.、]\s+/g, '$1\n$2. ')
   return s
@@ -490,6 +494,7 @@ function cleanPrescription(jsonData) {
 async function send() {
   const text = input.value.trim()
   if (!text || loadingStatus.value) return
+  const requestSessionId = activeSessionId.value
 
   messages.value.push({ role: 'user', content: text })
   input.value = ''
@@ -517,6 +522,7 @@ async function send() {
 
   try {
     const fullText = await callSiliconFlowStream((chunk, accumulated) => {
+      if (activeSessionId.value !== requestSessionId) return
       if (loadingStatus.value) loadingStatus.value = ''
       if (prescriptionLoading.value) return
 
@@ -525,6 +531,7 @@ async function send() {
         messages.value[streamIdx].content = accumulated.slice(0, codeBlockIdx).trim()
         if (accumulated.includes('"prescription"')) {
           prescriptionLoading.value = true
+          prescriptionLoadingSessionId.value = requestSessionId
         }
         return
       }
@@ -536,6 +543,7 @@ async function send() {
           messages.value[streamIdx].content = textLines.slice(0, i).join('\n').trim()
           if (accumulated.includes('"prescription"')) {
             prescriptionLoading.value = true
+            prescriptionLoadingSessionId.value = requestSessionId
           }
           return
         }
@@ -544,7 +552,9 @@ async function send() {
       messages.value[streamIdx].content = accumulated
     }, text)
 
+    if (activeSessionId.value !== requestSessionId) return
     prescriptionLoading.value = false
+    prescriptionLoadingSessionId.value = null
     const jsonData = extractJSON(fullText, null)
 
    if (jsonData && jsonData.type === 'prescription') {
@@ -572,7 +582,9 @@ async function send() {
     }
   } catch (err) {
     console.error(err)
+    if (activeSessionId.value !== requestSessionId) return
     prescriptionLoading.value = false
+    prescriptionLoadingSessionId.value = null
     const existing = messages.value[streamIdx]
     if (existing && existing.content) {
       messages.value[streamIdx] = { role: 'assistant', type: 'text', content: existing.content }
@@ -582,6 +594,7 @@ async function send() {
   } finally {
     loadingStatus.value = ''
     prescriptionLoading.value = false
+    prescriptionLoadingSessionId.value = null
   }
 }
 
@@ -948,7 +961,7 @@ defineExpose({ openPanel })
             </div>
           </div>
           <div v-if="loadingStatus" class="mr-auto bg-[#F5EDD8] text-sandalwood px-4 py-2.5 rounded-lg text-sm flex items-center gap-2 animate-pulse"><Loader2 class="w-4 h-4 animate-spin" /><span>{{ loadingStatus }}</span></div>
-          <div v-if="prescriptionLoading" class="mr-auto w-[98%] space-y-2 animate-slide-up">
+          <div v-if="prescriptionLoading && prescriptionLoadingSessionId === activeSessionId" class="mr-auto w-[98%] space-y-2 animate-slide-up">
             <div class="bg-white border border-sandalwood/20 rounded-xl overflow-hidden shadow-md animate-pulse">
               <div class="bg-[#FAF6ED] p-3 border-b border-sandalwood/10">
                 <div class="h-4 bg-sandalwood/20 rounded w-3/4 mb-2"></div>
