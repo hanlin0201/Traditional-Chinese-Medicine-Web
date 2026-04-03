@@ -10,6 +10,7 @@ const open = ref(false)
 const input = ref('')
 const loadingStatus = ref('') 
 const messagesContainer = ref(null)
+const panelShellRef = ref(null)
 const favorited = ref(new Set())   
 const foldedStates = ref({})       
 
@@ -677,12 +678,50 @@ async function handleSavePlan(fullMessage) {
     messages.value.push({ role: 'assistant', type: 'text', content: `✅ 已加入调理计划（包含 ${count} 个已收藏食谱）。` })
   } catch (err) { console.error(err); messages.value.push({ role: 'assistant', type: 'text', content: '保存失败。' }) }
 }
-
 function handleKeydown(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }
 
 function openPanel() {
   open.value = true
   nextTick(() => scrollToBottom())
+}
+
+function findScrollableInPanel(startNode) {
+  const panel = panelShellRef.value
+  let el = startNode instanceof HTMLElement ? startNode : null
+
+  while (el && panel && el !== panel) {
+    if (el.dataset?.scrollable === 'true' && el.scrollHeight > el.clientHeight) {
+      return el
+    }
+    el = el.parentElement
+  }
+
+  if (messagesContainer.value && messagesContainer.value.scrollHeight > messagesContainer.value.clientHeight) {
+    return messagesContainer.value
+  }
+
+  return null
+}
+
+function onPanelWheel(e) {
+  if (!open.value) return
+  const scroller = findScrollableInPanel(e.target)
+
+  // Consume wheel events inside panel to prevent background scroll bleeding.
+  e.preventDefault()
+  e.stopPropagation()
+
+  if (!scroller) return
+
+  const atTop = scroller.scrollTop <= 0
+  const atBottom = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1
+  const up = e.deltaY < 0
+  const down = e.deltaY > 0
+
+  if ((up && atTop) || (down && atBottom)) return
+
+  scroller.scrollTop += e.deltaY
+  if (e.deltaX) scroller.scrollLeft += e.deltaX
 }
 
 /** 面板尺寸：右下角固定，从左下角拖拽调整 */
@@ -782,8 +821,10 @@ defineExpose({ openPanel })
   <Teleport to="body">
     <Transition enter-active-class="transition duration-200 ease-out" enter-from-class="opacity-0 translate-y-4" enter-to-class="opacity-100 translate-y-0" leave-active-class="transition duration-150 ease-in" leave-from-class="opacity-100 translate-y-0" leave-to-class="opacity-0 translate-y-4">
       <div
+        ref="panelShellRef"
         v-show="open"
         class="ai-panel-shell fixed bottom-24 right-6 z-50 rounded-xl shadow-card border border-sandalwood/20 flex flex-col bg-[#FDFBF7] overflow-hidden relative"
+        @wheel.capture="onPanelWheel"
         :style="{ width: `${panelW}px`, height: `${panelH}px`, maxHeight: `${panelMaxH()}px` }"
       >
         <div
@@ -816,7 +857,7 @@ defineExpose({ openPanel })
               <PlusCircle class="w-3.5 h-3.5" /> 新建对话
             </button>
           </div>
-          <div class="flex-1 overflow-y-auto">
+          <div class="ai-panel-scroll flex-1 overflow-y-auto" data-scrollable="true">
             <div v-if="!sessions.length" class="p-6 text-center text-xs text-gray-400">暂无历史记录</div>
             <div
               v-for="s in sessions" :key="s.id"
@@ -857,7 +898,7 @@ defineExpose({ openPanel })
           </div>
         </div>
 
-        <div ref="messagesContainer" class="flex-1 overflow-y-auto p-4 space-y-4 bg-[#FAF6ED]">
+        <div ref="messagesContainer" class="ai-panel-scroll flex-1 overflow-y-auto p-4 space-y-4 bg-[#FAF6ED]" data-scrollable="true">
           <div v-for="(m, i) in messages" :key="i">
             
             <div v-if="m.type === 'text' || !m.type" :class="['max-w-[85%] rounded-lg px-4 py-2.5 text-sm', m.role === 'user' ? 'ml-auto bg-sandalwood/15 text-sandalwood' : 'mr-auto bg-[#F5EDD8] text-sandalwood whitespace-pre-wrap']">
@@ -1008,6 +1049,11 @@ defineExpose({ openPanel })
 /* 右下角定位：从左下角拖拽放大（向左变宽、向上变高） */
 .ai-panel-shell {
   position: fixed;
+  overscroll-behavior: contain;
+}
+.ai-panel-scroll {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 .ai-panel-resize-handle {
   position: absolute;
