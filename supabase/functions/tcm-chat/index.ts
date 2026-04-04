@@ -43,34 +43,39 @@ Deno.serve(async (req: Request) => {
     if (lastUserIdx !== -1) {
       let hint = ''
       // 💡 提取出开方卡片的严格格式要求，防止代码重复，也防止 AI 忘掉格式
-      const FORMAT_PROMPT = '必须包含 ```json 代码块，内容为 {"type":"prescription","warm_words":"...","diagnosis_result":"...","summary":"...","recipes":[{"category":"tea",...},{"category":"meal",...},{"category":"classic",...}],"acupoints":[{"name":"...","location":"...","method":"..."} 或 {"name":"无","location":"无","method":"无"}],"lifestyle":["..."]}。recipes 必须有 tea、meal、classic 三类。严禁只输出纯文字不输出 JSON。'
+      const FORMAT_PROMPT = '【重要】必须先用2-3句自然语言写出诊断分析（如"根据你的症状和舌苔情况，初步判断你属于……"），再紧接着输出处方 JSON 卡片。禁止直接输出 JSON 而不写诊断分析。JSON格式：必须包含 ```json 代码块，内容为 {"type":"prescription","warm_words":"...","diagnosis_result":"...","summary":"...","recipes":[{"category":"tea",...},{"category":"meal",...},{"category":"classic",...}],"acupoints":[{"name":"...","location":"...","method":"..."} 或 {"name":"无","location":"无","method":"无"}],"lifestyle":["..."]}。recipes 必须有 tea、meal、classic 三类。严禁只输出纯文字不输出 JSON。'
       const SAFETY_PROMPT = '【食疗红线】仅推荐食疗食谱，禁止成药（丸、散、可直接购买服用）。严禁附子、乌头、马钱子等有毒药材。'
-  
+      const INQUIRY_PROMPT = '回复末尾必须附带如下格式的 JSON 选项卡片（禁止省略）：\n```json\n{"type":"inquiry","text":"你这一轮的问诊问题","options":[{"label":"选项1","value":"v1"},{"label":"以上都不是","value":"none"},{"label":"无其他症状，请开方","value":"finish"}]}\n```'
+
       if (userSaysAllFine) {
         hint = '用户表示一切良好，请停止追问，简短祝福即可。严禁输出 JSON。'
       } else if (isGeneralQuestion) {
         hint = '用户在问知识类问题，请直接回答，不要追问症状。严禁输出 JSON。'
       } else if (userJustConfirmed) {
-        // 绝对指令：用户主动点确认（如"没有其他症状了"），无视轮数，直接开方
         hint = `用户已确认没有其他症状或要求直接开方，请立即结束问诊，输出详细的处方 JSON 卡片（type: "prescription"）。\n${SAFETY_PROMPT}\n格式要求：${FORMAT_PROMPT}`
       } else {
-        // 🚀 核心修复：模糊表述必须多轮追问；用户要方案时也要先问清
-        const needMoreRounds = isVagueSymptom ? userTurnCount < 4 : userTurnCount < 3
+        const needMoreRounds = isVagueSymptom ? userTurnCount < 5 : userTurnCount < 4
         if (needMoreRounds) {
+          // 判断对话中是否已经问过舌苔
+          const tongueAsked = messages.some((m: {role: string, content: string}) =>
+            m.role === 'assistant' && (m.content || '').includes('舌苔')
+          )
+          const tongueHint = tongueAsked
+            ? '（舌苔已询问过，本轮请从其他角度追问，不要重复已问过的问题）'
+            : '【本轮必须询问舌苔情况】（舌色是红/淡/暗？苔是白/黄/厚/薄/腻？）'
+
           if (isVagueSymptom) {
-            hint = `【重要】用户描述较模糊（如累、没劲、不舒服等），必须从睡眠、饮食、情绪、二便、舌苔、怕冷怕热等多维度追问，当前仅第 ${userTurnCount} 轮，【绝对不要】急于开方！请继续追问并附带 type: "inquiry" 的 JSON 选项卡片。`
+            hint = `【重要】用户描述较模糊，必须多维度追问，当前仅第 ${userTurnCount} 轮，【绝对不要】急于开方！${tongueHint}\n${INQUIRY_PROMPT}`
           } else if (userNeedsPlanCard) {
-            hint = `【重要】用户表达了想要"食疗/调理/方案"的意愿，但当前是问诊初期（第 ${userTurnCount} 轮），信息尚不充分。请先安抚用户，然后【绝对不要】在这一轮输出 prescription！请继续追问（睡眠、二便、饮食、舌苔等），并在回复末尾务必附带 type: "inquiry" 的 JSON 选项卡片。`
+            hint = `【重要】用户想要调理方案，但当前第 ${userTurnCount} 轮信息尚不充分，【绝对不要】输出 prescription！${tongueHint}\n${INQUIRY_PROMPT}`
           } else {
-            hint = `【重要】当前是问诊初期（第 ${userTurnCount} 轮）。除非用户明确说"直接开方"，否则【绝对不要】输出 prescription！请继续追问（睡眠、二便、饮食、怕冷怕热、舌苔等），并在回复末尾务必附带 type: "inquiry" 的 JSON 选项卡片。`
+            hint = `【重要】当前问诊第 ${userTurnCount} 轮，除非用户明确说"直接开方"，否则【绝对不要】输出 prescription！${tongueHint}\n${INQUIRY_PROMPT}`
           }
         } else {
           if (userNeedsPlanCard) {
-            // 聊够了，并且用户主动要方案了：立刻给
-            hint = `【进度提示】问诊已进行 ${userTurnCount} 轮，且用户明确请求调理/食疗方案。请立即输出 type: "prescription" 的 JSON 卡片给出完整的调理方案。\n${SAFETY_PROMPT}\n格式要求：${FORMAT_PROMPT}`
+            hint = `【进度提示】问诊已进行 ${userTurnCount} 轮，用户明确请求方案，请立即输出处方。\n${SAFETY_PROMPT}\n格式要求：${FORMAT_PROMPT}`
           } else {
-            // 聊够了，用户没主动要：AI自行判断
-            hint = `【进度提示】问诊已进行 ${userTurnCount} 轮。请自行判断：如果用户的核心症状、舌象/二便/睡眠等信息已经足够明确，请直接输出 type: "prescription" 的 JSON 卡片给出完整的调理方案。\n${SAFETY_PROMPT}\n格式要求：${FORMAT_PROMPT}；如果信息依然很模糊且无法辩证，你可以继续追问并附带 inquiry 卡片。`
+            hint = `【进度提示】问诊已进行 ${userTurnCount} 轮。如果核心症状、舌象等信息已足够，请直接输出处方；否则继续追问。\n${SAFETY_PROMPT}\n格式要求：${FORMAT_PROMPT}\n如继续追问：${INQUIRY_PROMPT}`
           }
         }
       }
