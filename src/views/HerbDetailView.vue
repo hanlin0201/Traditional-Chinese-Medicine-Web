@@ -434,18 +434,6 @@ function goBack() {
         </h1>
       </div>
 
-      <div v-if="!loading && herb" class="flex items-center gap-2">
-        <button
-          @click="toggleFavorite"
-          :disabled="isToggling"
-          class="p-2 rounded-full transition-all active:scale-90 hover:bg-red-50"
-        >
-          <Heart 
-            :size="24" 
-            :class="isFavorite ? 'fill-red-500 text-red-500' : 'text-sandalwood/60'"
-          />
-        </button>
-      </div>
     </header>
 
     <template v-if="loading">
@@ -502,13 +490,25 @@ function goBack() {
 
             <!-- 基本信息文案 -->
             <div class="flex-1 space-y-2">
-              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <h1 class="font-serif font-semibold text-sandalwood text-xl sm:text-2xl">
-                  {{ herb?.name || '药材详情' }}
-                </h1>
-                <p v-if="herb?.pinyin || herb?.latin_name" class="text-xs sm:text-sm text-sandalwood/60">
-                  {{ herb?.pinyin }}<span v-if="herb?.pinyin && herb?.latin_name"> · </span>{{ herb?.latin_name }}
-                </p>
+              <div class="flex items-center gap-2">
+                <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 flex-1 min-w-0">
+                  <h1 class="font-serif font-semibold text-sandalwood text-xl sm:text-2xl">
+                    {{ herb?.name || '药材详情' }}
+                  </h1>
+                  <p v-if="herb?.pinyin || herb?.latin_name" class="text-xs sm:text-sm text-sandalwood/60">
+                    {{ herb?.pinyin }}<span v-if="herb?.pinyin && herb?.latin_name"> · </span>{{ herb?.latin_name }}
+                  </p>
+                </div>
+                <button
+                  @click="toggleFavorite"
+                  :disabled="isToggling"
+                  class="p-2 rounded-full transition-all active:scale-90 hover:bg-red-50 shrink-0"
+                >
+                  <Heart
+                    :size="24"
+                    :class="isFavorite ? 'fill-red-500 text-red-500' : 'text-sandalwood/60'"
+                  />
+                </button>
               </div>
               <p v-if="herb?.alias" class="text-xs sm:text-sm text-sandalwood/60">
                 别名：{{ herb.alias }}
