@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { X, UserCheck, Sparkles, Soup, ListOrdered, Leaf, Heart, Camera, Send, Loader2 } from 'lucide-vue-next'
+import { X, UserCheck, Sparkles, Soup, ListOrdered, Leaf, Star, Camera, Send, Loader2 } from 'lucide-vue-next'
 import { supabase } from '@/supabaseClient'
 import { useAuth } from '@/composables/useAuth'
 
@@ -74,7 +74,8 @@ async function loadRecipeDetail(recipeId) {
       .maybeSingle()
     isFavorite = !!fav
   }
-  selectedRecipe.value = normalizeRecipe(data, isFavorite)
+  const { count: favCount } = await supabase.from('favorite_recipes').select('*', { count: 'exact', head: true }).eq('recipe_id', recipeId)
+  selectedRecipe.value = { ...normalizeRecipe(data, isFavorite), favorites_count: favCount || 0 }
   await fetchInteractions(recipeId)
 }
 
@@ -101,6 +102,7 @@ const toggleFavorite = async (e) => {
   const recipe = selectedRecipe.value
   const originalState = recipe.is_favorite
   recipe.is_favorite = !originalState
+  recipe.favorites_count = Math.max(0, (recipe.favorites_count || 0) + (originalState ? -1 : 1))
   try {
     if (!originalState) {
       await supabase.from('favorite_recipes').insert({ user_id: currentUser.value.id, recipe_id: recipe.id })
@@ -109,6 +111,7 @@ const toggleFavorite = async (e) => {
     }
   } catch {
     recipe.is_favorite = originalState
+    recipe.favorites_count = Math.max(0, (recipe.favorites_count || 0) + (originalState ? 1 : -1))
   }
 }
 
@@ -310,8 +313,9 @@ watch(
               <button @click="submitComment" :disabled="isSubmitting" class="text-emerald-600"><Send :size="16" /></button>
             </div>
             <div class="flex items-center gap-4">
-              <div class="flex flex-col items-center gap-0.5 cursor-pointer hover:scale-105 transition" @click="(e) => toggleFavorite(e)">
-                <Heart :size="24" :class="selectedRecipe.is_favorite ? 'fill-red-500 text-red-500' : 'text-stone-400'" />
+              <div class="flex items-center gap-1.5 cursor-pointer hover:scale-105 transition" @click="(e) => toggleFavorite(e)">
+                <Star :size="24" :class="selectedRecipe.is_favorite ? 'fill-yellow-400 text-yellow-400' : 'text-stone-400'" />
+                <span class="text-sm text-stone-500">{{ selectedRecipe.favorites_count || 0 }}</span>
               </div>
               <button @click="triggerSelectImage" class="bg-emerald-600 text-white px-5 py-2 rounded-full font-bold flex items-center gap-1 shadow-lg shadow-emerald-200 hover:bg-emerald-700 active:scale-95 transition cursor-pointer text-sm">
                 <Camera :size="16" /> 交作业

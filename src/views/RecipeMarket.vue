@@ -4,8 +4,8 @@ defineOptions({ name: 'RecipeMarket' })
 import { ref, onMounted, onActivated, onDeactivated, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { 
-  Clock, UserCheck, Sparkles, Leaf, X, Soup, ListOrdered, 
-  Star, Heart, Camera, Send, Loader2, Image as ImageIcon,
+  Clock, UserCheck, Sparkles, Leaf, X, Soup, ListOrdered,
+  Star, Heart, Camera, Send, Loader2, Image as ImageIcon, Star as StarIcon,
   MessageCircle, ThumbsUp, Tag, ChevronLeft, MoreHorizontal,
   Search, Filter, ChevronDown, Trash2
 } from 'lucide-vue-next'
@@ -200,7 +200,7 @@ const fetchRecipes = async () => {
   const cached = getRecipeMarketCachedData()
   const hasCachedData = Array.isArray(cached) && cached.length > 0
   if (hasCachedData) {
-    recipes.value = cached
+    recipes.value = cached.map(r => ({ ...r, favorites_count: r.favorites_count || 0 }))
     loading.value = false
   }
 
@@ -221,10 +221,16 @@ const fetchRecipes = async () => {
       if (favs) myFavorites = favs.map(f => f.recipe_id)
     }
 
+    const { data: favCounts } = await supabase.from('favorite_recipes').select('recipe_id')
+    const favCountMap = {}
+    if (favCounts) {
+      favCounts.forEach(f => { favCountMap[f.recipe_id] = (favCountMap[f.recipe_id] || 0) + 1 })
+    }
+
     if (data) {
       const authorIds = data.map(item => item.author_user_id).filter(Boolean)
       const profilesById = await fetchProfilesMap(authorIds)
-      const normalized = data.map(item => normalizeRecipe(item, myFavorites, profilesById))
+      const normalized = data.map(item => ({ ...normalizeRecipe(item, myFavorites, profilesById), favorites_count: favCountMap[item.id] || 0 }))
       recipes.value = normalized
       setRecipeMarketCachedData(normalized)
       syncCookedCounts()
@@ -334,6 +340,7 @@ const toggleFavorite = async (e, recipe) => {
   
   const originalState = recipe.is_favorite
   recipe.is_favorite = !originalState
+  recipe.favorites_count = Math.max(0, (recipe.favorites_count || 0) + (originalState ? -1 : 1))
 
   try {
     if (!originalState) {
@@ -343,6 +350,7 @@ const toggleFavorite = async (e, recipe) => {
     }
   } catch (error) {
     recipe.is_favorite = originalState
+    recipe.favorites_count = (recipe.favorites_count || 0) + (originalState ? 1 : -1)
     console.error(error)
   }
 }
@@ -701,8 +709,9 @@ onDeactivated(() => {
               <Clock :size="12" /> {{ recipe.time }}
             </span>
           </div>
-          <button @click="(e) => toggleFavorite(e, recipe)" class="absolute top-2 right-2 bg-white/90 p-1.5 rounded-full shadow-sm hover:scale-110 transition z-10">
-            <Heart :size="16" :class="recipe.is_favorite ? 'fill-red-500 text-red-500' : 'text-stone-400'" />
+          <button @click="(e) => toggleFavorite(e, recipe)" class="absolute top-2 right-2 bg-white/90 px-2 py-1 rounded-full shadow-sm hover:scale-110 transition z-10 flex items-center gap-1">
+            <StarIcon :size="16" :class="recipe.is_favorite ? 'fill-yellow-400 text-yellow-400' : 'text-stone-400'" />
+            <span class="text-xs text-stone-500 leading-none">{{ recipe.favorites_count || 0 }}</span>
           </button>
         </div>
         <div class="p-4 flex-1 flex flex-col">
@@ -907,8 +916,9 @@ onDeactivated(() => {
                </div>
                
                <div class="flex items-center gap-4">
-                   <div class="flex flex-col items-center gap-0.5 cursor-pointer hover:scale-105 transition" @click="(e) => toggleFavorite(e, selectedRecipe)">
-                      <Heart :size="24" :class="selectedRecipe.is_favorite ? 'fill-red-500 text-red-500' : 'text-stone-400'" />
+                   <div class="flex items-center gap-1.5 cursor-pointer hover:scale-105 transition" @click="(e) => toggleFavorite(e, selectedRecipe)">
+                      <StarIcon :size="24" :class="selectedRecipe.is_favorite ? 'fill-yellow-400 text-yellow-400' : 'text-stone-400'" />
+                      <span class="text-sm text-stone-500">{{ selectedRecipe.favorites_count || 0 }}</span>
                    </div>
                    <button @click="triggerSelectImage" class="bg-emerald-600 text-white px-5 py-2 rounded-full font-bold flex items-center gap-1 shadow-lg shadow-emerald-200 hover:bg-emerald-700 active:scale-95 transition cursor-pointer text-sm">
                       <Camera :size="16" /> 交作业
