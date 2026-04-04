@@ -1,6 +1,6 @@
 <script setup>
-import { ref, onMounted } from 'vue'
-import { HelpCircle, XCircle, RefreshCw, Loader2 } from 'lucide-vue-next'
+import { ref, computed, onMounted, watch } from 'vue'
+import { HelpCircle, XCircle, RefreshCw, Loader2, Search, ChevronDown, ChevronUp } from 'lucide-vue-next'
 import { supabase } from '@/supabaseClient'
 import { FEATURE_COPY } from '@/constants/branding'
 
@@ -10,6 +10,10 @@ const fullMyths = ref([])
 const displayedMyths = ref([])
 const loading = ref(false)
 const expandedId = ref(null)
+const mythSearch = ref('')
+const activeHitIndex = ref(0)
+
+let hitIdOrder = []
 
 const FALLBACK = [
   { id: 1, emoji: '❌', question: '感冒了就要立刻喝姜汤捂汗？', answer: '错！', detail: '姜汤只适用于<span class="hl">风寒感冒</span>（怕冷、流清涕）。若是风热感冒，喝姜汤如同火上浇油。', type: 'danger' },
@@ -24,10 +28,107 @@ function normalize(row, index) {
 }
 
 function hasValidItems(list) {
-  return Array.isArray(list) && list.length > 0 && list.some(item => item && String(item.question || '').trim() !== '')
+  return Array.isArray(list) && list.some(item => item && String(item.question || '').trim() !== '')
+}
+
+function stripHtml(html) {
+  if (html == null) return ''
+  return String(html).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+function escapeHtml(text) {
+  return String(text ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+function highlightPlain(text, q) {
+  const t = String(text ?? '')
+  const needle = String(q ?? '').trim()
+  if (!needle) return escapeHtml(t)
+  const re = new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')
+  let out = ''
+  let last = 0
+  let m
+  while ((m = re.exec(t)) !== null) {
+    out += escapeHtml(t.slice(last, m.index))
+    out += `<mark class="myth-search-hit">${escapeHtml(m[0])}</mark>`
+    last = m.index + m[0].length
+    if (m[0].length === 0) {
+      re.lastIndex++
+      if (re.lastIndex > t.length) break
+    }
+  }
+  out += escapeHtml(t.slice(last))
+  return out
 }
 
 const BATCH_SIZE = 3
+
+const isMythSearching = computed(() => mythSearch.value.trim().length > 0)
+
+const mythSourceList = computed(() => {
+  const list = fullMyths.value
+  return list && list.length && hasValidItems(list) ? list : FALLBACK
+})
+
+function rowMatchesQuery(item, q) {
+  const hay = [
+    item.question,
+    item.answer,
+    stripHtml(item.detail),
+  ]
+    .filter(Boolean)
+    .join('\u0001')
+  return hay.includes(q)
+}
+
+const visibleMyths = computed(() => {
+  const src = mythSourceList.value
+  const q = mythSearch.value.trim()
+  if (!q) {
+    return displayedMyths.value.length ? displayedMyths.value : src.slice(0, BATCH_SIZE)
+  }
+  return src.filter((item) => rowMatchesQuery(item, q))
+})
+
+watch([visibleMyths, mythSearch], () => {
+  const q = mythSearch.value.trim()
+  if (!q) {
+    activeHitIndex.value = 0
+    hitIdOrder = []
+    return
+  }
+  hitIdOrder = visibleMyths.value.map((x) => x.id)
+  if (hitIdOrder.length === 0) {
+    activeHitIndex.value = 0
+    return
+  }
+  if (activeHitIndex.value >= hitIdOrder.length) activeHitIndex.value = 0
+})
+
+function clearMythSearch() {
+  mythSearch.value = ''
+  expandedId.value = null
+  activeHitIndex.value = 0
+}
+
+function focusHit(delta) {
+  const ids = hitIdOrder.length ? hitIdOrder : visibleMyths.value.map((x) => x.id)
+  if (!ids.length) return
+  let idx = activeHitIndex.value
+  if (!hitIdOrder.length) hitIdOrder = ids
+  idx = (idx + delta + ids.length) % ids.length
+  activeHitIndex.value = idx
+  const id = ids[idx]
+  expandedId.value = id
+  requestAnimationFrame(() => {
+    const el = document.querySelector(`[data-myth-id="${id}"]`)
+    el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  })
+}
 
 function pickRandomBatch() {
   const list = fullMyths.value
@@ -44,6 +145,8 @@ async function loadMyths() {
   loading.value = true
   fullMyths.value = []
   displayedMyths.value = []
+  mythSearch.value = ''
+  expandedId.value = null
   try {
     const { data, error } = await supabase.from('myths').select('*')
     if (error) {
@@ -66,7 +169,8 @@ async function loadMyths() {
 }
 
 function refreshBatch() {
-  if (fullMyths.value.length === 0) return
+  if (isMythSearching.value) return
+  if (!fullMyths.value.length) return
   expandedId.value = null
   pickRandomBatch()
 }
@@ -88,12 +192,54 @@ onMounted(() => {
       <div class="section-header">
         <div class="title-row">
           <h3 class="title">{{ FEATURE_COPY.mythBuster.title }}</h3>
-          <div class="refresh-control" :class="{ 'is-loading': loading }" @click="refreshBatch">
+          <div
+            class="refresh-control"
+            :class="{ 'is-loading': loading, 'is-disabled': isMythSearching }"
+            @click="refreshBatch"
+          >
             <RefreshCw class="refresh-icon" />
             <span class="action-text">随机换一批</span>
           </div>
         </div>
         <span class="subtitle">{{ FEATURE_COPY.mythBuster.motto }}</span>
+
+        <div class="myth-search-bar">
+          <div class="myth-search-field">
+            <Search class="myth-search-icon" :size="18" aria-hidden="true" />
+            <input
+              v-model="mythSearch"
+              type="search"
+              class="myth-search-input"
+              placeholder="搜索谣言、结论或解析中的关键词…"
+              enterkeyhint="search"
+              autocomplete="off"
+            />
+            <div v-if="isMythSearching && visibleMyths.length" class="myth-hit-nav">
+              <button type="button" class="hit-btn" aria-label="上一条" @click.stop="focusHit(-1)">
+                <ChevronUp :size="18" />
+              </button>
+              <span class="hit-count">{{ activeHitIndex + 1 }} / {{ visibleMyths.length }}</span>
+              <button type="button" class="hit-btn" aria-label="下一条" @click.stop="focusHit(1)">
+                <ChevronDown :size="18" />
+              </button>
+            </div>
+            <button
+              v-show="mythSearch.trim()"
+              type="button"
+              class="myth-search-clear"
+              aria-label="清空搜索"
+              @click.stop="clearMythSearch"
+            >
+              清空
+            </button>
+          </div>
+          <p v-if="isMythSearching" class="myth-search-meta">
+            <template v-if="visibleMyths.length">
+              在 {{ mythSourceList.length }} 条中匹配到 {{ visibleMyths.length }} 条（含问题、结论与解析纯文本）
+            </template>
+            <template v-else>未匹配到包含「{{ mythSearch.trim() }}」的条目</template>
+          </p>
+        </div>
       </div>
 
       <div class="myth-list">
@@ -103,25 +249,41 @@ onMounted(() => {
         </div>
         <template v-else>
           <div
-            v-for="item in (displayedMyths.length ? displayedMyths : FALLBACK)"
-            :key="item.id"
+            v-for="(item, idx) in visibleMyths"
+            :key="item.id + '-' + idx"
             class="myth-item"
-            :class="{ 'is-expanded': expandedId === item.id }"
+            :class="{
+              'is-expanded': expandedId === item.id,
+              'is-search-hit':
+                isMythSearching && hitIdOrder.length && hitIdOrder[activeHitIndex] === item.id,
+            }"
+            :data-myth-id="item.id"
             @click="toggle(item.id)"
           >
             <div class="myth-question">
               <span class="emoji" v-if="item.emoji">{{ item.emoji }}</span>
               <HelpCircle class="icon-q" />
-              <span>{{ item.question }}</span>
+              <span v-if="isMythSearching" v-html="highlightPlain(item.question, mythSearch)" />
+              <span v-else>{{ item.question }}</span>
               <span class="indicator">{{ expandedId === item.id ? '收起' : '揭秘' }}</span>
             </div>
 
             <div v-show="expandedId === item.id" class="myth-answer animate-slide-down">
               <div class="answer-badge" :class="item.type">
                 <XCircle class="w-5 h-5 text-red-500" />
-                <span class="font-bold answer-text">{{ item.answer }}</span>
+                <span
+                  v-if="isMythSearching"
+                  class="font-bold answer-text"
+                  v-html="highlightPlain(item.answer, mythSearch)"
+                />
+                <span v-else class="font-bold answer-text">{{ item.answer }}</span>
               </div>
-              <p class="detail" v-html="item.detail"></p>
+              <p
+                v-if="isMythSearching"
+                class="detail"
+                v-html="highlightPlain(stripHtml(item.detail), mythSearch)"
+              />
+              <p v-else class="detail" v-html="item.detail"></p>
             </div>
           </div>
         </template>
@@ -199,6 +361,11 @@ onMounted(() => {
   transition: all 0.25s;
 }
 .refresh-control:hover { background: #C44D36; color: white; border-color: #C44D36; }
+.refresh-control.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
 .refresh-control.is-loading .refresh-icon { animation: spin 0.8s linear infinite; }
 @keyframes spin { 100% { transform: rotate(360deg); } }
 .refresh-icon { width: 18px; height: 18px; flex-shrink: 0; }
@@ -208,6 +375,94 @@ onMounted(() => {
   font-size: 1.05rem;
   color: #8B5E3C;
   letter-spacing: 0.14em;
+}
+
+.myth-search-bar {
+  margin-top: 22px;
+  text-align: left;
+}
+.myth-search-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(139, 94, 60, 0.22);
+  background: rgba(255, 255, 255, 0.75);
+}
+.myth-search-icon {
+  flex-shrink: 0;
+  color: #8B5E3C;
+}
+.myth-search-input {
+  flex: 1;
+  min-width: 140px;
+  border: none;
+  background: transparent;
+  font-size: 0.95rem;
+  color: #3e2723;
+  outline: none;
+}
+.myth-search-input::placeholder {
+  color: #a1887f;
+}
+.myth-hit-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.hit-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(139, 94, 60, 0.12);
+  color: #5d4037;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.hit-btn:hover {
+  background: rgba(196, 77, 54, 0.25);
+}
+.hit-count {
+  font-size: 0.8rem;
+  color: #6d4c41;
+  min-width: 3.2rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.myth-search-clear {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: #c44d36;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+.myth-search-clear:hover {
+  background: rgba(196, 77, 54, 0.12);
+}
+.myth-search-meta {
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  color: #8b7355;
+  line-height: 1.5;
+}
+:deep(.myth-search-hit) {
+  background: #fff59d;
+  color: inherit;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+.myth-item.is-search-hit {
+  box-shadow: 0 0 0 2px #c44d36, 0 10px 15px rgba(0, 0, 0, 0.06);
 }
 
 .myth-list { display: flex; flex-direction: column; gap: 16px; min-height: 200px; }
