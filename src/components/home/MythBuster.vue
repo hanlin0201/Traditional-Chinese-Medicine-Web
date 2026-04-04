@@ -1,191 +1,242 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { HelpCircle, XCircle, RefreshCw, Loader2, Search, ChevronDown, ChevronUp } from 'lucide-vue-next'
-import { supabase } from '@/supabaseClient'
-import { FEATURE_COPY } from '@/constants/branding'
+import { ref, computed, onMounted, watch } from "vue";
+import {
+  HelpCircle,
+  XCircle,
+  RefreshCw,
+  Loader2,
+  Search,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-vue-next";
+import { supabase } from "@/supabaseClient";
+import { FEATURE_COPY } from "@/constants/branding";
 
-const bgImage = "https://bpic.588ku.com/back_list_pic/25/01/23/ec0cb9c263b689042869b689494b650e.jpg!/fw/350/quality/95/unsharp/true/compress/true"
+const bgImage = "/images/myth-bg-2.jpg?v=2";
 
-const fullMyths = ref([])
-const displayedMyths = ref([])
-const loading = ref(false)
-const expandedId = ref(null)
-const mythSearch = ref('')
-const activeHitIndex = ref(0)
+const fullMyths = ref([]);
+const displayedMyths = ref([]);
+const loading = ref(false);
+const expandedId = ref(null);
+const mythSearch = ref("");
+const activeHitIndex = ref(0);
 
-let hitIdOrder = []
+let hitIdOrder = [];
 
 const FALLBACK = [
-  { id: 1, emoji: '❌', question: '感冒了就要立刻喝姜汤捂汗？', answer: '错！', detail: '姜汤只适用于<span class="hl">风寒感冒</span>（怕冷、流清涕）。若是风热感冒，喝姜汤如同火上浇油。', type: 'danger' },
-  { id: 2, emoji: '🚫', question: '晚上吃姜，真的等于吃砒霜？', answer: '片面。', detail: '中医认为夜间主收敛，姜主发散，晚上吃姜会影响睡眠、伤阴，但绝无砒霜之毒。', type: 'warning' },
-  { id: 3, emoji: '💡', question: '只有肾虚的人才需要吃黑芝麻？', answer: '非也。', detail: '黑芝麻补肝肾、润五脏，还能润肠通便、乌发美容，普通人日常食疗也非常合适。', type: 'safe' }
-]
+  {
+    id: 1,
+    emoji: "❌",
+    question: "感冒了就要立刻喝姜汤捂汗？",
+    answer: "错！",
+    detail:
+      '姜汤只适用于<span class="hl">风寒感冒</span>（怕冷、流清涕）。若是风热感冒，喝姜汤如同火上浇油。',
+    type: "danger",
+  },
+  {
+    id: 2,
+    emoji: "🚫",
+    question: "晚上吃姜，真的等于吃砒霜？",
+    answer: "片面。",
+    detail:
+      "中医认为夜间主收敛，姜主发散，晚上吃姜会影响睡眠、伤阴，但绝无砒霜之毒。",
+    type: "warning",
+  },
+  {
+    id: 3,
+    emoji: "💡",
+    question: "只有肾虚的人才需要吃黑芝麻？",
+    answer: "非也。",
+    detail:
+      "黑芝麻补肝肾、润五脏，还能润肠通便、乌发美容，普通人日常食疗也非常合适。",
+    type: "safe",
+  },
+];
 
 function normalize(row, index) {
-  const id = row.id != null ? Number(row.id) || index + 1 : index + 1
-  const answer = (row.answer_text != null && String(row.answer_text).trim() !== '') ? row.answer_text : (row.answer ?? '')
-  return { id, emoji: row.emoji ?? '', question: row.question ?? '', answer, detail: row.detail ?? '', type: row.type ?? 'warning' }
+  const id = row.id != null ? Number(row.id) || index + 1 : index + 1;
+  const answer =
+    row.answer_text != null && String(row.answer_text).trim() !== ""
+      ? row.answer_text
+      : (row.answer ?? "");
+  return {
+    id,
+    emoji: row.emoji ?? "",
+    question: row.question ?? "",
+    answer,
+    detail: row.detail ?? "",
+    type: row.type ?? "warning",
+  };
 }
 
 function hasValidItems(list) {
-  return Array.isArray(list) && list.some(item => item && String(item.question || '').trim() !== '')
+  return (
+    Array.isArray(list) &&
+    list.some((item) => item && String(item.question || "").trim() !== "")
+  );
 }
 
 function stripHtml(html) {
-  if (html == null) return ''
-  return String(html).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+  if (html == null) return "";
+  return String(html)
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function escapeHtml(text) {
-  return String(text ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
+  return String(text ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function highlightPlain(text, q) {
-  const t = String(text ?? '')
-  const needle = String(q ?? '').trim()
-  if (!needle) return escapeHtml(t)
-  const re = new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')
-  let out = ''
-  let last = 0
-  let m
+  const t = String(text ?? "");
+  const needle = String(q ?? "").trim();
+  if (!needle) return escapeHtml(t);
+  const re = new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+  let out = "";
+  let last = 0;
+  let m;
   while ((m = re.exec(t)) !== null) {
-    out += escapeHtml(t.slice(last, m.index))
-    out += `<mark class="myth-search-hit">${escapeHtml(m[0])}</mark>`
-    last = m.index + m[0].length
+    out += escapeHtml(t.slice(last, m.index));
+    out += `<mark class="myth-search-hit">${escapeHtml(m[0])}</mark>`;
+    last = m.index + m[0].length;
     if (m[0].length === 0) {
-      re.lastIndex++
-      if (re.lastIndex > t.length) break
+      re.lastIndex++;
+      if (re.lastIndex > t.length) break;
     }
   }
-  out += escapeHtml(t.slice(last))
-  return out
+  out += escapeHtml(t.slice(last));
+  return out;
 }
 
-const BATCH_SIZE = 3
+const BATCH_SIZE = 3;
 
-const isMythSearching = computed(() => mythSearch.value.trim().length > 0)
+const isMythSearching = computed(() => mythSearch.value.trim().length > 0);
 
 const mythSourceList = computed(() => {
-  const list = fullMyths.value
-  return list && list.length && hasValidItems(list) ? list : FALLBACK
-})
+  const list = fullMyths.value;
+  return list && list.length && hasValidItems(list) ? list : FALLBACK;
+});
 
 function rowMatchesQuery(item, q) {
-  const hay = [
-    item.question,
-    item.answer,
-    stripHtml(item.detail),
-  ]
+  const hay = [item.question, item.answer, stripHtml(item.detail)]
     .filter(Boolean)
-    .join('\u0001')
-  return hay.includes(q)
+    .join("\u0001");
+  return hay.includes(q);
 }
 
 const visibleMyths = computed(() => {
-  const src = mythSourceList.value
-  const q = mythSearch.value.trim()
+  const src = mythSourceList.value;
+  const q = mythSearch.value.trim();
   if (!q) {
-    return displayedMyths.value.length ? displayedMyths.value : src.slice(0, BATCH_SIZE)
+    return displayedMyths.value.length
+      ? displayedMyths.value
+      : src.slice(0, BATCH_SIZE);
   }
-  return src.filter((item) => rowMatchesQuery(item, q))
-})
+  return src.filter((item) => rowMatchesQuery(item, q));
+});
 
 watch([visibleMyths, mythSearch], () => {
-  const q = mythSearch.value.trim()
+  const q = mythSearch.value.trim();
   if (!q) {
-    activeHitIndex.value = 0
-    hitIdOrder = []
-    return
+    activeHitIndex.value = 0;
+    hitIdOrder = [];
+    return;
   }
-  hitIdOrder = visibleMyths.value.map((x) => x.id)
+  hitIdOrder = visibleMyths.value.map((x) => x.id);
   if (hitIdOrder.length === 0) {
-    activeHitIndex.value = 0
-    return
+    activeHitIndex.value = 0;
+    return;
   }
-  if (activeHitIndex.value >= hitIdOrder.length) activeHitIndex.value = 0
-})
+  if (activeHitIndex.value >= hitIdOrder.length) activeHitIndex.value = 0;
+});
 
 function clearMythSearch() {
-  mythSearch.value = ''
-  expandedId.value = null
-  activeHitIndex.value = 0
+  mythSearch.value = "";
+  expandedId.value = null;
+  activeHitIndex.value = 0;
 }
 
 function focusHit(delta) {
-  const ids = hitIdOrder.length ? hitIdOrder : visibleMyths.value.map((x) => x.id)
-  if (!ids.length) return
-  let idx = activeHitIndex.value
-  if (!hitIdOrder.length) hitIdOrder = ids
-  idx = (idx + delta + ids.length) % ids.length
-  activeHitIndex.value = idx
-  const id = ids[idx]
-  expandedId.value = id
+  const ids = hitIdOrder.length
+    ? hitIdOrder
+    : visibleMyths.value.map((x) => x.id);
+  if (!ids.length) return;
+  let idx = activeHitIndex.value;
+  if (!hitIdOrder.length) hitIdOrder = ids;
+  idx = (idx + delta + ids.length) % ids.length;
+  activeHitIndex.value = idx;
+  const id = ids[idx];
+  expandedId.value = id;
   requestAnimationFrame(() => {
-    const el = document.querySelector(`[data-myth-id="${id}"]`)
-    el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-  })
+    const el = document.querySelector(`[data-myth-id="${id}"]`);
+    el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  });
 }
 
 function pickRandomBatch() {
-  const list = fullMyths.value
-  if (!list || list.length === 0) return
-  const copy = [...list]
+  const list = fullMyths.value;
+  if (!list || list.length === 0) return;
+  const copy = [...list];
   for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[copy[i], copy[j]] = [copy[j], copy[i]]
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
   }
-  displayedMyths.value = copy.slice(0, BATCH_SIZE)
+  displayedMyths.value = copy.slice(0, BATCH_SIZE);
 }
 
 async function loadMyths() {
-  loading.value = true
-  fullMyths.value = []
-  displayedMyths.value = []
-  mythSearch.value = ''
-  expandedId.value = null
+  loading.value = true;
+  fullMyths.value = [];
+  displayedMyths.value = [];
+  mythSearch.value = "";
+  expandedId.value = null;
   try {
-    const { data, error } = await supabase.from('myths').select('*')
+    const { data, error } = await supabase.from("myths").select("*");
     if (error) {
-      console.warn('[养生避雷针] Supabase error:', error.message)
-      fullMyths.value = [...FALLBACK]
-      pickRandomBatch()
-      return
+      console.warn("[养生避雷针] Supabase error:", error.message);
+      fullMyths.value = [...FALLBACK];
+      pickRandomBatch();
+      return;
     }
-    const raw = Array.isArray(data) ? data : []
-    const mapped = raw.map((r, i) => normalize(r, i))
-    fullMyths.value = hasValidItems(mapped) ? mapped : [...FALLBACK]
-    pickRandomBatch()
+    const raw = Array.isArray(data) ? data : [];
+    const mapped = raw.map((r, i) => normalize(r, i));
+    fullMyths.value = hasValidItems(mapped) ? mapped : [...FALLBACK];
+    pickRandomBatch();
   } catch (e) {
-    console.warn('[养生避雷针] load failed:', e)
-    fullMyths.value = [...FALLBACK]
-    pickRandomBatch()
+    console.warn("[养生避雷针] load failed:", e);
+    fullMyths.value = [...FALLBACK];
+    pickRandomBatch();
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
 function refreshBatch() {
-  if (isMythSearching.value) return
-  if (!fullMyths.value.length) return
-  expandedId.value = null
-  pickRandomBatch()
+  if (isMythSearching.value) return;
+  if (!fullMyths.value.length) return;
+  expandedId.value = null;
+  pickRandomBatch();
 }
 
 function toggle(id) {
-  expandedId.value = expandedId.value === id ? null : id
+  expandedId.value = expandedId.value === id ? null : id;
 }
 
 onMounted(() => {
-  loadMyths()
-})
+  loadMyths();
+});
 </script>
 
 <template>
-  <section class="myth-buster-screen" :style="{ backgroundImage: `url(${bgImage})` }">
+  <section
+    class="myth-buster-screen"
+    :style="{ backgroundImage: `url(${bgImage})` }"
+  >
     <div class="bg-overlay"></div>
 
     <div class="content-wrapper">
@@ -214,12 +265,27 @@ onMounted(() => {
               enterkeyhint="search"
               autocomplete="off"
             />
-            <div v-if="isMythSearching && visibleMyths.length" class="myth-hit-nav">
-              <button type="button" class="hit-btn" aria-label="上一条" @click.stop="focusHit(-1)">
+            <div
+              v-if="isMythSearching && visibleMyths.length"
+              class="myth-hit-nav"
+            >
+              <button
+                type="button"
+                class="hit-btn"
+                aria-label="上一条"
+                @click.stop="focusHit(-1)"
+              >
                 <ChevronUp :size="18" />
               </button>
-              <span class="hit-count">{{ activeHitIndex + 1 }} / {{ visibleMyths.length }}</span>
-              <button type="button" class="hit-btn" aria-label="下一条" @click.stop="focusHit(1)">
+              <span class="hit-count"
+                >{{ activeHitIndex + 1 }} / {{ visibleMyths.length }}</span
+              >
+              <button
+                type="button"
+                class="hit-btn"
+                aria-label="下一条"
+                @click.stop="focusHit(1)"
+              >
                 <ChevronDown :size="18" />
               </button>
             </div>
@@ -235,9 +301,12 @@ onMounted(() => {
           </div>
           <p v-if="isMythSearching" class="myth-search-meta">
             <template v-if="visibleMyths.length">
-              在 {{ mythSourceList.length }} 条中匹配到 {{ visibleMyths.length }} 条（含问题、结论与解析纯文本）
+              在 {{ mythSourceList.length }} 条中匹配到
+              {{ visibleMyths.length }} 条（含问题、结论与解析纯文本）
             </template>
-            <template v-else>未匹配到包含「{{ mythSearch.trim() }}」的条目</template>
+            <template v-else
+              >未匹配到包含「{{ mythSearch.trim() }}」的条目</template
+            >
           </p>
         </div>
       </div>
@@ -255,7 +324,9 @@ onMounted(() => {
             :class="{
               'is-expanded': expandedId === item.id,
               'is-search-hit':
-                isMythSearching && hitIdOrder.length && hitIdOrder[activeHitIndex] === item.id,
+                isMythSearching &&
+                hitIdOrder.length &&
+                hitIdOrder[activeHitIndex] === item.id,
             }"
             :data-myth-id="item.id"
             @click="toggle(item.id)"
@@ -263,12 +334,20 @@ onMounted(() => {
             <div class="myth-question">
               <span class="emoji" v-if="item.emoji">{{ item.emoji }}</span>
               <HelpCircle class="icon-q" />
-              <span v-if="isMythSearching" v-html="highlightPlain(item.question, mythSearch)" />
+              <span
+                v-if="isMythSearching"
+                v-html="highlightPlain(item.question, mythSearch)"
+              />
               <span v-else>{{ item.question }}</span>
-              <span class="indicator">{{ expandedId === item.id ? '收起' : '揭秘' }}</span>
+              <span class="indicator">{{
+                expandedId === item.id ? "收起" : "揭秘"
+              }}</span>
             </div>
 
-            <div v-show="expandedId === item.id" class="myth-answer animate-slide-down">
+            <div
+              v-show="expandedId === item.id"
+              class="myth-answer animate-slide-down"
+            >
               <div class="answer-badge" :class="item.type">
                 <XCircle class="w-5 h-5 text-red-500" />
                 <span
@@ -276,7 +355,9 @@ onMounted(() => {
                   class="font-bold answer-text"
                   v-html="highlightPlain(item.answer, mythSearch)"
                 />
-                <span v-else class="font-bold answer-text">{{ item.answer }}</span>
+                <span v-else class="font-bold answer-text">{{
+                  item.answer
+                }}</span>
               </div>
               <p
                 v-if="isMythSearching"
@@ -310,7 +391,10 @@ onMounted(() => {
 
 .bg-overlay {
   position: absolute;
-  top: 0; left: 0; width: 100%; height: 100%;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   background: rgba(0, 0, 0, 0.4);
   z-index: 0;
 }
@@ -330,7 +414,10 @@ onMounted(() => {
   overflow-y: auto;
 }
 
-.section-header { text-align: center; margin-bottom: 30px; }
+.section-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
 .title-row {
   display: flex;
   align-items: center;
@@ -340,9 +427,9 @@ onMounted(() => {
   margin-bottom: 8px;
 }
 .title {
-  font-family: 'Ma Shan Zheng', cursive;
+  font-family: "Ma Shan Zheng", cursive;
   font-size: 2.35rem;
-  color: #5D4037;
+  color: #5d4037;
   font-weight: 400;
   margin: 0;
   letter-spacing: 0.08em;
@@ -352,28 +439,44 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  color: #8B5E3C;
+  color: #8b5e3c;
   font-size: 0.95rem;
   padding: 6px 14px;
   border-radius: 24px;
   border: 1px solid rgba(139, 94, 60, 0.3);
-  background: rgba(255,255,255,0.6);
+  background: rgba(255, 255, 255, 0.6);
   transition: all 0.25s;
 }
-.refresh-control:hover { background: #C44D36; color: white; border-color: #C44D36; }
+.refresh-control:hover {
+  background: #c44d36;
+  color: white;
+  border-color: #c44d36;
+}
 .refresh-control.is-disabled {
   opacity: 0.45;
   cursor: not-allowed;
   pointer-events: none;
 }
-.refresh-control.is-loading .refresh-icon { animation: spin 0.8s linear infinite; }
-@keyframes spin { 100% { transform: rotate(360deg); } }
-.refresh-icon { width: 18px; height: 18px; flex-shrink: 0; }
-.action-text { font-weight: 600; }
+.refresh-control.is-loading .refresh-icon {
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+.refresh-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.action-text {
+  font-weight: 600;
+}
 .subtitle {
-  font-family: 'Ma Shan Zheng', cursive;
+  font-family: "Ma Shan Zheng", cursive;
   font-size: 1.05rem;
-  color: #8B5E3C;
+  color: #8b5e3c;
   letter-spacing: 0.14em;
 }
 
@@ -393,7 +496,7 @@ onMounted(() => {
 }
 .myth-search-icon {
   flex-shrink: 0;
-  color: #8B5E3C;
+  color: #8b5e3c;
 }
 .myth-search-input {
   flex: 1;
@@ -462,29 +565,41 @@ onMounted(() => {
   border-radius: 2px;
 }
 .myth-item.is-search-hit {
-  box-shadow: 0 0 0 2px #c44d36, 0 10px 15px rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0 0 0 2px #c44d36,
+    0 10px 15px rgba(0, 0, 0, 0.06);
 }
 
-.myth-list { display: flex; flex-direction: column; gap: 16px; min-height: 200px; }
+.myth-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 200px;
+}
 
 .loading-state {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  height: 200px; color: #8B5E3C; gap: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: #8b5e3c;
+  gap: 10px;
 }
 
 .myth-item {
   background: white;
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
   border: 1px solid rgba(139, 94, 60, 0.1);
   transition: all 0.3s ease;
   cursor: pointer;
 }
 .myth-item:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 15px rgba(0,0,0,0.05);
-  border-color: #C44D36;
+  box-shadow: 0 10px 15px rgba(0, 0, 0, 0.05);
+  border-color: #c44d36;
 }
 
 .myth-question {
@@ -496,8 +611,16 @@ onMounted(() => {
   color: #2c2c2c;
   font-weight: 500;
 }
-.emoji { font-size: 1.2rem; line-height: 1; }
-.icon-q { color: #C44D36; width: 22px; height: 22px; flex-shrink: 0; }
+.emoji {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+.icon-q {
+  color: #c44d36;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
 .indicator {
   margin-left: auto;
   font-size: 0.85rem;
@@ -507,31 +630,76 @@ onMounted(() => {
   border-radius: 20px;
   transition: all 0.3s;
 }
-.myth-item:hover .indicator { background: #C44D36; color: white; }
+.myth-item:hover .indicator {
+  background: #c44d36;
+  color: white;
+}
 
 .myth-answer {
-  background: #FFF5F2;
+  background: #fff5f2;
   padding: 15px 24px 24px 58px;
   border-top: 1px dashed rgba(196, 77, 54, 0.2);
 }
-.answer-badge { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-.answer-badge .answer-text { color: #C62828; }
-.answer-badge.warning .answer-text { color: #E65100; }
-.answer-badge.safe .answer-text { color: #2E7D32; }
-.detail { font-size: 1rem; color: #5D4037; line-height: 1.7; }
-.detail :deep(.hl) { font-weight: 700; color: #5D4037; }
-.detail :deep(.danger) { color: #C62828; font-weight: 600; }
-.detail :deep(.warning) { color: #E65100; font-weight: 500; }
-.detail :deep(.safe) { color: #2E7D32; font-weight: 500; }
+.answer-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.answer-badge .answer-text {
+  color: #c62828;
+}
+.answer-badge.warning .answer-text {
+  color: #e65100;
+}
+.answer-badge.safe .answer-text {
+  color: #2e7d32;
+}
+.detail {
+  font-size: 1rem;
+  color: #5d4037;
+  line-height: 1.7;
+}
+.detail :deep(.hl) {
+  font-weight: 700;
+  color: #5d4037;
+}
+.detail :deep(.danger) {
+  color: #c62828;
+  font-weight: 600;
+}
+.detail :deep(.warning) {
+  color: #e65100;
+  font-weight: 500;
+}
+.detail :deep(.safe) {
+  color: #2e7d32;
+  font-weight: 500;
+}
 
-.animate-slide-down { animation: slideDown 0.3s cubic-bezier(0.25, 0.8, 0.5, 1); }
+.animate-slide-down {
+  animation: slideDown 0.3s cubic-bezier(0.25, 0.8, 0.5, 1);
+}
 @keyframes slideDown {
-  from { opacity: 0; transform: translateY(-10px); height: 0; }
-  to { opacity: 1; transform: translateY(0); height: auto; }
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+    height: 0;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    height: auto;
+  }
 }
 
 @media (max-width: 768px) {
-  .content-wrapper { padding: 20px; width: 95%; }
-  .title { font-size: 1.5rem; }
+  .content-wrapper {
+    padding: 20px;
+    width: 95%;
+  }
+  .title {
+    font-size: 1.5rem;
+  }
 }
 </style>
