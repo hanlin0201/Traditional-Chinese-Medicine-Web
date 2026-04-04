@@ -18,6 +18,7 @@ const foldedStates = ref({})
 const pendingPrescription = ref(null)
 const prescriptionLoading = ref(false)
 const prescriptionLoadingSessionId = ref(null)
+const isGenerating = ref(false)
 
 // 👇 Supabase Edge Function 地址（API Key 安全存储在服务端，前端无需暴露）
 const TCM_CHAT_URL = 'https://htrtcaswqydnfvgwernh.supabase.co/functions/v1/tcm-chat'
@@ -138,6 +139,7 @@ function saveActiveSession() {
 }
 
 function createNewSession() {
+  if (isGenerating.value) return
   saveActiveSession()
   const id = String(Date.now())
   sessions.value.unshift({
@@ -156,6 +158,7 @@ function createNewSession() {
 }
 
 function switchToSession(id) {
+  if (isGenerating.value) return
   if (id === activeSessionId.value) { showSessionList.value = false; return }
   saveActiveSession()
   cancelRenameSession()
@@ -503,7 +506,7 @@ function cleanPrescription(jsonData) {
 
 async function send() {
   const text = input.value.trim()
-  if (!text || loadingStatus.value) return
+  if (!text || isGenerating.value) return
   const requestSessionId = activeSessionId.value
 
   messages.value.push({ role: 'user', content: text })
@@ -525,6 +528,7 @@ async function send() {
     pendingPrescription.value = null
   }*/
 
+  isGenerating.value = true
   loadingStatus.value = 'AI 思考中...'
   const streamMsg = { role: 'assistant', type: 'streaming', content: '' }
   messages.value.push(streamMsg)
@@ -602,6 +606,7 @@ async function send() {
       messages.value[streamIdx] = { role: 'assistant', type: 'text', content: '连接波动，请重试。' }
     }
   } finally {
+    isGenerating.value = false
     loadingStatus.value = ''
     prescriptionLoading.value = false
     prescriptionLoadingSessionId.value = null
@@ -848,7 +853,7 @@ defineExpose({ openPanel })
             {{ sessions.find(s => s.id === activeSessionId)?.title || AI_TUTOR_LABEL }}
           </h3>
           <div class="flex items-center gap-1.5">
-            <button @click="createNewSession" title="新建对话" class="p-1.5 rounded-lg hover:bg-sandalwood/10 text-sandalwood/60 hover:text-sandalwood transition">
+            <button @click="createNewSession" title="新建对话" :disabled="isGenerating" class="p-1.5 rounded-lg hover:bg-sandalwood/10 text-sandalwood/60 hover:text-sandalwood transition disabled:opacity-30 disabled:cursor-not-allowed">
               <PlusCircle class="w-4 h-4" />
             </button>
             <button @click="showSessionList = !showSessionList" title="历史对话" class="p-1.5 rounded-lg hover:bg-sandalwood/10 transition" :class="showSessionList ? 'text-sandalwood bg-sandalwood/10' : 'text-sandalwood/60 hover:text-sandalwood'">
@@ -862,7 +867,7 @@ defineExpose({ openPanel })
         <div v-if="showSessionList" class="absolute left-0 right-0 bottom-0 z-10 bg-[#FDFBF7] flex flex-col border-t border-sandalwood/15 overflow-hidden" style="top: 52px">
           <div class="px-4 py-2.5 border-b border-sandalwood/10 flex items-center justify-between shrink-0">
             <span class="text-xs font-semibold text-sandalwood/70 uppercase tracking-wide">历史对话</span>
-            <button @click="createNewSession" class="flex items-center gap-1 text-xs text-sandalwood bg-sandalwood/10 px-2.5 py-1 rounded-lg hover:bg-sandalwood/20 transition">
+            <button @click="createNewSession" :disabled="isGenerating" class="flex items-center gap-1 text-xs text-sandalwood bg-sandalwood/10 px-2.5 py-1 rounded-lg hover:bg-sandalwood/20 transition disabled:opacity-30 disabled:cursor-not-allowed">
               <PlusCircle class="w-3.5 h-3.5" /> 新建对话
             </button>
           </div>
@@ -872,7 +877,7 @@ defineExpose({ openPanel })
               v-for="s in sessions" :key="s.id"
               @click="switchToSession(s.id)"
               class="px-4 py-3 border-b border-sandalwood/10 cursor-pointer hover:bg-sandalwood/5 flex items-center gap-3 group transition"
-              :class="s.id === activeSessionId ? 'bg-sandalwood/10' : ''"
+              :class="[s.id === activeSessionId ? 'bg-sandalwood/10' : '', isGenerating ? 'opacity-40 pointer-events-none' : '']"
             >
               <MessageCircle class="w-4 h-4 text-sandalwood/40 shrink-0" />
               <div class="flex-1 min-w-0">
@@ -1028,8 +1033,8 @@ defineExpose({ openPanel })
         </div>
 
         <div class="p-3 border-t bg-[#FDFBF7] flex gap-2">
-          <input v-model="input" @keyup.enter="send" :disabled="!!loadingStatus" placeholder="输入症状..." class="flex-1 px-4 py-2 border rounded-lg outline-none focus:ring-1 focus:ring-sandalwood/50 disabled:opacity-50" />
-          <button @click="send" :disabled="!!loadingStatus" class="p-2 bg-sandalwood text-white rounded-lg disabled:opacity-50"><Send class="w-5 h-5"/></button>
+          <input v-model="input" @keyup.enter="send" :disabled="isGenerating" placeholder="输入症状..." class="flex-1 px-4 py-2 border rounded-lg outline-none focus:ring-1 focus:ring-sandalwood/50 disabled:opacity-50" />
+          <button @click="send" :disabled="isGenerating" class="p-2 bg-sandalwood text-white rounded-lg disabled:opacity-50"><Send class="w-5 h-5"/></button>
         </div>
       </div>
     </Transition>
