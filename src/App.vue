@@ -4,7 +4,6 @@ import { useRouter, useRoute } from 'vue-router'
 import { User, Home, BookOpen, UtensilsCrossed, Activity } from 'lucide-vue-next'
 import AiCompanion from '@/components/AiCompanion.vue'
 import LoginOverlay from '@/components/LoginOverlay.vue'
-import OnboardingProfile from '@/components/OnboardingProfile.vue'
 import { useAuth } from '@/composables/useAuth'
 import { SITE_SHORT_NAME, SITE_FULL_NAME, FEATURE_COPY } from '@/constants/branding'
 
@@ -13,8 +12,6 @@ const route = useRoute()
 const { user, profile, gatePassed } = useAuth()
 const forceShowLogin = ref(false)
 const showLoginOverlay = computed(() => !gatePassed.value || forceShowLogin.value)
-const showOnboarding = computed(() => user.value && profile.value != null && !String(profile.value?.username ?? '').trim())
-
 watch(() => route.query.login, (v) => {
   if (v === '1') forceShowLogin.value = true
 }, { immediate: true })
@@ -80,7 +77,6 @@ provide('openAiCompanion', openAiCompanion)
 
     <AiCompanion ref="aiCompanionRef" />
     <LoginOverlay v-if="showLoginOverlay" :dismissible="gatePassed" @close="forceShowLogin = false" />
-    <OnboardingProfile v-if="showOnboarding" />
   </div>
 </template>
 
