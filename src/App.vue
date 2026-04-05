@@ -16,6 +16,40 @@ watch(() => route.query.login, (v) => {
   if (v === '1') forceShowLogin.value = true
 }, { immediate: true })
 
+const isHomeRoute = computed(() => route.path === '/')
+
+/** 与 DynastyDetailView 全屏朝代 id 一致：这些页顶栏移出视口，main 勿加顶栏占位 */
+const DYNASTY_FULLSCREEN_IDS = new Set([
+  'shanggu', 'chunqiu', 'qinhan', 'donghan', 'liangjin', 'tang', 'song',
+  'ming', 'qing', 'xiandai', 'dangxia',
+])
+
+/** 非首页、非全屏朝代详情：内容区需为固定顶栏留出高度（与 nav min-h-[4.5rem] 一致） */
+const mainNavPadClass = computed(() => {
+  if (!gatePassed.value) return ''
+  if (isHomeRoute.value) return ''
+  if (route.name === 'DynastyDetail' && DYNASTY_FULLSCREEN_IDS.has(String(route.params.id ?? ''))) return ''
+  return 'main-with-fixed-nav'
+})
+
+// 首页为整屏 fixed 翻屏：锁住文档与根节点高度，避免从其它页切回时仍出现右侧系统滚动条
+watch(
+  isHomeRoute,
+  (on) => {
+    if (typeof document === 'undefined') return
+    document.documentElement.classList.toggle('home-no-doc-scroll', on)
+    document.body.classList.toggle('home-no-doc-scroll', on)
+    if (on) {
+      requestAnimationFrame(() => {
+        window.scrollTo(0, 0)
+        document.documentElement.scrollTop = 0
+        document.body.scrollTop = 0
+      })
+    }
+  },
+  { immediate: true },
+)
+
 function openAuthPanel() {
   if (user.value) { router.push('/profile') } else { forceShowLogin.value = true }
 }
@@ -28,9 +62,15 @@ provide('openAiCompanion', openAiCompanion)
 </script>
 
 <template>
-  <div class="min-h-screen bg-paper font-sans text-stone-800">
+  <div
+    class="bg-paper font-sans text-stone-800"
+    :class="isHomeRoute ? 'h-screen min-h-0 overflow-hidden' : 'min-h-screen'"
+  >
     
-    <nav v-if="gatePassed" class="main-nav sticky top-0 z-40 bg-[#f4f1ea]/90 backdrop-blur-md border-b border-stone-200 shadow-sm transition-transform duration-500 ease-in-out">
+    <nav
+      v-if="gatePassed"
+      class="main-nav fixed top-0 left-0 right-0 z-40 w-full max-w-none bg-[#f4f1ea] backdrop-blur-md border-b border-stone-200 shadow-sm transition-transform duration-500 ease-in-out"
+    >
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between min-h-[4.5rem] h-[4.5rem] items-center">
           <div class="flex-shrink-0 flex items-center gap-2.5 cursor-pointer" @click="router.push('/')">
@@ -67,7 +107,7 @@ provide('openAiCompanion', openAiCompanion)
       </div>
     </nav>
 
-    <main class="relative z-0">
+    <main class="relative z-0" :class="mainNavPadClass">
       <RouterView v-slot="{ Component }">
         <KeepAlive include="RecipeMarket,HomeView">
           <component :is="Component" />
@@ -81,6 +121,24 @@ provide('openAiCompanion', openAiCompanion)
 </template>
 
 <style>
+/* 首页：禁止 html/body 出现纵向滚动条（内容在 MenuIndexView 内自洽滚动） */
+html.home-no-doc-scroll {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+body.home-no-doc-scroll {
+  height: 100%;
+  max-height: 100vh;
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+body.home-no-doc-scroll #app {
+  height: 100%;
+  max-height: 100vh;
+  overflow: hidden;
+}
+
 /* 当 body 拥有 hide-global-nav 类时，隐藏导航栏 */
 body.hide-global-nav .main-nav {
   transform: translateY(-100%);
@@ -109,6 +167,11 @@ body.dynasty-fullscreen #app > div {
 body.dynasty-fullscreen #app > div main {
   height: 100%;
   min-height: 0;
+}
+
+/* 固定顶栏后：普通页面 main 预留导航高度（首页 / 全屏朝代由模板 class 排除） */
+.main-with-fixed-nav {
+  padding-top: 4.5rem;
 }
 </style>
 

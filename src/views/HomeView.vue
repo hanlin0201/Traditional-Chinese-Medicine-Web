@@ -161,29 +161,29 @@ onUnmounted(() => {
   <div class="herb-ency-page min-h-screen">
     <!-- 固定视口背景：避免整页变长后 cover 按超长画布拉伸发糊 -->
     <div class="herb-ency-foreground min-h-screen pb-24 relative z-[1]">
-    <header class="sticky top-0 z-30 px-4 py-3 transition-all duration-300 bg-[#FDFBF7]/80 backdrop-blur-md border-b border-sandalwood/5">
+    <header class="sticky top-0 z-30 px-4 py-3 transition-all duration-300 bg-transparent border-b border-white/25 [text-shadow:0_1px_2px_rgba(0,0,0,0.35)]">
       <div class="max-w-6xl mx-auto space-y-3">
         <div class="flex flex-col sm:flex-row gap-3">
           <button
             @click="router.push('/')"
-            class="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-sandalwood/10 bg-white/60 text-sandalwood hover:bg-white hover:border-sandalwood/20 text-sm font-serif transition-all shadow-sm shrink-0"
+            class="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/35 bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 hover:border-white/50 text-sm font-serif transition-all shadow-sm shrink-0"
           >
             <ArrowLeft class="w-4 h-4" />
             <span>返回主页</span>
           </button>
           <div class="relative flex-1 group">
-            <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-sandalwood/40 group-focus-within:text-cinnabar transition-colors pointer-events-none" />
+            <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/65 group-focus-within:text-white pointer-events-none" />
             <input
               v-model="keyword"
               type="search"
               placeholder="搜索本草、拼音或功效..."
-              class="w-full pl-9 pr-10 py-2 rounded-xl border border-sandalwood/10 bg-white/60 text-sandalwood placeholder-sandalwood/30 text-sm focus:outline-none focus:ring-1 focus:ring-cinnabar/30 focus:bg-white transition-all shadow-sm"
+              class="w-full pl-9 pr-10 py-2 rounded-xl border border-white/35 bg-white/10 text-white placeholder:text-white/60 text-sm focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white/50 focus:bg-white/15 backdrop-blur-sm transition-all shadow-sm"
             />
             <button
               v-if="keyword"
               type="button"
               @click="keyword = ''"
-              class="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-sandalwood/10 text-sandalwood/50 hover:text-sandalwood"
+              class="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-white/20 text-white/75 hover:text-white"
               aria-label="清空"
             >
               <X class="w-4 h-4" />
@@ -192,8 +192,8 @@ onUnmounted(() => {
           <button
             type="button"
             @click="showFilterPanel = !showFilterPanel"
-            class="flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-sandalwood/10 bg-white/60 text-sandalwood hover:bg-white hover:border-sandalwood/20 transition shrink-0"
-            :class="{ 'ring-1 ring-cinnabar/30 border-cinnabar/20': showFilterPanel }"
+            class="flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-white/35 bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 hover:border-white/50 transition shrink-0"
+            :class="{ 'ring-2 ring-white/50 border-white/60': showFilterPanel }"
           >
             <Filter class="w-4 h-4" />
             <span>筛选</span>
@@ -209,10 +209,10 @@ onUnmounted(() => {
           leave-from-class="opacity-100 translate-y-0"
           leave-to-class="opacity-0 -translate-y-2"
         >
-          <div v-show="showFilterPanel" class="p-4 rounded-2xl border border-sandalwood/10 bg-white/80 shadow-sm space-y-4">
+          <div v-show="showFilterPanel" class="p-4 rounded-2xl border border-white/30 bg-black/25 backdrop-blur-md shadow-sm space-y-4">
             <div class="flex flex-wrap items-center gap-2">
-              <span class="text-sm font-medium text-sandalwood/60 shrink-0">筛选方式</span>
-              <div class="bg-sandalwood/5 p-1 rounded-xl flex items-center flex-wrap gap-1">
+              <span class="text-sm font-medium text-white/90 shrink-0">筛选方式</span>
+              <div class="bg-white/10 p-1 rounded-xl flex items-center flex-wrap gap-1">
                 <button
                   v-for="mode in ['category', 'letter', 'effect']"
                   :key="mode"
@@ -222,7 +222,7 @@ onUnmounted(() => {
                     'px-4 py-1.5 rounded-lg text-xs font-medium transition-all duration-300',
                     filterMode === mode
                       ? 'bg-white text-cinnabar shadow-sm'
-                      : 'text-sandalwood/60 hover:text-sandalwood'
+                      : 'text-white/85 hover:text-white hover:bg-white/10'
                   ]"
                 >
                   {{ mode === 'category' ? '按类别' : mode === 'letter' ? '按 A-Z' : '按功效' }}
@@ -244,21 +244,21 @@ onUnmounted(() => {
                           (tag !== '全部' && activeEffectTags.includes(tag))
                         )
                         ? 'bg-cinnabar text-white border-cinnabar shadow-sm'
-                        : 'bg-white text-sandalwood/70 border-sandalwood/10 hover:border-sandalwood/30 hover:text-sandalwood'
+                        : 'bg-white/15 text-white border-white/30 hover:border-white/50 hover:bg-white/25'
                       : activeTag === tag
                       ? 'bg-cinnabar text-white border-cinnabar shadow-sm'
-                      : 'bg-white text-sandalwood/70 border-sandalwood/10 hover:border-sandalwood/30 hover:text-sandalwood'
+                      : 'bg-white/15 text-white border-white/30 hover:border-white/50 hover:bg-white/25'
                   ]"
                 >
                   {{ tag }}
                 </button>
               </div>
             </div>
-            <div v-if="hasActiveFilters()" class="pt-2 border-t border-sandalwood/10">
+            <div v-if="hasActiveFilters()" class="pt-2 border-t border-white/20">
               <button
                 type="button"
                 @click="clearAllFilters()"
-                class="text-sm text-sandalwood/60 hover:text-cinnabar transition"
+                class="text-sm text-white/85 hover:text-white transition"
               >
                 清空条件
               </button>

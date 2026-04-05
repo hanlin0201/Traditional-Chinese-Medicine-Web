@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { Link, AlertTriangle, Compass, Search, X } from "lucide-vue-next";
 import { supabase } from "@/supabaseClient";
@@ -10,23 +10,43 @@ const fullPairings = ref([]);
 const browsePairs = ref([]);
 const herbQuery = ref("");
 const loading = ref(false);
+/**
+ * 搜索结果必须用 ref（深度响应），不能用 shallowRef：
+ * 点击翻转只改 item.isOpen，shallowRef 不会跟踪深层属性，界面不更新。
+ */
+const searchPairs = ref([]);
 
 const SEARCH_RESULT_CAP = 200;
 
 const isSearching = computed(() => herbQuery.value.trim().length > 0);
 
+watch(
+  [herbQuery, fullPairings],
+  () => {
+    const q = herbQuery.value.trim();
+    if (!q) {
+      searchPairs.value = [];
+      return;
+    }
+    const list = fullPairings.value;
+    searchPairs.value = list
+      .filter(
+        (p) =>
+          (p.left_herb && String(p.left_herb).includes(q)) ||
+          (p.right_herb && String(p.right_herb).includes(q))
+      )
+      .slice(0, SEARCH_RESULT_CAP)
+      .map((p, i) => ({
+        ...mapPairingRow(p),
+        _key: `s-${p.id ?? i}-${i}`,
+      }));
+  },
+  { immediate: true }
+);
+
 const displayedPairs = computed(() => {
-  const q = herbQuery.value.trim();
-  if (!q) return browsePairs.value;
-  const list = fullPairings.value;
-  return list
-    .filter(
-      (p) =>
-        (p.left_herb && String(p.left_herb).includes(q)) ||
-        (p.right_herb && String(p.right_herb).includes(q))
-    )
-    .slice(0, SEARCH_RESULT_CAP)
-    .map((p, i) => ({ ...p, isOpen: false, _key: `s-${p.id ?? i}-${i}` }));
+  if (herbQuery.value.trim()) return searchPairs.value;
+  return browsePairs.value;
 });
 
 const pairRowKey = (item, index) =>

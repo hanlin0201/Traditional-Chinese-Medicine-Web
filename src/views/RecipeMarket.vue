@@ -580,7 +580,7 @@ onDeactivated(() => {
 <template>
   <div class="recipe-market-page min-h-screen text-stone-800">
     <!-- 前景单独叠层，避免固定背景与整页滚动高度联动导致 cover 被「拉高」发糊 -->
-    <div class="recipe-market-foreground min-h-screen p-6 pt-15 pb-24 relative z-[1]">
+    <div class="recipe-market-foreground min-h-screen p-6 pb-24 relative z-[1]">
     <header class="mb-6">
       <h1 class="text-[1.65rem] sm:text-3xl font-['Ma_Shan_Zheng',cursive] text-stone-900 mb-2 tracking-[0.08em] leading-tight">
         {{ FEATURE_COPY.recipes.title }} · 养生膳食广场

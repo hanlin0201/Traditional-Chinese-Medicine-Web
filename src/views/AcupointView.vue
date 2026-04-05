@@ -8,9 +8,6 @@ import { FEATURE_COPY } from '@/constants/branding'
 
 // ===================== 状态 =====================
 
-// 视图模式
-const viewMode = ref('2D') // '2D' | '3D'
-
 // 搜索
 const searchQuery = ref('')
 const searchResults = computed(() => searchAcupoints(searchQuery.value))
@@ -76,10 +73,8 @@ function selectPoint(meridian, pointName) {
   fetchPointDetail(pointName)
 
   // 自动聚焦到穴位坐标
-  if (viewMode.value === '2D') {
-    const coord = getPointCoord(meridian.id, pointName)
-    if (coord) focusOnPoint(coord.x, coord.y)
-  }
+  const coord = getPointCoord(meridian.id, pointName)
+  if (coord) focusOnPoint(coord.x, coord.y)
 }
 
 /** 从搜索结果中选中穴位 */
@@ -367,33 +362,17 @@ watch(activeMeridian, () => {
     <!-- ==================== 中央视图区 ==================== -->
     <main class="center-viewport">
 
-      <!-- 标题 + 2D/3D 切换 -->
+      <!-- 标题 -->
       <div class="viewport-header">
         <h1 class="viewport-title">{{ FEATURE_COPY.acupoints.title }}</h1>
         <p class="viewport-motto">{{ FEATURE_COPY.acupoints.motto }}</p>
-        <div class="view-toggle">
-          <button
-            class="toggle-btn"
-            :class="{ 'toggle-btn--active': viewMode === '2D' }"
-            @click="viewMode = '2D'"
-          >
-            2D
-          </button>
-          <button
-            class="toggle-btn"
-            :class="{ 'toggle-btn--active': viewMode === '3D' }"
-            @click="viewMode = '3D'"
-          >
-            3D
-          </button>
-        </div>
       </div>
 
       <!-- 视图内容 -->
       <div class="viewport-content">
 
-        <!-- 2D 视图 -->
-        <div v-if="viewMode === '2D'" class="view-2d">
+        <!-- 2D 经络图 -->
+        <div class="view-2d">
           <!-- 已选择经脉且有图片 -->
           <div
             v-if="activeMeridian && activeMeridian.image"
@@ -444,17 +423,6 @@ watch(activeMeridian, () => {
               <p class="placeholder-sub">
                 {{ activeMeridian ? '暂无该经脉的2D图片' : '请在左侧选择经脉查看经络图' }}
               </p>
-            </div>
-          </div>
-        </div>
-
-        <!-- 3D 视图占位 -->
-        <div v-if="viewMode === '3D'" class="view-3d">
-          <div class="placeholder-body">
-            <div class="placeholder-text">
-              <span class="placeholder-icon">🫀</span>
-              <p>3D 人体模型</p>
-              <p class="placeholder-sub">Three.js 渲染区域（待接入）</p>
             </div>
           </div>
         </div>
@@ -566,7 +534,7 @@ watch(activeMeridian, () => {
   font-family: 'Noto Serif SC', 'SimSun', 宋体, serif;
   display: flex;
   flex-direction: row;
-  height: calc(100vh - 64px);   /* 减去顶部导航栏高度 */
+  height: calc(100vh - 4.5rem);   /* 与 App 固定顶栏 min-h-[4.5rem] 对齐 */
   overflow: hidden;
   background: var(--bg);
   position: relative;
@@ -813,7 +781,7 @@ watch(activeMeridian, () => {
     var(--bg);
 }
 
-/* 标题 + 切换 */
+/* 标题 */
 .viewport-header {
   display: flex;
   flex-direction: column;
@@ -843,34 +811,6 @@ watch(activeMeridian, () => {
   line-height: 1.4;
 }
 
-/* 2D / 3D 切换按钮 */
-.view-toggle {
-  display: flex;
-  background: rgba(139, 94, 60, 0.06);
-  border-radius: 8px;
-  padding: 3px;
-  border: 1px solid rgba(139, 94, 60, 0.1);
-}
-
-.toggle-btn {
-  padding: 6px 20px;
-  font-family: inherit;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--primary);
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.25s;
-  letter-spacing: 1px;
-}
-.toggle-btn--active {
-  background: var(--primary-dark);
-  color: #fff;
-  box-shadow: 0 2px 6px rgba(93, 64, 55, 0.2);
-}
-
 /* 视图内容区 */
 .viewport-content {
   flex: 1;
@@ -882,8 +822,7 @@ watch(activeMeridian, () => {
 }
 
 /* 视图区域 */
-.view-2d,
-.view-3d {
+.view-2d {
   width: 100%;
   height: 100%;
   display: flex;
@@ -914,7 +853,7 @@ watch(activeMeridian, () => {
 
 .image-2d {
   display: block;
-  max-height: calc(100vh - 64px - 100px);  /* 减去导航栏 + 顶部/底部控制栏 */
+  max-height: calc(100vh - 4.5rem - 100px);  /* 减去导航栏 + 顶部/底部控制栏 */
   max-width: calc(100vw - 660px);
   object-fit: contain;
   border-radius: 12px;
@@ -1293,7 +1232,7 @@ watch(activeMeridian, () => {
   .acupoint-page {
     flex-direction: column;
     height: auto;
-    min-height: calc(100vh - 64px);
+    min-height: calc(100vh - 4.5rem);
   }
 
   .left-panel {
