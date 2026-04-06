@@ -1,7 +1,7 @@
 <script setup>
 defineOptions({ name: 'HomeView' })
 
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onActivated, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search, Loader2, ArrowLeft, Filter, ChevronDown, X } from 'lucide-vue-next'
 import { pinyin } from 'pinyin-pro'
@@ -150,6 +150,10 @@ onMounted(() => {
   watch([() => sentinelRef.value, loading], ([el, ld]) => {
     if (el && !ld) _observer?.observe(el)
   }, { flush: 'post', immediate: true })
+})
+
+onActivated(() => {
+  load()
 })
 
 onUnmounted(() => {

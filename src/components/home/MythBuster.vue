@@ -405,11 +405,14 @@ onMounted(() => {
   width: 100%;
   max-width: 800px;
   padding: 40px;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 252, 248, 0.95);
   backdrop-filter: blur(16px);
   border-radius: 24px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow:
+    0 30px 60px -10px rgba(90, 40, 10, 0.3),
+    0 10px 24px -6px rgba(0, 0, 0, 0.18),
+    0 2px 6px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 220, 195, 0.6);
   max-height: 90vh;
   overflow-y: auto;
   scrollbar-width: none;
@@ -594,17 +597,21 @@ onMounted(() => {
 }
 
 .myth-item {
-  background: white;
+  background: #fffdf9;
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
-  border: 1px solid rgba(139, 94, 60, 0.1);
+  box-shadow:
+    0 4px 16px rgba(139, 94, 60, 0.12),
+    0 1px 4px rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(139, 94, 60, 0.15);
   transition: all 0.3s ease;
   cursor: pointer;
 }
 .myth-item:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 15px rgba(0, 0, 0, 0.05);
+  box-shadow:
+    0 12px 28px rgba(139, 94, 60, 0.18),
+    0 4px 8px rgba(0, 0, 0, 0.08);
   border-color: #c44d36;
 }
 

@@ -617,20 +617,25 @@ async function getProfile() {
         ...item.herb,
         favorite_id: item.id,
         saved_at: item.created_at,
+        identity_tag: undefined,
       }));
+      // 后台异步补充 identity_tag，不阻塞主流程
       const herbNames = favoriteHerbs.value.map((h) => h.name).filter(Boolean);
       if (herbNames.length) {
-        const { data: easyData } = await supabase
+        supabase
           .from("herbseasy")
           .select("name, identity_tag")
-          .in("name", herbNames);
-        if (easyData) {
-          const easyMap = Object.fromEntries(easyData.map((e) => [e.name, e.identity_tag]));
-          favoriteHerbs.value = favoriteHerbs.value.map((h) => ({
-            ...h,
-            identity_tag: easyMap[h.name] || null,
-          }));
-        }
+          .in("name", herbNames)
+          .then(({ data: easyData }) => {
+            if (easyData) {
+              const easyMap = Object.fromEntries(easyData.map((e) => [e.name, e.identity_tag]));
+              favoriteHerbs.value = favoriteHerbs.value.map((h) => ({
+                ...h,
+                identity_tag: easyMap[h.name] || null,
+              }));
+              saveProfilePayload();
+            }
+          });
       }
     }
 
@@ -968,6 +973,7 @@ async function handleFileChange(event) {
 }
 
 function goToHerbDetail(herbName) {
+  sessionStorage.setItem('profileReturnTab', 'herbs');
   router.push(`/herb/${herbName}`);
 }
 
@@ -1130,6 +1136,11 @@ onMounted(() => {
     getProfile(); // 后台刷新，不阻塞界面
   } else {
     getProfile();
+  }
+  const returnTab = sessionStorage.getItem('profileReturnTab');
+  if (returnTab) {
+    activeTab.value = returnTab;
+    sessionStorage.removeItem('profileReturnTab');
   }
   window.addEventListener("profile-updated", getProfile);
 });
