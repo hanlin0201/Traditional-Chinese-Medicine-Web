@@ -286,52 +286,50 @@ onMounted(() => {
           <h2 class="main-title">百子柜 · {{ FEATURE_COPY.pairing.title }}</h2>
           <p class="sub-title">{{ FEATURE_COPY.pairing.motto }}</p>
         </div>
-
-        <div
-          class="refresh-control"
-          :class="{ 'is-disabled': isSearching }"
-          @click="shuffleBrowseBatch"
-        >
-          <div class="compass-box" :class="{ 'is-loading': loading }">
-            <Compass :size="28" />
+        <div class="header-actions">
+          <div class="search-field">
+            <Search class="search-icon" :size="18" aria-hidden="true" />
+            <input
+              v-model="herbQuery"
+              type="search"
+              class="herb-search-input"
+              placeholder="输入药材名，查看与之宜 / 忌配伍的药材"
+              enterkeyhint="search"
+              autocomplete="off"
+            />
+            <button
+              v-show="herbQuery.trim()"
+              type="button"
+              class="search-clear"
+              aria-label="清空"
+              @click="clearHerbSearch"
+            >
+              <X :size="16" />
+            </button>
           </div>
-          <div class="label-group">
-            <span class="action-text">换一批</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="search-row">
-        <div class="search-field">
-          <Search class="search-icon" :size="18" aria-hidden="true" />
-          <input
-            v-model="herbQuery"
-            type="search"
-            class="herb-search-input"
-            placeholder="输入药材名，查看与之宜 / 忌配伍的药材"
-            enterkeyhint="search"
-            autocomplete="off"
-          />
-          <button
-            v-show="herbQuery.trim()"
-            type="button"
-            class="search-clear"
-            aria-label="清空"
-            @click="clearHerbSearch"
+          <div
+            class="refresh-control"
+            :class="{ 'is-disabled': isSearching }"
+            @click="shuffleBrowseBatch"
           >
-            <X :size="16" />
-          </button>
+            <div class="compass-box" :class="{ 'is-loading': loading }">
+              <Compass :size="28" />
+            </div>
+            <div class="label-group">
+              <span class="action-text">换一批</span>
+            </div>
+          </div>
         </div>
-        <p v-if="isSearching" class="search-hint">
-          <template v-if="displayedPairs.length">
-            共 {{ displayedPairs.length }} 条配伍
-            <span v-if="displayedPairs.length >= SEARCH_RESULT_CAP">
-              （至多展示 {{ SEARCH_RESULT_CAP }} 条）
-            </span>
-          </template>
-          <template v-else> 未找到包含「{{ herbQuery.trim() }}」的配伍记录 </template>
-        </p>
       </div>
+      <p v-if="isSearching" class="search-hint">
+        <template v-if="displayedPairs.length">
+          共 {{ displayedPairs.length }} 条配伍
+          <span v-if="displayedPairs.length >= SEARCH_RESULT_CAP">
+            （至多展示 {{ SEARCH_RESULT_CAP }} 条）
+          </span>
+        </template>
+        <template v-else> 未找到包含「{{ herbQuery.trim() }}」的配伍记录 </template>
+      </p>
 
       <div class="cabinet-container">
         <div class="cabinet-inner">
@@ -444,10 +442,18 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
+  gap: 12px;
   max-width: 1000px;
-  margin: 0 auto 20px;
+  margin: 0 auto 12px;
   border-bottom: 2px solid rgba(255, 255, 255, 0.35);
   padding-bottom: 10px;
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  flex: 1;
 }
 .main-title {
   font-family: "Ma Shan Zheng", cursive;
@@ -480,15 +486,13 @@ onMounted(() => {
   pointer-events: none;
 }
 
-.search-row {
-  max-width: 1000px;
-  margin: 0 auto 16px;
-}
 .search-field {
   display: flex;
   align-items: center;
   gap: 10px;
-  max-width: 520px;
+  flex: 1;
+  max-width: 560px;
+  min-width: 260px;
   padding: 10px 14px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.12);
@@ -529,7 +533,8 @@ onMounted(() => {
   background: rgba(255, 255, 255, 0.28);
 }
 .search-hint {
-  margin: 8px 0 0;
+  max-width: 1000px;
+  margin: 0 auto 10px;
   font-size: 0.8rem;
   color: rgba(255, 255, 255, 0.82);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
@@ -552,6 +557,19 @@ onMounted(() => {
   color: rgba(255, 255, 255, 0.95);
   font-size: 0.9rem;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+@media (max-width: 820px) {
+  .match-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .header-actions {
+    width: 100%;
+  }
+  .search-field {
+    min-width: 0;
+  }
 }
 
 .cabinet-container {

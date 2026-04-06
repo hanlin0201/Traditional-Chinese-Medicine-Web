@@ -149,7 +149,7 @@ function goToRecipeDetail(id) {
 watch(activeIndex, (newVal) => {
   if (newVal > 0) document.body.classList.add("hide-global-nav");
   else document.body.classList.remove("hide-global-nav");
-});
+}, { immediate: true });
 
 watch(
   () => ({ path: route.path, history: route.query.history }),
