@@ -412,6 +412,12 @@ onMounted(() => {
   border: 1px solid rgba(255, 255, 255, 0.5);
   max-height: 90vh;
   overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.myth-modal-content::-webkit-scrollbar {
+  display: none;
+  width: 0;
 }
 
 .section-header {

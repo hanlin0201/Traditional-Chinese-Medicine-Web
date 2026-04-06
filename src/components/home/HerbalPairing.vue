@@ -431,6 +431,11 @@ onMounted(() => {
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.content-layer::-webkit-scrollbar {
+  display: none;
+  width: 0;
 }
 
 /* --- 下面是之前调整过的紧凑版样式 (保持不变) --- */

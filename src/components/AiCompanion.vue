@@ -1,6 +1,6 @@
 <script setup>
 import { ref, nextTick, watch, onMounted, onUnmounted } from 'vue'
-import { ScrollText, Send, X, ChevronDown, Heart, PlusCircle, Loader2, BookOpen, Coffee, Soup, Pill, MessageCircle, Check, History, Trash2 } from 'lucide-vue-next'
+import { ScrollText, Send, X, ChevronDown, Heart, PlusCircle, Loader2, BookOpen, Coffee, Soup, Pill, MessageCircle, Check, History, Trash2, Edit2 } from 'lucide-vue-next'
 import { supabase } from '@/supabaseClient'
 import { useAuth } from '@/composables/useAuth'
 import { AI_TUTOR_LABEL } from '@/constants/branding'
@@ -679,10 +679,11 @@ async function handleSavePlan(fullMessage) {
   try {
     const { data } = await supabase.from('profiles').select('care_plans').eq('id', user.value.id).single()
     let list = data?.care_plans || []; if(!Array.isArray(list)) list = []
-    
-    if (list.some(p => p.diagnosis_result === newPlan.diagnosis_result)) { 
-      messages.value.push({ role: 'assistant', type: 'text', content: '该方案已存在。' }); 
-      return 
+
+    const planKey = p => { const { id, saved_at, ...rest } = p; return JSON.stringify(rest) }
+    if (list.some(p => planKey(p) === planKey(newPlan))) {
+      messages.value.push({ role: 'assistant', type: 'text', content: '该方案已存在。' })
+      return
     }
 
     await supabase.from('profiles').update({ care_plans: [newPlan, ...list] }).eq('id', user.value.id)
@@ -849,9 +850,29 @@ defineExpose({ openPanel })
         />
 
         <div class="px-4 py-3 border-b border-sandalwood/15 flex justify-between items-center bg-[#FBF8F2] shrink-0">
-          <h3 class="font-serif font-semibold text-sandalwood truncate max-w-[55%]">
-            {{ sessions.find(s => s.id === activeSessionId)?.title || AI_TUTOR_LABEL }}
-          </h3>
+          <div class="max-w-[55%] flex items-center min-w-0">
+            <template v-if="editingSessionId === activeSessionId">
+              <input
+                v-model="editingTitle"
+                @blur="commitRenameSession(activeSessionId, $event)"
+                @keyup.enter="commitRenameSession(activeSessionId, $event)"
+                @keyup.esc="cancelRenameSession"
+                autofocus
+                class="font-serif font-semibold text-sandalwood bg-sandalwood/10 px-2 py-0.5 rounded outline-none w-full text-sm"
+              />
+            </template>
+            <template v-else>
+              <div
+                class="group flex items-center gap-1.5 min-w-0 cursor-pointer"
+                @click="startRenameSession(sessions.find(s => s.id === activeSessionId) || { id: activeSessionId, title: AI_TUTOR_LABEL }, $event)"
+              >
+                <h3 class="font-serif font-semibold text-sandalwood truncate">
+                  {{ sessions.find(s => s.id === activeSessionId)?.title || AI_TUTOR_LABEL }}
+                </h3>
+                <Edit2 class="w-3.5 h-3.5 text-sandalwood/40 group-hover:text-sandalwood transition-colors opacity-0 group-hover:opacity-100 shrink-0" />
+              </div>
+            </template>
+          </div>
           <div class="flex items-center gap-1.5">
             <button @click="createNewSession" title="新建对话" :disabled="isGenerating" class="p-1.5 rounded-lg hover:bg-sandalwood/10 text-sandalwood/60 hover:text-sandalwood transition disabled:opacity-30 disabled:cursor-not-allowed">
               <PlusCircle class="w-4 h-4" />
@@ -889,18 +910,15 @@ defineExpose({ openPanel })
                   @keyup.esc.stop="cancelRenameSession($event)"
                   @blur="commitRenameSession(s.id, $event)"
                   maxlength="30"
+                  autofocus
                   class="w-full text-sm px-2 py-1 border border-sandalwood/20 rounded bg-white text-gray-800 outline-none focus:ring-1 focus:ring-sandalwood/40"
                 />
-                <p v-else class="text-sm text-gray-800 truncate">{{ s.title }}</p>
+                <div v-else class="group/title flex items-center gap-1 min-w-0" @click.stop="startRenameSession(s, $event)">
+                  <p class="text-sm text-gray-800 truncate">{{ s.title }}</p>
+                  <Edit2 class="w-3 h-3 text-sandalwood/30 group-hover/title:text-sandalwood transition-colors opacity-0 group-hover/title:opacity-100 shrink-0" />
+                </div>
                 <p class="text-xs text-gray-400 mt-0.5">{{ formatSessionDate(s.updatedAt) }}</p>
               </div>
-              <button
-                @click="startRenameSession(s, $event)"
-                title="重命名对话"
-                class="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-sandalwood/10 text-gray-300 hover:text-sandalwood transition"
-              >
-                重命名
-              </button>
               <button
                 @click="deleteSession(s.id, $event)"
                 title="删除对话"
