@@ -688,42 +688,43 @@ function goBack() {
                 <p class="text-sandalwood/90 text-base font-medium leading-relaxed text-justify">{{ herbEasy.identity_tag }}</p>
               </div>
 
-              <div class="rounded-xl bg-paper-card shadow-paper border border-sandalwood/10 divide-y divide-sandalwood/10">
-                
-                <div v-if="herbEasy.friendly_explanation" class="p-5">
-                  <h2 class="text-cinnabar font-serif font-semibold text-base mb-2 flex items-center gap-2">
-                    <span class="w-1 h-4 bg-cinnabar rounded" /> 作用效果
-                  </h2>
-                  <p class="text-sandalwood/90 text-sm leading-relaxed text-justify">{{ herbEasy.friendly_explanation }}</p>
-                </div>
+              <!-- 作用效果：主角卡片 -->
+              <div v-if="herbEasy.friendly_explanation" class="rounded-xl bg-cinnabar/5 border border-cinnabar/20 p-6">
+                <h2 class="text-cinnabar font-serif font-bold text-lg mb-3 flex items-center gap-2">
+                  <span class="w-1.5 h-5 bg-cinnabar rounded-full" /> 作用效果
+                </h2>
+                <p class="text-sandalwood text-base font-medium leading-relaxed text-justify">{{ herbEasy.friendly_explanation }}</p>
+              </div>
 
-                <div v-if="herbEasy.modern_scene != null && (Array.isArray(herbEasy.modern_scene) ? herbEasy.modern_scene.length : true)" class="p-5">
-                  <h2 class="text-bamboo font-serif font-semibold text-base mb-2 flex items-center gap-2">
-                    <span class="w-1 h-4 bg-bamboo rounded" /> 应用场景
+              <div class="rounded-xl bg-paper-card shadow-paper border border-sandalwood/10 divide-y divide-sandalwood/10">
+
+                <div v-if="herbEasy.modern_scene != null && (Array.isArray(herbEasy.modern_scene) ? herbEasy.modern_scene.length : true)" class="p-4">
+                  <h2 class="text-bamboo font-serif font-semibold text-sm mb-1.5 flex items-center gap-2">
+                    <span class="w-1 h-3.5 bg-bamboo rounded" /> 应用场景
                   </h2>
-                  <p v-if="Array.isArray(herbEasy.modern_scene)" class="text-sandalwood/90 text-sm leading-relaxed text-justify">
+                  <p v-if="Array.isArray(herbEasy.modern_scene)" class="text-sandalwood/80 text-xs leading-relaxed text-justify">
                     {{ herbEasy.modern_scene.join('；') }}
                   </p>
                   <p v-else-if="typeof herbEasy.modern_scene === 'string'" class="text-sandalwood/90 text-sm leading-relaxed text-justify">
                     {{ herbEasy.modern_scene }}
                   </p>
-                  <p v-else class="text-sandalwood/90 text-sm leading-relaxed text-justify">
+                  <p v-else class="text-sandalwood/80 text-xs leading-relaxed text-justify">
                     {{ JSON.stringify(herbEasy.modern_scene) }}
                   </p>
                 </div>
 
-                <div v-if="herbEasy.nature_logic" class="p-5">
-                  <h2 class="text-bamboo font-serif font-semibold text-base mb-2 flex items-center gap-2">
-                    <span class="w-1 h-4 bg-bamboo rounded" /> 性味原理
+                <div v-if="herbEasy.nature_logic" class="p-4">
+                  <h2 class="text-bamboo font-serif font-semibold text-sm mb-1.5 flex items-center gap-2">
+                    <span class="w-1 h-3.5 bg-bamboo rounded" /> 性味原理
                   </h2>
-                  <p class="text-sandalwood/90 text-sm leading-relaxed text-justify">{{ herbEasy.nature_logic }}</p>
+                  <p class="text-sandalwood/80 text-xs leading-relaxed text-justify">{{ herbEasy.nature_logic }}</p>
                 </div>
 
-                <div v-if="herbEasy.easy_usage" class="p-5">
-                  <h2 class="text-bamboo font-serif font-semibold text-base mb-2 flex items-center gap-2">
-                    <span class="w-1 h-4 bg-bamboo rounded" /> 实用搭配
+                <div v-if="herbEasy.easy_usage" class="p-4">
+                  <h2 class="text-bamboo font-serif font-semibold text-sm mb-1.5 flex items-center gap-2">
+                    <span class="w-1 h-3.5 bg-bamboo rounded" /> 实用搭配
                   </h2>
-                  <p class="text-sandalwood/90 text-sm leading-relaxed text-justify">{{ herbEasy.easy_usage }}</p>
+                  <p class="text-sandalwood/80 text-xs leading-relaxed text-justify">{{ herbEasy.easy_usage }}</p>
                 </div>
 
               </div>

@@ -1325,7 +1325,7 @@ function closeAccountMenu() {
           ]"
           :key="tab.id"
           @click="activeTab = tab.id"
-          class="flex-shrink-0 px-4 py-3 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 whitespace-nowrap"
+          class="flex-shrink-0 px-4 py-3 text-sm font-bold font-serif rounded-lg transition-all flex items-center justify-center gap-2 whitespace-nowrap"
           :class="
             activeTab === tab.id
               ? 'bg-sandalwood text-white shadow-md'
@@ -1342,7 +1342,7 @@ function closeAccountMenu() {
           class="animate-in slide-in-from-bottom-4 duration-500"
         >
           <div class="flex justify-between items-center mb-4 px-2">
-            <h3 class="font-bold text-gray-700">我的调理记录</h3>
+            <h3 class="font-bold font-serif text-gray-700">我的调理记录</h3>
             <button
               @click="togglePrivacy('plans')"
               class="text-xs flex items-center gap-1 px-3 py-1.5 rounded-full border transition-all"
@@ -1371,7 +1371,7 @@ function closeAccountMenu() {
           <div
             v-for="plan in carePlans"
             :key="plan.id"
-            class="bg-white rounded-xl p-4 shadow-card border border-sandalwood/10 relative group mb-4"
+            class="bg-white rounded-xl p-4 shadow-card border border-sandalwood/10 relative group mb-4 font-['KaiTi',cursive]"
           >
             <button
               @click="deletePlan(plan.id)"
@@ -1524,7 +1524,7 @@ function closeAccountMenu() {
           class="animate-in slide-in-from-bottom-4 duration-500"
         >
           <div class="flex justify-between items-center mb-4 px-2">
-            <h3 class="font-bold text-gray-700">收藏的药材</h3>
+            <h3 class="font-bold font-serif text-gray-700">收藏的药材</h3>
             <button
               @click="togglePrivacy('herbs')"
               class="text-xs flex items-center gap-1 px-3 py-1.5 rounded-full border transition-all"
@@ -1574,8 +1574,8 @@ function closeAccountMenu() {
                 />
               </div>
               <div class="flex-1 min-w-0">
-                <h4 class="font-bold text-gray-800">{{ herb.name }}</h4>
-                <p class="text-xs text-gray-500 mt-1 truncate">
+                <h4 class="font-bold font-serif text-gray-800">{{ herb.name }}</h4>
+                <p class="text-xs font-serif text-gray-500 mt-1 truncate">
                   {{ herb.nature }} · {{ herb.taste }}
                 </p>
               </div>
@@ -1796,7 +1796,7 @@ function closeAccountMenu() {
           class="animate-in slide-in-from-bottom-4 duration-500"
         >
           <div class="flex justify-between items-center mb-4 px-2">
-            <h3 class="font-bold text-gray-700">我的跟做作业</h3>
+            <h3 class="font-bold font-serif text-gray-700">我的跟做作业</h3>
             <span class="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded"
               >默认为公开</span
             >
@@ -1848,7 +1848,7 @@ function closeAccountMenu() {
           class="animate-in slide-in-from-bottom-4 duration-500"
         >
           <div class="flex justify-between items-center mb-4 px-2">
-            <h3 class="font-bold text-gray-700">我发布的食谱</h3>
+            <h3 class="font-bold font-serif text-gray-700">我发布的食谱</h3>
             <button
               type="button"
               class="text-xs bg-sandalwood text-white px-3 py-1.5 rounded-full shadow-sm hover:bg-sandalwood/90 flex items-center gap-1"
@@ -1958,7 +1958,7 @@ function closeAccountMenu() {
           class="animate-in slide-in-from-bottom-4 duration-500"
         >
           <div class="flex justify-between items-center mb-4 px-2">
-            <h3 class="font-bold text-gray-700">信箱</h3>
+            <h3 class="font-bold font-serif text-gray-700">信箱</h3>
             <span class="text-xs text-gray-400">站内通知</span>
           </div>
 
