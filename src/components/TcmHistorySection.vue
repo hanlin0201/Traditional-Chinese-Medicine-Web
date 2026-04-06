@@ -154,6 +154,10 @@ function onPaperWheel(e) {
             class="tcm-scroll-paper"
             :style="{ width: scrollContentWidth }"
           >
+            <p v-if="unfolded" class="tcm-history-scroll-title" aria-label="中医药历史，杏林长卷，路启千秋">
+              <span class="tcm-history-scroll-title-main">中医药历史</span>
+              <span class="tcm-history-scroll-title-sub">杏林长卷，路启千秋</span>
+            </p>
             <div
               ref="paperInnerRef"
               class="tcm-paper-inner"
@@ -379,6 +383,59 @@ function onPaperWheel(e) {
   justify-content: flex-start;
   overflow-x: auto;
   overflow-y: hidden;
+}
+
+.tcm-history-scroll-title {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  line-height: 1.4;
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.82),
+    0 2px 8px rgba(120, 92, 70, 0.1);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.tcm-history-scroll-title-main {
+  font-family: 'Ma Shan Zheng', 'STKaiti', 'KaiTi', serif;
+  font-size: clamp(1.3rem, 2.6vw, 1.75rem);
+  font-weight: 400;
+  letter-spacing: 0.28em;
+  color: rgba(92, 62, 42, 0.82);
+  position: relative;
+  padding: 0 0.24em;
+}
+
+.tcm-history-scroll-title-main::after {
+  content: '';
+  position: absolute;
+  left: 16%;
+  right: 16%;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    rgba(161, 130, 104, 0),
+    rgba(161, 130, 104, 0.35),
+    rgba(161, 130, 104, 0)
+  );
+}
+
+.tcm-history-scroll-title-sub {
+  font-family: 'Noto Serif SC', 'SimSun', 'STSong', serif;
+  font-size: clamp(0.92rem, 1.35vw, 1.08rem);
+  font-weight: 400;
+  letter-spacing: 0.42em;
+  color: rgba(116, 89, 68, 0.72);
+  padding-left: 0.42em;
 }
 
 /* --- 卡片容器 --- */

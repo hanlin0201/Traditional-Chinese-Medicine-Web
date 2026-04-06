@@ -201,10 +201,13 @@ function formatNatureMeridianHtml(text) {
   if (!text || !text.trim()) return ''
   let plain = text.trim().replace(/^；+/, '').replace(/\s+/g, ' ')
   let t = escapeHtml(plain)
-  t = t.replace(/。\s*；/g, '。\n；')
+  t = t.replace(/。\s*；/g, '。\n')
   t = t.replace(/；\s*(?=[入《])/g, '；\n')
   t = t.replace(/\s*([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])/g, '\n$1')
-  const lines = t.split('\n').map((s) => s.trim()).filter(Boolean)
+  const lines = t
+    .split('\n')
+    .map((s) => s.trim().replace(/^；+/, ''))
+    .filter(Boolean)
   return lines
     .map((line) => {
       const isCite = /^[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]/.test(line)
