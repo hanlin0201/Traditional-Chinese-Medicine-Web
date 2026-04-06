@@ -618,6 +618,20 @@ async function getProfile() {
         favorite_id: item.id,
         saved_at: item.created_at,
       }));
+      const herbNames = favoriteHerbs.value.map((h) => h.name).filter(Boolean);
+      if (herbNames.length) {
+        const { data: easyData } = await supabase
+          .from("herbseasy")
+          .select("name, identity_tag")
+          .in("name", herbNames);
+        if (easyData) {
+          const easyMap = Object.fromEntries(easyData.map((e) => [e.name, e.identity_tag]));
+          favoriteHerbs.value = favoriteHerbs.value.map((h) => ({
+            ...h,
+            identity_tag: easyMap[h.name] || null,
+          }));
+        }
+      }
     }
 
     let marketRecipes = [];
@@ -1380,13 +1394,8 @@ function closeAccountMenu() {
               <Trash2 class="w-4 h-4" />
             </button>
             <div
-              class="flex items-start gap-4 mb-4 border-b border-dashed border-gray-100 pb-4"
+              class="flex items-start mb-4 border-b border-dashed border-gray-100 pb-4"
             >
-              <div
-                class="w-12 h-12 rounded-xl bg-[#F5EDD8] flex items-center justify-center shrink-0 shadow-sm border border-[#EADBB5]"
-              >
-                <Activity class="w-6 h-6 text-sandalwood" />
-              </div>
               <div>
                 <h3
                   class="font-['Ma_Shan_Zheng',cursive] text-gray-800 text-lg leading-tight mt-0.5"
@@ -1403,14 +1412,14 @@ function closeAccountMenu() {
               </div>
             </div>
             <div
-              class="text-sm text-gray-600 mb-5 bg-[#FAF9F6] p-4 rounded-lg leading-relaxed border border-gray-100"
+              class="text-base text-gray-600 mb-5 bg-[#FAF9F6] p-4 rounded-lg leading-relaxed border border-gray-100"
             >
               {{ plan.summary }}
             </div>
 
             <div v-if="plan.recipes && plan.recipes.length > 0">
               <div
-                class="text-xs font-bold text-sandalwood mb-3 flex items-center gap-1 uppercase tracking-wider opacity-80"
+                class="text-sm font-bold text-sandalwood mb-3 flex items-center gap-1 uppercase tracking-wider opacity-80"
               >
                 <ChefHat class="w-3.5 h-3.5" /> 推荐食谱
               </div>
@@ -1436,10 +1445,10 @@ function closeAccountMenu() {
                       }}
                     </div>
                     <div class="flex-1 min-w-0">
-                      <div class="font-bold text-gray-800 text-sm truncate">
+                      <div class="font-bold text-gray-800 text-base truncate">
                         {{ recipe.name }}
                       </div>
-                      <div class="text-xs text-gray-500 truncate mt-0.5">
+                      <div class="text-sm text-gray-500 truncate mt-0.5">
                         食材：{{
                           formatIngredientsForDisplay(recipe.ingredients)
                         }}
@@ -1457,7 +1466,7 @@ function closeAccountMenu() {
                     v-show="foldedStates[`plan-${plan.id}-recipe-${recipe.id}`]"
                     class="bg-white px-4 pb-4 pt-1 border-t border-dashed border-sandalwood/10"
                   >
-                    <div class="mt-2 text-xs text-gray-600 space-y-2">
+                    <div class="mt-2 text-sm text-gray-600 space-y-2">
                       <p
                         v-for="(s, i) in ensureArray(recipe.steps)"
                         :key="i"
@@ -1478,12 +1487,12 @@ function closeAccountMenu() {
               class="mt-5 pt-4 border-t border-dashed border-gray-100 grid gap-3"
             >
               <div v-if="plan.acupoints && plan.acupoints.length">
-                <div class="text-xs font-bold text-gray-400 mb-2">穴位方案</div>
+                <div class="text-sm font-bold text-gray-400 mb-2">穴位方案</div>
                 <div class="grid grid-cols-1 gap-2">
                   <div
                     v-for="(ac, idx) in plan.acupoints"
                     :key="idx"
-                    class="bg-gray-50 border border-gray-100 px-3 py-2 rounded-lg text-sm"
+                    class="bg-gray-50 border border-gray-100 px-3 py-2 rounded-lg text-base"
                   >
                     <div
                       class="font-bold text-gray-700 mb-1 flex items-center gap-2"
@@ -1493,13 +1502,13 @@ function closeAccountMenu() {
                     </div>
                     <div
                       v-if="ac.location"
-                      class="text-xs text-gray-500 mb-1.5 flex items-start gap-1"
+                      class="text-sm text-gray-500 mb-1.5 flex items-start gap-1"
                     >
                       <span class="shrink-0">📍</span> {{ ac.location }}
                     </div>
                     <div
                       v-if="ac.method"
-                      class="text-xs text-sandalwood/80 leading-relaxed bg-[#F5EDD8]/40 p-2 rounded flex items-start gap-1"
+                      class="text-sm text-sandalwood/80 leading-relaxed bg-[#F5EDD8]/40 p-2 rounded flex items-start gap-1"
                     >
                       <span class="shrink-0">👇</span> {{ ac.method }}
                     </div>
@@ -1508,7 +1517,7 @@ function closeAccountMenu() {
               </div>
               <div
                 v-if="plan.lifestyle && plan.lifestyle.length"
-                class="flex gap-2 items-start bg-red-50/50 p-2.5 rounded-lg text-xs"
+                class="flex gap-2 items-start bg-red-50/50 p-2.5 rounded-lg text-sm"
               >
                 <span class="font-bold text-red-400/80 shrink-0">🚫 禁忌：</span
                 ><span class="text-gray-600 leading-relaxed">{{
@@ -1575,8 +1584,8 @@ function closeAccountMenu() {
               </div>
               <div class="flex-1 min-w-0">
                 <h4 class="font-bold font-serif text-gray-800">{{ herb.name }}</h4>
-                <p class="text-xs font-serif text-gray-500 mt-1 truncate">
-                  {{ herb.nature }} · {{ herb.taste }}
+                <p class="text-xs font-serif text-gray-500 mt-1 line-clamp-2">
+                  {{ herb.identity_tag || [herb.nature, herb.taste].filter(Boolean).join(' · ') }}
                 </p>
               </div>
               <ChevronDown class="-rotate-90 w-4 h-4 text-gray-300" />
@@ -1704,7 +1713,7 @@ function closeAccountMenu() {
             <div
               v-for="recipe in aiSavedRecipes"
               :key="recipe.id"
-              class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 relative group transition-all hover:-translate-y-0.5 hover:shadow-lg"
+              class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 relative group transition-all hover:-translate-y-0.5 hover:shadow-lg font-['KaiTi',cursive]"
             >
               <button
                 @click="deleteRecipe(recipe)"
@@ -1718,13 +1727,13 @@ function closeAccountMenu() {
                   class="text-[10px] bg-[#F5EDD6] text-[#8B6914] border border-[#DEC880] px-2 py-0.5 rounded-full font-medium shrink-0"
                   >AI推荐</span
                 >
-                <h4 class="font-bold text-gray-800 text-base shrink-0">
+                <h4 class="font-bold text-gray-800 text-lg shrink-0">
                   {{ recipe.name }}
                 </h4>
                 <span
                   v-if="recipe.rationale"
-                  class="text-[11px] text-stone-500 italic line-clamp-1"
-                  >{{ recipe.rationale }}</span
+                  class="text-xs text-stone-500 line-clamp-1"
+                  ><span class="font-medium">医理：</span>{{ recipe.rationale }}</span
                 >
               </div>
               <!-- 标签 -->
@@ -1732,13 +1741,13 @@ function closeAccountMenu() {
                 <span
                   v-for="tag in ensureArray(recipe.tags)"
                   :key="tag"
-                  class="text-[10px] bg-[#EEF2E6] text-[#5A7C65] px-2 py-0.5 rounded-full border border-[#5A7C65]/20 font-medium"
+                  class="text-[11px] bg-[#EEF2E6] text-[#5A7C65] px-2 py-0.5 rounded-full border border-[#5A7C65]/20 font-medium"
                   >{{ tag }}</span
                 >
               </div>
               <!-- 食材 -->
               <div
-                class="text-xs text-gray-600 bg-gray-50 p-2.5 rounded-lg leading-relaxed mb-2"
+                class="text-sm text-gray-600 bg-gray-50 p-2.5 rounded-lg leading-relaxed mb-2"
               >
                 <span class="font-bold text-gray-800">食材：</span
                 >{{ formatIngredientsForDisplay(recipe.ingredients) }}
@@ -1746,7 +1755,7 @@ function closeAccountMenu() {
               <!-- 展开步骤 -->
               <button
                 @click="toggleFold(`saved-${recipe.id}`)"
-                class="w-full text-xs text-center font-bold text-sandalwood bg-sandalwood/5 hover:bg-sandalwood/10 py-1.5 rounded-lg flex items-center justify-center gap-1 transition-colors mb-2"
+                class="w-full text-sm text-center font-bold text-sandalwood bg-sandalwood/5 hover:bg-sandalwood/10 py-1.5 rounded-lg flex items-center justify-center gap-1 transition-colors mb-2"
               >
                 {{
                   foldedStates[`saved-${recipe.id}`]
@@ -1765,7 +1774,7 @@ function closeAccountMenu() {
                 <p
                   v-for="(s, i) in ensureArray(recipe.steps)"
                   :key="i"
-                  class="text-xs text-gray-600 leading-relaxed"
+                  class="text-sm text-gray-600 leading-relaxed"
                 >
                   <span class="font-bold text-sandalwood/60 mr-1"
                     >{{ i + 1 }}.</span
@@ -1776,13 +1785,13 @@ function closeAccountMenu() {
               <div class="flex gap-2">
                 <button
                   @click="openPublishPrefillFromAi(recipe)"
-                  class="flex-1 text-xs py-2 rounded-lg bg-sandalwood/10 text-sandalwood font-medium hover:bg-sandalwood/20 transition flex items-center justify-center gap-1"
+                  class="flex-1 text-sm py-2 rounded-lg bg-sandalwood/10 text-sandalwood font-medium hover:bg-sandalwood/20 transition flex items-center justify-center gap-1"
                 >
                   <Sparkles class="w-3 h-3" />AI一键补全为可发布食谱
                 </button>
                 <button
                   @click="goToMarketSimilar(recipe)"
-                  class="flex-1 text-xs py-2 rounded-lg bg-stone-100 text-stone-600 font-medium hover:bg-stone-200 transition flex items-center justify-center gap-1"
+                  class="flex-1 text-sm py-2 rounded-lg bg-stone-100 text-stone-600 font-medium hover:bg-stone-200 transition flex items-center justify-center gap-1"
                 >
                   <ChefHat class="w-3 h-3" />去广场找相似
                 </button>
