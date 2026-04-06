@@ -415,7 +415,7 @@ onMounted(() => {
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
-.myth-modal-content::-webkit-scrollbar {
+.content-wrapper::-webkit-scrollbar {
   display: none;
   width: 0;
 }

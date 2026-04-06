@@ -585,7 +585,7 @@ onDeactivated(() => {
       <h1 class="text-[1.65rem] sm:text-3xl font-['Ma_Shan_Zheng',cursive] text-stone-900 mb-2 tracking-[0.08em] leading-tight">
         {{ FEATURE_COPY.recipes.title }} · 养生膳食广场
       </h1>
-      <p class="text-stone-500">{{ FEATURE_COPY.recipes.motto }} · 结合体质与节气推荐食疗方案</p>
+      <p class="text-stone-500 font-['Ma_Shan_Zheng',cursive]">{{ FEATURE_COPY.recipes.motto }} · 结合体质与节气推荐食疗方案</p>
     </header>
 
     <!-- 搜索条：用户自主输入，综合匹配名称/功效/食材 -->
@@ -699,44 +699,44 @@ onDeactivated(() => {
           清空条件后重试
         </button>
       </div>
-      <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div v-else class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <div v-for="recipe in filteredRecipes" :key="recipe.id" @click="openRecipe(recipe)"
-        class="group bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden border border-stone-100 flex flex-col relative">
-        <div class="relative h-48 overflow-hidden">
+        class="group bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden border border-stone-100 flex flex-col relative">
+        <div class="relative h-36 overflow-hidden">
           <img :src="recipe.image" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
-          <div class="absolute bottom-2 left-2 flex gap-2">
-            <span class="bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-md flex items-center gap-1">
-              <Clock :size="12" /> {{ recipe.time }}
+          <div class="absolute bottom-1.5 left-1.5 flex gap-1.5">
+            <span class="bg-black/60 backdrop-blur-sm text-white text-[10px] px-1.5 py-0.5 rounded-md flex items-center gap-1">
+              <Clock :size="10" /> {{ recipe.time }}
             </span>
           </div>
-          <button @click="(e) => toggleFavorite(e, recipe)" class="absolute top-2 right-2 bg-white/90 px-2 py-1 rounded-full shadow-sm hover:scale-110 transition z-10 flex items-center gap-1">
-            <StarIcon :size="16" :class="recipe.is_favorite ? 'fill-yellow-400 text-yellow-400' : 'text-stone-400'" />
-            <span class="text-xs text-stone-500 leading-none">{{ recipe.favorites_count || 0 }}</span>
+          <button @click="(e) => toggleFavorite(e, recipe)" class="absolute top-1.5 right-1.5 bg-white/90 px-1.5 py-0.5 rounded-full shadow-sm hover:scale-110 transition z-10 flex items-center gap-1">
+            <StarIcon :size="13" :class="recipe.is_favorite ? 'fill-yellow-400 text-yellow-400' : 'text-stone-400'" />
+            <span class="text-[10px] text-stone-500 leading-none">{{ recipe.favorites_count || 0 }}</span>
           </button>
         </div>
-        <div class="p-4 flex-1 flex flex-col">
-          <h3 class="text-lg font-bold text-stone-800 mb-1">{{ recipe.name }}</h3>
+        <div class="p-3 flex-1 flex flex-col">
+          <h3 class="text-sm font-bold text-stone-800 mb-1 line-clamp-1">{{ recipe.name }}</h3>
           <div
             v-if="recipe.is_user_submission"
-            class="flex items-center gap-2 mb-2 cursor-pointer w-fit rounded-lg px-1 -mx-1 hover:bg-stone-50"
+            class="flex items-center gap-1.5 mb-1.5 cursor-pointer w-fit rounded-lg px-1 -mx-1 hover:bg-stone-50"
             @click.stop="goToUserProfile(recipe.author_user_id, $event)"
           >
             <img
               v-if="recipe.author_display_avatar"
               :src="recipe.author_display_avatar"
-              class="w-6 h-6 rounded-full object-cover border border-stone-200"
+              class="w-5 h-5 rounded-full object-cover border border-stone-200"
               alt="作者头像"
             />
             <div
               v-else
-              class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-[10px] font-bold"
+              class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-[9px] font-bold"
             >{{ recipe.author_display_name?.[0] }}</div>
-            <span class="text-xs text-stone-500 truncate max-w-[10rem]">{{ recipe.author_display_name }}</span>
-            <span class="text-[10px] px-1.5 py-0 rounded border border-amber-200 bg-amber-50 text-amber-900 shrink-0">用户投稿</span>
+            <span class="text-[10px] text-stone-500 truncate max-w-[6rem]">{{ recipe.author_display_name }}</span>
+            <span class="text-[9px] px-1 py-0 rounded border border-amber-200 bg-amber-50 text-amber-900 shrink-0">用户投稿</span>
           </div>
-          <p class="text-xs text-stone-400 mb-3">{{ recipe.cooked_count }} 人做过</p>
-          <div class="flex flex-wrap gap-2 mt-auto">
-            <span class="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-100">{{ recipe.bodyType }}</span>
+          <p class="text-[10px] text-stone-400 mb-2">{{ recipe.cooked_count }} 人做过</p>
+          <div class="flex flex-wrap gap-1.5 mt-auto">
+            <span class="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-100">{{ recipe.bodyType }}</span>
           </div>
         </div>
       </div>
