@@ -456,6 +456,7 @@ onBeforeUnmount(() => {
   margin: 0;
   text-align: center;
   max-width: 720px;
+  white-space: pre-line;
 }
 
 .xiandai-screen-2 {

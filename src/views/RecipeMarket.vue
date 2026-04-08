@@ -544,7 +544,24 @@ const closeRecipe = () => {
 };
 
 const handleHerbClick = (item) => {
-  if (item.isHerb) router.push({ name: 'HerbDetail', params: { name: item.name } })
+  if (!item?.isHerb) return
+
+  const fromRecipeId = selectedRecipe.value?.id
+  const fromRecipeName = selectedRecipe.value?.name
+
+  // 先关闭弹层，避免 Teleport 悬浮层残留到下一页
+  closeRecipe()
+
+  router.push({
+    name: 'HerbDetail',
+    params: { name: item.name },
+    query: fromRecipeId
+      ? {
+          from_recipe_id: String(fromRecipeId),
+          from_recipe_name: String(fromRecipeName || ''),
+        }
+      : undefined,
+  })
 };
 
 onMounted(() => {

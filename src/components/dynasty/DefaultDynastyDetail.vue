@@ -232,6 +232,7 @@ function scrollContainer(elRef, direction) {
   color: var(--primary-dark);
   margin: 0;
   text-align: justify;
+  white-space: pre-line;
 }
 .content-section { display: flex; flex-direction: column; gap: 14px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; padding: 0 4px; }

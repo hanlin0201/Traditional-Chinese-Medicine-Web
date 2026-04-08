@@ -38,6 +38,7 @@ import {
   Mail,
   ShieldCheck,
   CircleSlash,
+  AlertTriangle,
   Heart,
   Send,
 } from "lucide-vue-next";
@@ -1023,6 +1024,21 @@ function ensureArray(val) {
   return !val ? [] : Array.isArray(val) ? val : [val];
 }
 
+function normalizeLifestyleTips(lifestyle) {
+  const rows = ensureArray(lifestyle)
+    .map((x) => String(x ?? "").trim())
+    .filter(Boolean);
+  const flat = [];
+  for (const row of rows) {
+    const parts = row
+      .split(/[；;]\s*/g)
+      .map((p) => p.trim())
+      .filter(Boolean);
+    flat.push(...(parts.length ? parts : [row]));
+  }
+  return [...new Set(flat)].filter(Boolean);
+}
+
 /** 将接口/缓存里的食材字段统一成数组（支持 JSON 字符串、类数组对象） */
 function normalizeIngredientsInput(raw) {
   if (raw == null || raw === "") return [];
@@ -1421,34 +1437,103 @@ function closeAccountMenu() {
               <Trash2 class="w-4 h-4" />
             </button>
             <div
-              class="flex items-start mb-4 border-b border-dashed border-gray-100 pb-4"
+              class="flex flex-col sm:flex-row sm:items-start items-stretch justify-between gap-3 mb-4 border-b-2 border-sandalwood/10 pb-4 pr-24"
             >
-              <div>
-                <h3
-                  class="font-['Ma_Shan_Zheng',cursive] text-gray-800 text-lg leading-tight mt-0.5"
-                >
-                  {{ plan.diagnosis_result }}
-                </h3>
-                <div
-                  class="flex items-center gap-2 mt-2 text-xs text-gray-400 font-mono"
-                >
-                  <Calendar class="w-3 h-3" /><span>{{
-                    formatDate(plan.saved_at)
-                  }}</span>
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <div
+                    class="text-sm text-gray-500 font-bold tracking-wide"
+                  >
+                    调理主题
+                  </div>
                 </div>
+                <div
+                  class="relative flex items-stretch gap-2 mt-1 max-w-full z-30"
+                >
+                  <!-- 病症：左侧 -->
+                  <div
+                    class="inline-flex items-center bg-[#F5EDD8]/55 border border-sandalwood/10 rounded-2xl px-3 py-1.5 shadow-sm max-w-full"
+                  >
+                    <h3
+                      class="font-['Ma_Shan_Zheng',cursive] text-gray-900 text-2xl leading-snug line-clamp-2"
+                    >
+                      {{ plan.diagnosis_result }}
+                    </h3>
+                  </div>
+
+                  <!-- 需注意：右侧（不伸出卡片） -->
+                  <div
+                    v-if="normalizeLifestyleTips(plan.lifestyle).length"
+                    class="relative inline-flex shrink-0"
+                  >
+                    <button
+                      type="button"
+                      class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-2xl border border-red-200 bg-red-50/90 text-red-700 text-xs font-bold hover:bg-red-50 transition shadow-sm"
+                      @click="toggleFold(`plan-${plan.id}-cautions`)"
+                    >
+                      <AlertTriangle class="w-4 h-4" />
+                      <span>需注意</span>
+                      <ChevronDown
+                        class="w-3.5 h-3.5 transition-transform duration-300"
+                        :class="{
+                          'rotate-180': foldedStates[`plan-${plan.id}-cautions`],
+                        }"
+                      />
+                    </button>
+
+                    <!-- 浮层：叠在页面上，不推动布局 -->
+                    <div
+                      v-show="foldedStates[`plan-${plan.id}-cautions`]"
+                      class="absolute z-50 left-0 top-[calc(100%+0.5rem)] w-[min(380px,calc(100vw-2rem))] bg-white border border-red-200/90 rounded-2xl shadow-2xl p-3 sm:p-4"
+                    >
+                      <div
+                        class="flex items-center gap-2 text-xs font-bold text-red-800 mb-2"
+                      >
+                        <AlertTriangle class="w-4 h-4" />
+                        <span>禁忌 / 注意事项</span>
+                      </div>
+                      <ul class="space-y-1.5">
+                        <li
+                          v-for="(tip, i) in normalizeLifestyleTips(plan.lifestyle)"
+                          :key="`${plan.id}-tip-${i}`"
+                          class="text-xs text-gray-700 leading-relaxed flex gap-2"
+                        >
+                          <span
+                            class="mt-1 w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"
+                          ></span>
+                          <span class="break-words">{{ tip }}</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                class="absolute top-4 right-16 flex items-center gap-1.5 text-[11px] text-gray-400 font-mono bg-white/80 backdrop-blur px-2 py-1 rounded-lg border border-sandalwood/10"
+                :title="formatDate(plan.saved_at) || ''"
+              >
+                <Calendar class="w-3.5 h-3.5" />
+                <span>{{ formatDate(plan.saved_at) }}</span>
               </div>
             </div>
             <div
               class="text-base text-gray-600 mb-5 bg-[#FAF9F6] p-4 rounded-lg leading-relaxed border border-gray-100"
             >
-              {{ plan.summary }}
+              <span class="font-bold text-gray-800">AI养生导师：</span>
+              <span>{{ plan.summary }}</span>
             </div>
 
             <div v-if="plan.recipes && plan.recipes.length > 0">
-              <div
-                class="text-sm font-bold text-sandalwood mb-3 flex items-center gap-1 uppercase tracking-wider opacity-80"
-              >
-                <ChefHat class="w-3.5 h-3.5" /> 推荐食谱
+              <div class="mb-3">
+                <div
+                  class="inline-flex items-center gap-1.5 bg-[#FAF6ED]/80 border border-sandalwood/10 rounded-xl px-3 py-1.5 shadow-sm"
+                >
+                  <ChefHat class="w-3.5 h-3.5 text-sandalwood" />
+                  <span class="text-sm font-bold text-sandalwood tracking-wide"
+                    >推荐食谱</span
+                  >
+                </div>
               </div>
               <div class="space-y-3">
                 <div
@@ -1511,45 +1596,45 @@ function closeAccountMenu() {
             </div>
 
             <div
-              class="mt-5 pt-4 border-t border-dashed border-gray-100 grid gap-3"
+              class="mt-5 pt-5 border-t-2 border-sandalwood/15 grid gap-4"
             >
               <div v-if="plan.acupoints && plan.acupoints.length">
-                <div class="text-sm font-bold text-gray-400 mb-2">穴位方案</div>
-                <div class="grid grid-cols-1 gap-2">
+                <div class="mb-3">
+                  <div
+                    class="inline-flex items-center gap-1.5 bg-[#EEF2E6]/80 border border-[#5A7C65]/20 rounded-xl px-3 py-1.5 shadow-sm"
+                  >
+                    <Activity class="w-3.5 h-3.5 text-[#5A7C65]" />
+                    <span class="text-sm font-bold text-[#5A7C65] tracking-wide"
+                      >穴位方案</span
+                    >
+                  </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   <div
                     v-for="(ac, idx) in plan.acupoints"
                     :key="idx"
-                    class="bg-gray-50 border border-gray-100 px-3 py-2 rounded-lg text-base"
+                    class="bg-white border border-[#5A7C65]/15 px-3 py-3 rounded-2xl text-base shadow-sm hover:shadow-md transition"
                   >
                     <div
-                      class="font-bold text-gray-700 mb-1 flex items-center gap-2"
+                      class="font-bold text-gray-800 mb-1 flex items-center gap-2"
                     >
-                      <div class="w-1.5 h-1.5 rounded-full bg-sandalwood"></div>
+                      <div class="w-1.5 h-1.5 rounded-full bg-[#5A7C65]"></div>
                       {{ ac.name }}
                     </div>
                     <div
                       v-if="ac.location"
-                      class="text-sm text-gray-500 mb-1.5 flex items-start gap-1"
+                      class="text-sm text-gray-600 mb-2 flex items-start gap-1"
                     >
                       <span class="shrink-0">📍</span> {{ ac.location }}
                     </div>
                     <div
                       v-if="ac.method"
-                      class="text-sm text-sandalwood/80 leading-relaxed bg-[#F5EDD8]/40 p-2 rounded flex items-start gap-1"
+                      class="text-sm text-[#5A7C65] leading-relaxed bg-[#EEF2E6]/70 p-2.5 rounded-xl flex items-start gap-1"
                     >
                       <span class="shrink-0">👇</span> {{ ac.method }}
                     </div>
                   </div>
                 </div>
-              </div>
-              <div
-                v-if="plan.lifestyle && plan.lifestyle.length"
-                class="flex gap-2 items-start bg-red-50/50 p-2.5 rounded-lg text-sm"
-              >
-                <span class="font-bold text-red-400/80 shrink-0">🚫 禁忌：</span
-                ><span class="text-gray-600 leading-relaxed">{{
-                  ensureArray(plan.lifestyle).join("；")
-                }}</span>
               </div>
             </div>
           </div>
