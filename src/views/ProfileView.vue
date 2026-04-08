@@ -4,12 +4,11 @@ import { onMounted, onUnmounted, ref, computed, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { supabase } from "@/supabaseClient";
 import { useAuth } from "@/composables/useAuth";
-import HealthTagManager from "@/components/HealthTagManager.vue";
 import RecipeMarketDetailModal from "@/components/RecipeMarketDetailModal.vue";
 import { SOLAR_TERMS_LOOKUP } from "@/constants/solarTerms";
 import { BODY_TYPES } from "@/constants/recipeFilters";
 import { ADMIN_LOGIN_EMAIL } from "@/utils/loginEmail";
-import { clearRecipeMarketCache, profileCache as _profileCache } from "@/composables/usePagePreload";
+import { clearRecipeMarketCache, profileCache as _profileCache, prefetchHomeworkDetail } from "@/composables/usePagePreload";
 import {
   Trash2,
   ChevronDown,
@@ -613,14 +612,18 @@ async function getProfile() {
     }
 
     if (herbsData) {
+      // 保留已有的 identity_tag，避免后台刷新时短暂显示回退文字
+      const existingTagMap = Object.fromEntries(
+        favoriteHerbs.value.filter((h) => h.identity_tag).map((h) => [h.name, h.identity_tag])
+      );
       favoriteHerbs.value = herbsData.map((item) => ({
         ...item.herb,
         favorite_id: item.id,
         saved_at: item.created_at,
-        identity_tag: undefined,
+        identity_tag: existingTagMap[item.herb?.name] ?? undefined,
       }));
-      // 后台异步补充 identity_tag，不阻塞主流程
-      const herbNames = favoriteHerbs.value.map((h) => h.name).filter(Boolean);
+      // 只补充缺少 identity_tag 的药材
+      const herbNames = favoriteHerbs.value.filter((h) => !h.identity_tag).map((h) => h.name).filter(Boolean);
       if (herbNames.length) {
         supabase
           .from("herbseasy")
@@ -631,7 +634,7 @@ async function getProfile() {
               const easyMap = Object.fromEntries(easyData.map((e) => [e.name, e.identity_tag]));
               favoriteHerbs.value = favoriteHerbs.value.map((h) => ({
                 ...h,
-                identity_tag: easyMap[h.name] || null,
+                identity_tag: h.identity_tag ?? easyMap[h.name] ?? null,
               }));
               saveProfilePayload();
             }
@@ -661,6 +664,22 @@ async function getProfile() {
             is_ai: false,
             tags: recipeMap[f.recipe_id].tags || ["广场精选"],
           }));
+
+        // 用 homeworks 表的真实数量覆盖 cooked_count
+        const { data: hwData } = await supabase
+          .from("homeworks")
+          .select("recipe_id")
+          .in("recipe_id", recipeIds);
+        if (hwData) {
+          const hwCount = {};
+          hwData.forEach((h) => {
+            hwCount[h.recipe_id] = (hwCount[h.recipe_id] || 0) + 1;
+          });
+          marketRecipes = marketRecipes.map((r) => ({
+            ...r,
+            cooked_count: hwCount[r.id] || 0,
+          }));
+        }
       }
     }
     savedRecipes.value = [...marketRecipes, ...aiRecipes].sort(
@@ -823,8 +842,10 @@ function goToMarketSimilar(recipe) {
 // --- 广场收藏：详情弹窗 ---
 const showSavedRecipeModal = ref(false);
 const savedRecipeModalId = ref(null);
+const savedRecipeModalData = ref(null);
 
 function openSavedRecipeDetail(recipe) {
+  savedRecipeModalData.value = recipe;
   savedRecipeModalId.value = recipe.id;
   showSavedRecipeModal.value = true;
 }
@@ -980,6 +1001,7 @@ function goToHerbDetail(herbName) {
 // 从「我的作品」跳转到独立的作业详情页
 function goToHomeworkDetail(work) {
   if (!work) return;
+  sessionStorage.setItem('profileReturnTab', 'works');
   router.push({
     name: "WorkDetail",
     params: { id: work.id },
@@ -1330,12 +1352,6 @@ function closeAccountMenu() {
     </div>
 
     <div class="-mt-8 px-2 relative z-20 w-full space-y-4 max-w-6xl mx-auto">
-      <div
-        class="bg-white rounded-xl shadow-card p-1 border border-sandalwood/5 overflow-hidden"
-      >
-        <HealthTagManager />
-      </div>
-
       <div
         class="bg-white rounded-xl shadow-sm p-1.5 flex overflow-x-auto gap-2 border border-sandalwood/10 scrollbar-hide"
       >
@@ -1836,6 +1852,8 @@ function closeAccountMenu() {
               v-for="work in myWorks"
               :key="work.id"
               class="aspect-square bg-gray-100 rounded-lg overflow-hidden relative group cursor-pointer shadow-sm border border-gray-200"
+              @mouseenter="prefetchHomeworkDetail(work.id)"
+              @touchstart.passive="prefetchHomeworkDetail(work.id)"
               @click="goToHomeworkDetail(work)"
             >
               <button
@@ -2058,7 +2076,7 @@ function closeAccountMenu() {
   </div>
 
   <!-- 广场收藏：食谱详情弹窗（复用 RecipeMarketDetailModal 组件） -->
-  <RecipeMarketDetailModal v-model="showSavedRecipeModal" :recipe-id="savedRecipeModalId" />
+  <RecipeMarketDetailModal v-model="showSavedRecipeModal" :recipe-id="savedRecipeModalId" :initial-recipe="savedRecipeModalData" />
 
 
   <!-- 我发布的食谱：详情资料卡（样式对齐"食谱推荐"的详情卡） -->

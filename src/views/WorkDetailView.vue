@@ -3,9 +3,10 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '@/supabaseClient'
 import { useAuth } from '@/composables/useAuth'
-import { ChevronLeft, Heart, MoreHorizontal, Trash2 } from 'lucide-vue-next'
+import { ChevronLeft, Heart, MoreHorizontal, Trash2, SendHorizontal } from 'lucide-vue-next'
 import RecipeMarketDetailModal from '@/components/RecipeMarketDetailModal.vue'
 import { getUserDisplayInfo, DEFAULT_USER_DISPLAY_NAME } from '@/utils/userDisplay'
+import { getHomeworkDetailCache } from '@/composables/usePagePreload'
 
 const route = useRoute()
 const router = useRouter()
@@ -21,6 +22,7 @@ const isLiked = ref(false)
 const showRelatedRecipeModal = ref(false)
 const relatedRecipeId = ref(null)
 const authorProfile = ref(null)
+const authorLoaded = ref(false)
 
 const homeworkUserDisplay = computed(() =>
   getUserDisplayInfo({
@@ -46,47 +48,63 @@ const formatDate = (isoStr) => {
   return `${date.getMonth() + 1}月${date.getDate()}日`
 }
 
+async function fetchSecondary(id, hw) {
+  const [{ data: cs }, likeRes] = await Promise.all([
+    supabase.from('homework_comments').select('*').eq('homework_id', id).order('created_at', { ascending: true }),
+    currentUser.value
+      ? supabase.from('homework_likes').select('id').eq('user_id', currentUser.value.id).eq('homework_id', hw.id).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ])
+  comments.value = cs || []
+  isLiked.value = !!likeRes.data
+}
+
 async function fetchData() {
   const id = route.params.id
   if (!id) return
+
+  // 有缓存 → 0ms 显示，后台只刷评论和点赞
+  const cached = getHomeworkDetailCache(id)
+  if (cached) {
+    homework.value = cached.homework
+    authorProfile.value = cached.authorProfile
+    recipe.value = cached.recipe
+    authorLoaded.value = true
+    loading.value = false
+    fetchSecondary(id, cached.homework)
+    return
+  }
+
   loading.value = true
+  authorLoaded.value = false
   try {
     const [{ data: hw }, { data: cs }] = await Promise.all([
       supabase.from('homeworks').select('*').eq('id', id).single(),
       supabase.from('homework_comments').select('*').eq('homework_id', id).order('created_at', { ascending: true }),
     ])
     homework.value = hw
-    if (hw?.user_id) {
-      const { data: userProfile } = await supabase
-        .from('profiles')
-        .select('id, username, avatar_url')
-        .eq('id', hw.user_id)
-        .maybeSingle()
-      authorProfile.value = userProfile || null
-    } else {
-      authorProfile.value = null
-    }
     comments.value = cs || []
+    loading.value = false  // 主内容立即显示
 
-    if (hw?.recipe_id) {
-      const { data: recipeData } = await supabase
-        .from('recipes')
-        .select('id, name, image, time, body_type, efficacy')
-        .eq('id', hw.recipe_id)
-        .single()
-      recipe.value = recipeData
+    // 次要数据后台并行加载，不阻塞页面渲染
+    if (hw) {
+      const [profileRes, recipeRes, likeRes] = await Promise.all([
+        hw.user_id
+          ? supabase.from('profiles').select('id, username, avatar_url').eq('id', hw.user_id).maybeSingle()
+          : Promise.resolve({ data: null }),
+        hw.recipe_id
+          ? supabase.from('recipes').select('id, name, image, time, body_type, efficacy').eq('id', hw.recipe_id).single()
+          : Promise.resolve({ data: null }),
+        currentUser.value
+          ? supabase.from('homework_likes').select('id').eq('user_id', currentUser.value.id).eq('homework_id', hw.id).maybeSingle()
+          : Promise.resolve({ data: null }),
+      ])
+      authorProfile.value = profileRes.data || null
+      recipe.value = recipeRes.data || null
+      isLiked.value = !!likeRes.data
+      authorLoaded.value = true
     }
-
-    if (currentUser.value && hw) {
-      const { data } = await supabase
-        .from('homework_likes')
-        .select('id')
-        .eq('user_id', currentUser.value.id)
-        .eq('homework_id', hw.id)
-        .single()
-      isLiked.value = !!data
-    }
-  } finally {
+  } catch {
     loading.value = false
   }
 }
@@ -181,18 +199,18 @@ onMounted(fetchData)
         <ChevronLeft :size="24" />
       </button>
       <div class="font-bold text-base flex items-center gap-2">
-        <div
-          v-if="homework"
-          class="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center text-[10px] font-bold text-emerald-700 cursor-pointer"
-          @click="goToHomeworkUserProfile"
-        >
-          {{ homeworkUserDisplay.name?.[0] }}
-        </div>
-        <span
-          v-if="homework"
-          class="cursor-pointer hover:text-emerald-700"
-          @click="goToHomeworkUserProfile"
-        >{{ homeworkUserDisplay.name }}</span>
+        <template v-if="homework && authorLoaded">
+          <div
+            class="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center text-[10px] font-bold text-emerald-700 cursor-pointer"
+            @click="goToHomeworkUserProfile"
+          >
+            {{ homeworkUserDisplay.name?.[0] }}
+          </div>
+          <span
+            class="cursor-pointer hover:text-emerald-700"
+            @click="goToHomeworkUserProfile"
+          >{{ homeworkUserDisplay.name }}</span>
+        </template>
         <span v-else>作业详情</span>
       </div>
       <button class="p-2 -mr-2 text-stone-800">
@@ -286,14 +304,21 @@ onMounted(fetchData)
       </div>
 
       <div class="h-14 border-t border-stone-100 px-4 flex items-center gap-4 bg-white shrink-0 max-w-2xl mx-auto w-full">
-        <div class="flex-1 bg-stone-100 rounded-full h-9 flex items-center px-4 gap-2">
+        <div class="flex-1 bg-stone-100 rounded-full h-9 flex items-center px-3 gap-2">
           <input
             v-model="newComment"
             @keyup.enter="submitComment"
             type="text"
             placeholder="说点好听的..."
-            class="bg-transparent text-sm w-full outline-none"
+            class="bg-transparent text-sm flex-1 outline-none"
           />
+          <button
+            @click="submitComment"
+            :disabled="!newComment.trim()"
+            class="text-emerald-600 disabled:text-stone-300 transition-colors shrink-0"
+          >
+            <SendHorizontal :size="18" />
+          </button>
         </div>
 
         <button @click="toggleLike" class="flex flex-col items-center gap-0.5 min-w-[32px]">

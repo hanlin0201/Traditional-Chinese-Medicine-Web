@@ -4,10 +4,12 @@ import { useRouter } from 'vue-router'
 import { X, UserCheck, Sparkles, Soup, ListOrdered, Leaf, Star, Camera, Send, Loader2 } from 'lucide-vue-next'
 import { supabase } from '@/supabaseClient'
 import { useAuth } from '@/composables/useAuth'
+import { interactionsCache } from '@/composables/usePagePreload'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
   recipeId: { type: [Number, String], default: null },
+  initialRecipe: { type: Object, default: null },
 })
 const emit = defineEmits(['update:modelValue'])
 
@@ -53,29 +55,62 @@ function normalizeRecipe(item, isFavorite = false) {
 }
 
 async function fetchInteractions(recipeId) {
-  const { data: cData } = await supabase.from('comments').select('*').eq('recipe_id', recipeId).order('created_at', { ascending: false })
+  // 缓存命中：直接从内存读，0 延迟，不突变
+  if (interactionsCache.loaded) {
+    comments.value = interactionsCache.comments[recipeId] || []
+    homeworks.value = interactionsCache.homeworks[recipeId] || []
+    if (selectedRecipe.value) selectedRecipe.value.cooked_count = homeworks.value.length
+    return
+  }
+  // 缓存未就绪（冷启动极少情况）：走网络请求
+  const [{ data: cData }, { data: hData }] = await Promise.all([
+    supabase.from('comments').select('*').eq('recipe_id', recipeId).order('created_at', { ascending: false }),
+    supabase.from('homeworks').select('*').eq('recipe_id', recipeId).order('created_at', { ascending: false }),
+  ])
   comments.value = cData || []
-  const { data: hData } = await supabase.from('homeworks').select('*').eq('recipe_id', recipeId).order('created_at', { ascending: false })
   homeworks.value = hData || []
   if (selectedRecipe.value) selectedRecipe.value.cooked_count = homeworks.value.length
 }
 
-async function loadRecipeDetail(recipeId) {
+async function loadRecipeDetail(recipeId, preloaded = null) {
   if (!recipeId) return
-  const { data } = await supabase.from('recipes').select('*').eq('id', recipeId).single()
-  if (!data) return
-  let isFavorite = false
-  if (currentUser.value?.id) {
-    const { data: fav } = await supabase
-      .from('favorite_recipes')
-      .select('id')
-      .eq('user_id', currentUser.value.id)
-      .eq('recipe_id', recipeId)
-      .maybeSingle()
-    isFavorite = !!fav
+  comments.value = []
+  homeworks.value = []
+
+  if (preloaded) {
+    // 立刻展示，评论/作业从缓存同步填入（0延迟）
+    selectedRecipe.value = { ...normalizeRecipe(preloaded, true), favorites_count: 0 }
+    fetchInteractions(recipeId)
+    // 收藏状态和收藏数后台静默更新，不阻塞显示
+    ;(async () => {
+      const [favRes, favCountRes] = await Promise.all([
+        currentUser.value?.id
+          ? supabase.from('favorite_recipes').select('id').eq('user_id', currentUser.value.id).eq('recipe_id', recipeId).maybeSingle()
+          : Promise.resolve({ data: null }),
+        supabase.from('favorite_recipes').select('*', { count: 'exact', head: true }).eq('recipe_id', recipeId),
+      ])
+      if (selectedRecipe.value?.id !== recipeId) return // 竞态保护
+      selectedRecipe.value = {
+        ...selectedRecipe.value,
+        is_favorite: !!favRes.data,
+        favorites_count: favCountRes.count || 0,
+      }
+    })()
+    return
   }
-  const { count: favCount } = await supabase.from('favorite_recipes').select('*', { count: 'exact', head: true }).eq('recipe_id', recipeId)
-  selectedRecipe.value = { ...normalizeRecipe(data, isFavorite), favorites_count: favCount || 0 }
+
+  // 无预加载：完整加载
+  selectedRecipe.value = null
+  const [recipeRes, favRes, favCountRes] = await Promise.all([
+    supabase.from('recipes').select('*').eq('id', recipeId).single(),
+    currentUser.value?.id
+      ? supabase.from('favorite_recipes').select('id').eq('user_id', currentUser.value.id).eq('recipe_id', recipeId).maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase.from('favorite_recipes').select('*', { count: 'exact', head: true }).eq('recipe_id', recipeId),
+  ])
+  const data = recipeRes.data
+  if (!data) return
+  selectedRecipe.value = { ...normalizeRecipe(data, !!favRes.data), favorites_count: favCountRes.count || 0 }
   await fetchInteractions(recipeId)
 }
 
@@ -178,7 +213,13 @@ function handleHerbClick(item) {
 watch(
   () => [props.modelValue, props.recipeId],
   async ([open, rid]) => {
-    if (open && rid) await loadRecipeDetail(rid)
+    if (open && rid) {
+      await loadRecipeDetail(rid, props.initialRecipe || null)
+    } else if (!open) {
+      selectedRecipe.value = null
+      comments.value = []
+      homeworks.value = []
+    }
   },
   { immediate: true },
 )
@@ -194,9 +235,12 @@ watch(
     leave-to-class="opacity-0 translate-y-4"
   >
     <Teleport to="body">
-      <div v-if="modelValue && selectedRecipe" class="fixed inset-0 z-[1300] flex items-center justify-center p-4 sm:p-6 bg-black/40 backdrop-blur-[2px]">
+      <div v-if="modelValue" class="fixed inset-0 z-[1300] flex items-center justify-center p-4 sm:p-6 bg-black/40 backdrop-blur-[2px]">
         <div class="absolute inset-0" @click="close"></div>
-        <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl h-[90vh] flex flex-col overflow-hidden z-10">
+        <div v-if="!selectedRecipe" class="relative z-10 flex items-center justify-center">
+          <Loader2 class="w-10 h-10 text-white animate-spin" />
+        </div>
+        <div v-else class="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl h-[90vh] flex flex-col overflow-hidden z-10">
           <button @click="close" class="absolute top-4 right-4 z-20 bg-black/20 backdrop-blur-md text-white p-2 rounded-full hover:bg-black/40 transition">
             <X :size="20" />
           </button>

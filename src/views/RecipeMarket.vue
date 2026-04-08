@@ -202,38 +202,33 @@ const fetchRecipes = async () => {
   if (hasCachedData) {
     recipes.value = cached.map(r => ({ ...r, favorites_count: r.favorites_count || 0 }))
     loading.value = false
+    syncCookedCounts()
   }
 
   try {
     if (!hasCachedData) loading.value = true
     const uid = currentUser.value?.id
 
-    let { data, error } = await supabase
-      .from('recipes')
-      .select('*')
-      .or('moderation_status.eq.published,moderation_status.is.null')
-      .order('id')
+    const [recipesRes, myFavsRes, favCountsRes] = await Promise.all([
+      supabase.from('recipes').select('*').or('moderation_status.eq.published,moderation_status.is.null').order('id'),
+      uid ? supabase.from('favorite_recipes').select('recipe_id').eq('user_id', uid) : Promise.resolve({ data: [] }),
+      supabase.from('favorite_recipes').select('recipe_id'),
+    ])
+
+    const { data, error } = recipesRes
     if (error) throw error
 
-    let myFavorites = []
-    if (uid) {
-      const { data: favs } = await supabase.from('favorite_recipes').select('recipe_id').eq('user_id', uid)
-      if (favs) myFavorites = favs.map(f => f.recipe_id)
-    }
-
-    const { data: favCounts } = await supabase.from('favorite_recipes').select('recipe_id')
+    const myFavorites = (myFavsRes.data || []).map(f => f.recipe_id)
     const favCountMap = {}
-    if (favCounts) {
-      favCounts.forEach(f => { favCountMap[f.recipe_id] = (favCountMap[f.recipe_id] || 0) + 1 })
-    }
+    ;(favCountsRes.data || []).forEach(f => { favCountMap[f.recipe_id] = (favCountMap[f.recipe_id] || 0) + 1 })
 
     if (data) {
       const authorIds = data.map(item => item.author_user_id).filter(Boolean)
       const profilesById = await fetchProfilesMap(authorIds)
       const normalized = data.map(item => ({ ...normalizeRecipe(item, myFavorites, profilesById), favorites_count: favCountMap[item.id] || 0 }))
       recipes.value = normalized
-      setRecipeMarketCachedData(normalized)
       syncCookedCounts()
+      setRecipeMarketCachedData([...recipes.value])
     }
   } catch (error) {
     console.error('获取食谱失败:', error)
@@ -250,8 +245,11 @@ const syncCookedCounts = () => {
   }
 }
 
-// 缓存先于食谱列表就绪时，等食谱加载完再同步
-onInteractionsLoaded(() => syncCookedCounts())
+// 缓存先于食谱列表就绪时，等食谱加载完再同步；同步后写回 localStorage，下次打开直接正确
+onInteractionsLoaded(() => {
+  syncCookedCounts()
+  if (recipes.value.length > 0) setRecipeMarketCachedData([...recipes.value])
+})
 
 // --- 2. 获取互动数据 ---
 const applyInteractions = (recipeId) => {

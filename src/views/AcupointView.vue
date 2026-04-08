@@ -5,6 +5,7 @@ import { MERIDIAN_GROUPS, CATEGORIES, searchAcupoints } from '@/constants/acupoi
 import { ACUPOINT_COORDS, getPointCoord } from '@/constants/acupointCoords.js'
 import { supabase } from '@/supabaseClient'
 import { FEATURE_COPY } from '@/constants/branding'
+import { getAcupointCache, setAcupointCache } from '@/composables/usePagePreload'
 
 // ===================== 状态 =====================
 
@@ -26,8 +27,16 @@ const detailLoading = ref(false)
 
 // ===================== Supabase 查询 =====================
 
-/** 从 Supabase 获取穴位详情 */
+/** 从 Supabase 获取穴位详情（缓存优先） */
 async function fetchPointDetail(pointName) {
+  // 缓存命中：直接展示，无需网络请求
+  const cached = getAcupointCache(pointName)
+  if (cached !== null) {
+    pointDetail.value = cached
+    detailLoading.value = false
+    return
+  }
+
   detailLoading.value = true
   pointDetail.value = null
 
@@ -41,7 +50,8 @@ async function fetchPointDetail(pointName) {
     if (error) {
       console.warn('查询穴位失败:', error)
     } else {
-      pointDetail.value = data // data 为 null 表示该穴位暂无数据
+      pointDetail.value = data
+      if (data) setAcupointCache(pointName, data)
     }
   } catch (e) {
     console.error('穴位查询异常:', e)

@@ -12,6 +12,7 @@ import Herb3DScene from '@/components/Herb3DScene.vue'
 import { supabase } from '@/supabaseClient' 
 import { useAuth } from '@/composables/useAuth'
 import { getHerbTagDisplayByName } from '@/composables/useHerbTags'
+import { getHerbDetailCache, profileCache } from '@/composables/usePagePreload'
 // 入药部位对应的顶部背景图（静态资源见 public/photo/herb-part-categories/）
 const HERB_PART_ART = '/photo/herb-part-categories'
 
@@ -279,12 +280,15 @@ const fetchHerbByName = async () => {
   const herbName = route.params.name
   if (!herbName) return
 
-  const preloadData = history.state.preloadHerb
+  // 内存缓存优先（来自预加载或 history.state）
+  const cached = getHerbDetailCache(herbName) || history.state?.preloadHerb
+  const preloadData = (cached && cached.name === herbName) ? cached : null
 
-  if (preloadData && preloadData.name === herbName) {
+  if (preloadData) {
     herb.value = preloadData
     herbEasy.value = null
     loading.value = false
+    // 后台静默更新完整数据
     try {
       const [resHerb, resEasy] = await Promise.all([
         supabase.from('herbs').select('*').eq('name', herbName).single(),
@@ -321,22 +325,24 @@ const fetchHerbByName = async () => {
 
 // --- 新增：检查收藏状态 ---
 const checkFavoriteStatus = async () => {
-  // 必须要有用户且有药材数据才查
   if (!currentUser.value || !herb.value) return
 
+  // 先从 profileCache 读，有缓存直接用，0 延迟
+  const cached = profileCache.payload?.favoriteHerbs
+  if (cached) {
+    isFavorite.value = cached.some(h => h.id === herb.value.id || h.name === herb.value.name)
+    return
+  }
+
+  // 缓存未就绪时走网络兜底
   try {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('favorite_herbs')
       .select('id')
       .eq('user_id', currentUser.value.id)
       .eq('herb_id', herb.value.id)
-      .maybeSingle() // 用 maybeSingle 防止查不到报错
-
-    if (data) {
-      isFavorite.value = true
-    } else {
-      isFavorite.value = false
-    }
+      .maybeSingle()
+    isFavorite.value = !!data
   } catch (e) {
     console.error('检查收藏状态失败', e)
   }

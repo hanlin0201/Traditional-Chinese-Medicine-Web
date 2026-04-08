@@ -62,9 +62,66 @@ export const profileCache = { userId: null, payload: null }
 
 // 食谱互动缓存：按 recipe_id 分组的评论和作业，供 RecipeMarket 秒开
 export const interactionsCache = {
-  comments: {},  // { [recipe_id]: Comment[] }
-  homeworks: {}, // { [recipe_id]: HomeworkWithDisplay[] }
+  comments: {},      // { [recipe_id]: Comment[] }
+  homeworks: {},     // { [recipe_id]: HomeworkWithDisplay[] }
+  homeworksById: {}, // { [hw_id]: homework } 平铺索引，供 WorkDetailView 秒开
+  profilesById: {},  // { [user_id]: profile }  作业作者 profile 快查
   loaded: false,
+}
+
+// WorkDetail 详情缓存：{ homework, authorProfile, recipe }
+export const homeworkDetailCache = new Map()
+
+// 药材详情缓存：{ [name]: herbData }（供 HerbDetailView 秒开）
+export const herbDetailCache = new Map()
+
+export function getHerbDetailCache(name) {
+  return herbDetailCache.get(name) ?? null
+}
+
+// 穴位详情缓存：{ [name]: { name, position, disease } }
+export const acupointCache = new Map()
+
+export function getAcupointCache(name) {
+  return acupointCache.get(name) ?? null
+}
+
+export function setAcupointCache(name, data) {
+  acupointCache.set(name, data)
+}
+
+export function getHomeworkDetailCache(id) {
+  return homeworkDetailCache.get(String(id)) ?? null
+}
+
+/** 在用户触摸/悬停作业卡片时调用，提前把详情数据装进缓存 */
+export async function prefetchHomeworkDetail(id) {
+  if (!id) return
+  const key = String(id)
+  if (homeworkDetailCache.has(key)) return
+
+  const hw = interactionsCache.homeworksById[key]
+  if (!hw) return
+
+  const profile = hw.user_id ? interactionsCache.profilesById[String(hw.user_id)] : null
+  let recipe = null
+
+  if (hw.recipe_id) {
+    const cachedRecipes = getCache(RECIPE_CACHE_KEY)
+    recipe = cachedRecipes?.find(r => String(r.id) === String(hw.recipe_id)) ?? null
+    if (!recipe) {
+      try {
+        const { data } = await supabase
+          .from('recipes')
+          .select('id, name, image, time, body_type, efficacy')
+          .eq('id', hw.recipe_id)
+          .single()
+        recipe = data ?? null
+      } catch {}
+    }
+  }
+
+  homeworkDetailCache.set(key, { homework: hw, authorProfile: profile ?? null, recipe })
 }
 
 const _interactionsLoadedCallbacks = []
@@ -92,6 +149,7 @@ async function warmInteractions() {
       .in('id', userIds)
     profilesById = Object.fromEntries((profileRows || []).map(p => [String(p.id), p]))
   }
+  interactionsCache.profilesById = profilesById
 
   // 评论按 recipe_id 分组
   for (const c of (allComments || [])) {
@@ -100,16 +158,18 @@ async function warmInteractions() {
     interactionsCache.comments[key].push(c)
   }
 
-  // 作业按 recipe_id 分组，同时附上用户展示信息
+  // 作业按 recipe_id 分组，同时附上用户展示信息；同时建平铺 id 索引
   for (const hw of allHomeworksArr) {
-    const key = hw.recipe_id
-    if (!interactionsCache.homeworks[key]) interactionsCache.homeworks[key] = []
     const profile = hw.user_id ? profilesById[String(hw.user_id)] : null
-    interactionsCache.homeworks[key].push({
+    const enriched = {
       ...hw,
       user_display_name: profile?.username || hw.user_name || '养生达人',
       user_display_avatar: profile?.avatar_url || null,
-    })
+    }
+    const recipeKey = hw.recipe_id
+    if (!interactionsCache.homeworks[recipeKey]) interactionsCache.homeworks[recipeKey] = []
+    interactionsCache.homeworks[recipeKey].push(enriched)
+    interactionsCache.homeworksById[String(hw.id)] = enriched
   }
 
   interactionsCache.loaded = true
@@ -139,12 +199,21 @@ async function warmProfile() {
 
   if (!profileData) return
 
-  // 收藏药材
-  const favoriteHerbs = (herbsData || []).map((item) => ({
+  // 收藏药材（同时并行拉 identity_tag，避免 ProfileView 初始显示回退文字）
+  const rawHerbs = (herbsData || []).map((item) => ({
     ...item.herb,
     favorite_id: item.id,
     saved_at: item.created_at,
   }))
+  const herbNames = rawHerbs.map(h => h.name).filter(Boolean)
+  let identityTagMap = {}
+  if (herbNames.length) {
+    const { data: easyData } = await supabase.from('herbseasy').select('name, identity_tag').in('name', herbNames)
+    if (easyData) identityTagMap = Object.fromEntries(easyData.map(e => [e.name, e.identity_tag]))
+  }
+  const favoriteHerbs = rawHerbs.map(h => ({ ...h, identity_tag: identityTagMap[h.name] ?? null }))
+  // 填充药材详情缓存，供 HerbDetailView 秒开
+  favoriteHerbs.forEach(h => { if (h?.name) herbDetailCache.set(h.name, h) })
 
   // 广场收藏食谱
   let marketRecipes = []
@@ -223,13 +292,14 @@ export async function preloadHomeFeaturePages() {
     // 3) 食谱列表数据预加载（供 RecipeMarket 首屏秒开）
     const warmRecipes = (async () => {
       if (getCache(RECIPE_CACHE_KEY)) return
-      const { data, error } = await supabase
-        .from('recipes')
-        .select('*')
-        .or('moderation_status.eq.published,moderation_status.is.null')
-        .order('id')
+      const [{ data, error }, { data: favCounts }] = await Promise.all([
+        supabase.from('recipes').select('*').or('moderation_status.eq.published,moderation_status.is.null').order('id'),
+        supabase.from('favorite_recipes').select('recipe_id'),
+      ])
       if (!error && data) {
-        setCache(RECIPE_CACHE_KEY, data.map(normalizeRecipe))
+        const favCountMap = {}
+        if (favCounts) favCounts.forEach(f => { favCountMap[f.recipe_id] = (favCountMap[f.recipe_id] || 0) + 1 })
+        setCache(RECIPE_CACHE_KEY, data.map(item => ({ ...normalizeRecipe(item), favorites_count: favCountMap[item.id] || 0 })))
       }
     })()
 
@@ -239,7 +309,14 @@ export async function preloadHomeFeaturePages() {
     // 5) 食谱互动数据预加载（供 RecipeMarket 点进食谱秒开评论/作业）
     const warmInteractionsData = warmInteractions()
 
-    await Promise.allSettled([warmChunks, warmHerbs, warmRecipes, warmProfileData, warmInteractionsData])
+    // 6) 穴位全表预加载（供 AcupointView 点击秒开详情）
+    const warmAcupoints = (async () => {
+      if (acupointCache.size > 0) return
+      const { data } = await supabase.from('acupoint').select('name, position, disease')
+      if (data) data.forEach(item => acupointCache.set(item.name, item))
+    })()
+
+    await Promise.allSettled([warmChunks, warmHerbs, warmRecipes, warmProfileData, warmInteractionsData, warmAcupoints])
   })()
 
   return preloadPromise
