@@ -459,6 +459,7 @@ onBeforeUnmount(() => {
   margin: 0;
   text-align: center;
   max-width: 720px;
+  white-space: pre-line;
 }
 
 /* 第二页：杂志区严格 100vh，一屏内不二次滚动 */

@@ -20,6 +20,18 @@ const route = useRoute()
 const router = useRouter()
 const { user: currentUser } = useAuth()
 
+const fromRecipeId = computed(() => {
+  const v = route.query?.from_recipe_id
+  if (v == null || String(v).trim() === '') return null
+  return String(v)
+})
+const fromRecipeName = computed(() => {
+  const v = route.query?.from_recipe_name
+  if (v == null) return ''
+  return String(v)
+})
+const hasRecipeBackLink = computed(() => !!fromRecipeId.value)
+
 // 定义状态
 const herb = ref(null)
 const herbEasy = ref(null) // 通俗版数据，来自 herbseasy 表
@@ -417,11 +429,18 @@ watch(() => route.params.name, (newName) => {
 })
 
 function goBack() {
-  if (window.history.length > 1) {
-    router.back()
-  } else {
-    router.push('/herbs') 
+  if (hasRecipeBackLink.value) {
+    router.push({
+      name: 'RecipeMarket',
+      query: {
+        open_id: fromRecipeId.value,
+      },
+    })
+    return
   }
+
+  if (window.history.length > 1) router.back()
+  else router.push('/herbs')
 }
 </script>
 
@@ -432,11 +451,14 @@ function goBack() {
       <div class="flex items-center gap-3 overflow-hidden">
         <button
           type="button"
-          class="p-1.5 rounded-lg text-sandalwood hover:bg-sandalwood/10 transition-colors shrink-0"
+          class="p-1.5 rounded-lg text-sandalwood hover:bg-sandalwood/10 transition-colors shrink-0 flex items-center gap-2"
           aria-label="返回"
           @click="goBack"
         >
           <ArrowLeft class="w-5 h-5" />
+          <span v-if="hasRecipeBackLink" class="text-sm font-medium font-serif truncate max-w-[14rem]">
+            返回 {{ fromRecipeName || '食谱' }}
+          </span>
         </button>
         <h1 class="font-serif font-semibold text-sandalwood truncate text-lg">
           {{ herb?.name || '药材详情' }}
@@ -686,18 +708,18 @@ function goBack() {
           <template v-else>
             <div class="space-y-4">
               
-              <div v-if="herbEasy.identity_tag" class="rounded-xl bg-sandalwood/5 border border-sandalwood/10 p-5 relative overflow-hidden">
-                <div class="absolute top-0 left-0 w-1 h-full bg-cinnabar"></div>
-                <h2 class="text-cinnabar font-serif font-semibold text-base mb-2">
+              <div v-if="herbEasy.identity_tag" class="rounded-xl bg-[#FBF5EA] border border-sandalwood/10 p-5 relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-1 h-full bg-amber-400/80"></div>
+                <h2 class="text-amber-800 font-serif font-semibold text-base mb-2">
                   核心概括
                 </h2>
                 <p class="text-sandalwood/90 text-base font-medium leading-relaxed text-justify">{{ herbEasy.identity_tag }}</p>
               </div>
 
               <!-- 作用效果：主角卡片 -->
-              <div v-if="herbEasy.friendly_explanation" class="rounded-xl bg-cinnabar/5 border border-cinnabar/20 p-6">
-                <h2 class="text-cinnabar font-serif font-bold text-lg mb-3 flex items-center gap-2">
-                  <span class="w-1.5 h-5 bg-cinnabar rounded-full" /> 作用效果
+              <div v-if="herbEasy.friendly_explanation" class="rounded-xl bg-emerald-50/70 border border-emerald-200 p-6">
+                <h2 class="text-emerald-800 font-serif font-bold text-lg mb-3 flex items-center gap-2">
+                  <span class="w-1.5 h-5 bg-emerald-500/80 rounded-full" /> 作用效果
                 </h2>
                 <p class="text-sandalwood text-base font-medium leading-relaxed text-justify">{{ herbEasy.friendly_explanation }}</p>
               </div>

@@ -288,6 +288,7 @@ onBeforeUnmount(() => {
   margin: 0;
   text-align: center;
   max-width: 720px;
+  white-space: pre-line;
 }
 .hero-line { width: 36px; height: 1px; background: rgba(255,255,255,0.6); }
 .hero-diamond { width: 6px; height: 6px; background: #C44E46; transform: rotate(45deg); }
