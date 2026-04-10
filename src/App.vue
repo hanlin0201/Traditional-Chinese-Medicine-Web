@@ -50,6 +50,17 @@ watch(
   { immediate: true },
 )
 
+// 已登录且展示全局顶栏时：非首页页面与首页一致抑制文档纵向橡皮筋，避免 fixed 顶栏上方露出背景
+watch(
+  () => gatePassed.value,
+  (on) => {
+    if (typeof document === 'undefined') return
+    document.documentElement.classList.toggle('app-logged-in-shell', on)
+    document.body.classList.toggle('app-logged-in-shell', on)
+  },
+  { immediate: true },
+)
+
 function openAuthPanel() {
   if (user.value) { router.push('/profile') } else { forceShowLogin.value = true }
 }
@@ -137,6 +148,14 @@ body.home-no-doc-scroll #app {
   height: 100%;
   max-height: 100vh;
   overflow: hidden;
+}
+
+/* 已登录、非首页：禁止文档级纵向 overscroll（首页由 .home-no-doc-scroll 处理；全屏朝代由 body 自身 overflow 处理） */
+html.app-logged-in-shell:not(.home-no-doc-scroll) {
+  overscroll-behavior-y: none;
+}
+body.app-logged-in-shell:not(.home-no-doc-scroll):not(.dynasty-fullscreen) {
+  overscroll-behavior-y: none;
 }
 
 /* 当 body 拥有 hide-global-nav 类时，隐藏导航栏 */
