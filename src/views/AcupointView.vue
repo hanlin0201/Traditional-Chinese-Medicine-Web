@@ -1,11 +1,15 @@
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Search, ChevronRight, ChevronDown, X, ZoomIn, ZoomOut, RotateCcw } from 'lucide-vue-next'
-import { MERIDIAN_GROUPS, CATEGORIES, searchAcupoints } from '@/constants/acupoints.js'
+import { MERIDIAN_GROUPS, CATEGORIES, searchAcupoints, findMeridianForPoint, normalizeAcupointLookupName } from '@/constants/acupoints.js'
 import { ACUPOINT_COORDS, getPointCoord } from '@/constants/acupointCoords.js'
 import { supabase } from '@/supabaseClient'
 import { FEATURE_COPY } from '@/constants/branding'
 import { getAcupointCache, setAcupointCache } from '@/composables/usePagePreload'
+
+const route = useRoute()
+const router = useRouter()
 
 // ===================== 状态 =====================
 
@@ -24,6 +28,26 @@ const showDetailPanel = ref(false)
 // Supabase 数据
 const pointDetail = ref(null)        // { name, position, disease }
 const detailLoading = ref(false)
+
+const showBackToCarePlans = computed(() => route.query.from === 'care_plans')
+
+function backToCarePlans() {
+  router.push({ name: 'Profile', query: { tab: 'plans' } })
+}
+
+/** 个人中心等入口：?point=穴位名 深链选中并展开（须在 selectPoint 定义之后注册 watch） */
+function applyAcupointRouteQuery() {
+  const pointName = String(route.query.point || '').trim()
+  if (!pointName) return
+  const meridian = findMeridianForPoint(pointName)
+  if (meridian) {
+    expandedMeridianId.value = meridian.id
+    const canonical = meridian.points.find((p) => p === pointName || p === normalizeAcupointLookupName(pointName)) || normalizeAcupointLookupName(pointName) || pointName
+    selectPoint(meridian, canonical)
+  } else {
+    searchQuery.value = normalizeAcupointLookupName(pointName) || pointName
+  }
+}
 
 // ===================== Supabase 查询 =====================
 
@@ -169,6 +193,14 @@ function onImageLoad() {
     if (!img) return
     imgBaseW = img.clientWidth
     imgBaseH = img.clientHeight
+    if (
+      selectedPoint.value
+      && activeMeridian.value
+      && selectedPoint.value.meridianId === activeMeridian.value.id
+    ) {
+      const coord = getPointCoord(activeMeridian.value.id, selectedPoint.value.point)
+      if (coord) focusOnPoint(coord.x, coord.y)
+    }
   })
 }
 
@@ -280,6 +312,8 @@ watch(activeMeridian, () => {
   imgBaseW = 0
   imgBaseH = 0
 })
+
+watch(() => route.query.point, () => applyAcupointRouteQuery(), { immediate: true })
 </script>
 
 <template>
@@ -287,6 +321,12 @@ watch(activeMeridian, () => {
 
     <!-- ==================== 左侧面板 ==================== -->
     <aside class="left-panel">
+
+      <div v-if="showBackToCarePlans" class="back-to-care-plans-wrap">
+        <button type="button" class="back-to-care-plans-btn" @click="backToCarePlans">
+          回到调理记录
+        </button>
+      </div>
 
       <!-- 搜索栏 -->
       <div class="search-box">
@@ -562,6 +602,31 @@ watch(activeMeridian, () => {
   border-right: 1px solid rgba(139, 94, 60, 0.1);
   z-index: 10;
   overflow: hidden;
+}
+
+.back-to-care-plans-wrap {
+  flex-shrink: 0;
+  padding: 12px 14px 0;
+}
+
+.back-to-care-plans-btn {
+  width: 100%;
+  padding: 9px 12px;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--primary-dark);
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(139, 94, 60, 0.2);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+  letter-spacing: 0.06em;
+}
+
+.back-to-care-plans-btn:hover {
+  background: rgba(139, 94, 60, 0.08);
+  border-color: var(--primary);
 }
 
 /* 搜索框 */
