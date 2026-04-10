@@ -328,6 +328,15 @@ onUnmounted(() => {
           </button>
         </div>
       </div>
+
+      <p
+        v-if="!loading && !error && filteredHerbs.length > 0"
+        class="text-center text-[11px] text-sandalwood/40 mt-8 max-w-xl mx-auto leading-relaxed px-2"
+      >
+        条目经整理与清洗，数据及配图参考来源见
+        <router-link to="/about" class="text-emerald-800/80 hover:text-emerald-900 underline underline-offset-2">关于本站</router-link>
+        。
+      </p>
     </main>
     </div>
   </div>

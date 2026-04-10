@@ -1,22 +1,44 @@
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Search, ChevronRight, ChevronDown, X, ZoomIn, ZoomOut, RotateCcw } from 'lucide-vue-next'
-import { MERIDIAN_GROUPS, CATEGORIES, searchAcupoints, findMeridianForPoint, normalizeAcupointLookupName } from '@/constants/acupoints.js'
+import { MERIDIAN_GROUPS, CATEGORIES, searchAcupoints, searchAcupointsByDisease, findMeridianForPoint, normalizeAcupointLookupName } from '@/constants/acupoints.js'
 import { ACUPOINT_COORDS, getPointCoord } from '@/constants/acupointCoords.js'
 import { supabase } from '@/supabaseClient'
 import { FEATURE_COPY } from '@/constants/branding'
-import { getAcupointCache, setAcupointCache } from '@/composables/usePagePreload'
+import { acupointCache, getAcupointCache, setAcupointCache, preloadHomeFeaturePages } from '@/composables/usePagePreload'
 
 const route = useRoute()
 const router = useRouter()
 
 // ===================== 状态 =====================
 
-// 搜索
+// 搜索：按穴名 | 按症状与主治
+const searchMode = ref('acupoint')
 const searchQuery = ref('')
-const searchResults = computed(() => searchAcupoints(searchQuery.value))
+const acupointIndexReady = ref(acupointCache.size > 0)
+
+const activeSearchResults = computed(() => {
+  const q = searchQuery.value
+  if (searchMode.value === 'acupoint') return searchAcupoints(q)
+  if (!acupointIndexReady.value) return []
+  return searchAcupointsByDisease(q, acupointCache)
+})
+
 const isSearching = computed(() => searchQuery.value.trim().length > 0)
+
+function setSearchMode(mode) {
+  if (searchMode.value === mode) return
+  searchMode.value = mode
+  searchQuery.value = ''
+}
+
+onMounted(async () => {
+  if (acupointCache.size === 0) {
+    await preloadHomeFeaturePages()
+  }
+  acupointIndexReady.value = true
+})
 
 // 左侧手风琴：当前展开的经脉 id
 const expandedMeridianId = ref(null)
@@ -39,6 +61,7 @@ function backToCarePlans() {
 function applyAcupointRouteQuery() {
   const pointName = String(route.query.point || '').trim()
   if (!pointName) return
+  searchMode.value = 'acupoint'
   const meridian = findMeridianForPoint(pointName)
   if (meridian) {
     expandedMeridianId.value = meridian.id
@@ -328,14 +351,38 @@ watch(() => route.query.point, () => applyAcupointRouteQuery(), { immediate: tru
         </button>
       </div>
 
+      <div class="search-mode-tabs" role="tablist" aria-label="搜索方式">
+        <button
+          type="button"
+          role="tab"
+          class="search-mode-tab"
+          :class="{ 'search-mode-tab--active': searchMode === 'acupoint' }"
+          :aria-selected="searchMode === 'acupoint'"
+          @click="setSearchMode('acupoint')"
+        >
+          按穴名
+        </button>
+        <button
+          type="button"
+          role="tab"
+          class="search-mode-tab"
+          :class="{ 'search-mode-tab--active': searchMode === 'indication' }"
+          :aria-selected="searchMode === 'indication'"
+          @click="setSearchMode('indication')"
+        >
+          按症状反查
+        </button>
+      </div>
+
       <!-- 搜索栏 -->
       <div class="search-box">
         <Search :size="16" class="search-icon" />
         <input
           v-model="searchQuery"
           type="text"
-          placeholder="搜索穴位..."
+          :placeholder="searchMode === 'acupoint' ? '搜索穴位…' : '输入症状或主治关键词…'"
           class="search-input"
+          :aria-label="searchMode === 'acupoint' ? '搜索穴位' : '按症状反查穴位'"
         />
         <button v-if="searchQuery" class="search-clear" @click="searchQuery = ''">
           <X :size="14" />
@@ -344,17 +391,21 @@ watch(() => route.query.point, () => applyAcupointRouteQuery(), { immediate: tru
 
       <!-- 搜索结果下拉 -->
       <div v-if="isSearching" class="search-results">
-        <div v-if="searchResults.length === 0" class="search-empty">
-          未找到"{{ searchQuery }}"相关穴位
+        <div v-if="activeSearchResults.length === 0" class="search-empty">
+          <template v-if="searchMode === 'acupoint'">未找到与「{{ searchQuery }}」相关的穴位</template>
+          <template v-else>未找到与「{{ searchQuery }}」主治相关的穴位</template>
         </div>
         <div
-          v-for="(r, idx) in searchResults"
+          v-for="(r, idx) in activeSearchResults"
           :key="idx"
           class="search-result-item"
           @click="selectFromSearch(r)"
         >
-          <span class="result-point">{{ r.point }}</span>
-          <span class="result-meridian">{{ r.meridianName }}</span>
+          <div class="result-row">
+            <span class="result-point">{{ r.point }}</span>
+            <span class="result-meridian">{{ r.meridianName }}</span>
+          </div>
+          <span v-if="r.snippet" class="result-snippet">{{ r.snippet }}</span>
         </div>
       </div>
 
@@ -559,7 +610,10 @@ watch(() => route.query.point, () => applyAcupointRouteQuery(), { immediate: tru
         </div>
 
         <!-- 底部来源 -->
-        <p class="detail-source">数据来源：中医百科</p>
+        <p class="detail-source">
+          内容经整理汇总；参考来源与配图说明见
+          <router-link to="/about" class="detail-source-link">关于本站</router-link>。
+        </p>
       </aside>
     </Transition>
 
@@ -629,12 +683,46 @@ watch(() => route.query.point, () => applyAcupointRouteQuery(), { immediate: tru
   border-color: var(--primary);
 }
 
+.search-mode-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 12px 14px 0;
+  flex-shrink: 0;
+}
+
+.search-mode-tab {
+  flex: 1;
+  padding: 8px 6px;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(139, 94, 60, 0.12);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+  letter-spacing: 0.04em;
+}
+
+.search-mode-tab:hover {
+  color: var(--primary-dark);
+  border-color: rgba(139, 94, 60, 0.22);
+}
+
+.search-mode-tab--active {
+  color: var(--primary-dark);
+  background: rgba(255, 255, 255, 0.95);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(139, 94, 60, 0.08);
+}
+
 /* 搜索框 */
 .search-box {
   position: relative;
   display: flex;
   align-items: center;
-  margin: 16px 14px 10px;
+  margin: 10px 14px 10px;
   background: rgba(255, 255, 255, 0.8);
   border: 1px solid rgba(139, 94, 60, 0.15);
   border-radius: 10px;
@@ -685,8 +773,9 @@ watch(() => route.query.point, () => applyAcupointRouteQuery(), { immediate: tru
 
 .search-result-item {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
   padding: 10px 12px;
   border-radius: 8px;
   cursor: pointer;
@@ -694,6 +783,13 @@ watch(() => route.query.point, () => applyAcupointRouteQuery(), { immediate: tru
 }
 .search-result-item:hover {
   background: rgba(139, 94, 60, 0.06);
+}
+
+.result-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .result-point {
@@ -704,6 +800,16 @@ watch(() => route.query.point, () => applyAcupointRouteQuery(), { immediate: tru
 .result-meridian {
   font-size: 0.75rem;
   color: var(--text-muted);
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.result-snippet {
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: rgba(93, 64, 55, 0.72);
+  padding-top: 2px;
+  border-top: 1px dashed rgba(139, 94, 60, 0.12);
 }
 
 /* 经脉列表 */
@@ -1284,6 +1390,15 @@ watch(() => route.query.point, () => applyAcupointRouteQuery(), { immediate: tru
   font-size: 0.72rem;
   color: rgba(139, 94, 60, 0.3);
   text-align: right;
+}
+
+.detail-source-link {
+  color: rgba(59, 130, 110, 0.95);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.detail-source-link:hover {
+  color: rgba(6, 95, 70, 1);
 }
 
 /* 右面板滑入动画 */

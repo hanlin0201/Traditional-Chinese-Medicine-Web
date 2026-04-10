@@ -56,6 +56,12 @@ const routes = [
     component: () => import('@/views/RecipeMarket.vue'),
     meta: { title: '食谱推荐' },
   },
+  {
+    path: '/about',
+    name: 'About',
+    component: () => import('@/views/AboutView.vue'),
+    meta: { title: '关于本站' },
+  },
 ]
 
 const router = createRouter({

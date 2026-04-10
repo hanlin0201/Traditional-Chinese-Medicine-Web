@@ -246,3 +246,124 @@ export function searchAcupoints(keyword) {
   }
   return results
 }
+
+/** 与 AcupointView 详情区一致的主治拆分 */
+export function splitIndicationText(disease) {
+  if (!disease || !String(disease).trim()) return []
+  return String(disease)
+    .split(/[、，,；;]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+}
+
+/** 口语/常见写法 → 库内主治更可能出现的词（可逐步扩充） */
+const SYMPTOM_SYNONYMS = {
+  头疼: ['头痛'],
+  头昏: ['头痛', '眩晕', '头晕'],
+  头晕: ['眩晕', '头痛', '头晕'],
+  拉肚子: ['泄泻', '腹泻'],
+  腹泻: ['泄泻', '腹泻'],
+  睡不着: ['失眠'],
+  胃痛: ['胃脘痛', '胃痛'],
+  肚子痛: ['腹痛'],
+}
+
+const SYMPTOM_SINGLE_CHAR_STOP = new Set(['痛', '疼', '酸', '胀', '麻', '晕', '热', '冷', '不', '的', '性', '症', '血', '气'])
+
+function expandSymptomToken(token) {
+  const t = String(token || '').trim()
+  if (!t) return []
+  const extra = SYMPTOM_SYNONYMS[t] || []
+  return [...new Set([t, ...extra])]
+}
+
+function splitSymptomQuery(raw) {
+  return String(raw || '')
+    .trim()
+    .split(/[\s、，,；;]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
+/**
+ * 规则 B：整词包含；规则 A：约一半长度的连续子串出现在 hay 中。
+ */
+function matchTokenAgainstHaystack(cand, hay) {
+  if (!cand || !hay) return false
+  if (hay.includes(cand)) return true
+  const chars = [...cand]
+  const L = chars.length
+  if (L <= 1) {
+    if (SYMPTOM_SINGLE_CHAR_STOP.has(cand)) return false
+    return hay.includes(cand)
+  }
+  let k = Math.max(2, Math.ceil(L * 0.5))
+  if (k > L) k = L
+  for (let i = 0; i <= L - k; i++) {
+    const frag = chars.slice(i, i + k).join('')
+    if (hay.includes(frag)) return true
+  }
+  return false
+}
+
+function diseaseMatchesSymptomTokens(diseaseText, userTokens) {
+  const tags = splitIndicationText(diseaseText)
+  const haystacks = [...new Set([diseaseText, ...tags].filter(Boolean))]
+  return userTokens.some((userTok) => {
+    const candidates = expandSymptomToken(userTok)
+    return candidates.some((cand) => haystacks.some((h) => matchTokenAgainstHaystack(cand, h)))
+  })
+}
+
+function pickIndicationSnippet(diseaseText, userTokens) {
+  const tags = splitIndicationText(diseaseText)
+  for (const tag of tags) {
+    for (const t of userTokens) {
+      for (const c of expandSymptomToken(t)) {
+        if (matchTokenAgainstHaystack(c, tag)) {
+          return tag.length > 42 ? `${tag.slice(0, 42)}…` : tag
+        }
+      }
+    }
+  }
+  const d = String(diseaseText).trim()
+  return d.length > 48 ? `${d.slice(0, 48)}…` : d
+}
+
+const INDICATION_SEARCH_MAX = 50
+
+/**
+ * 按症状/主治反查穴位（遍历 acupoint 缓存 Map）
+ * @returns {{ meridianId: string, meridianName: string, point: string, snippet: string }[]}
+ */
+export function searchAcupointsByDisease(keyword, cache) {
+  const userTokens = splitSymptomQuery(keyword)
+  if (!userTokens.length || !cache || cache.size === 0) return []
+
+  const out = []
+  const seen = new Set()
+  for (const row of cache.values()) {
+    if (!row?.name || !row?.disease?.trim()) continue
+    if (!diseaseMatchesSymptomTokens(row.disease, userTokens)) continue
+    const meridian = findMeridianForPoint(row.name)
+    if (!meridian) continue
+
+    if (seen.has(row.name)) continue
+    seen.add(row.name)
+
+    out.push({
+      meridianId: meridian.id,
+      meridianName: meridian.name,
+      point: row.name,
+      snippet: pickIndicationSnippet(row.disease, userTokens),
+    })
+    if (out.length >= INDICATION_SEARCH_MAX) break
+  }
+
+  out.sort((a, b) => {
+    const mc = a.meridianName.localeCompare(b.meridianName, 'zh-CN')
+    if (mc !== 0) return mc
+    return a.point.localeCompare(b.point, 'zh-CN')
+  })
+  return out
+}

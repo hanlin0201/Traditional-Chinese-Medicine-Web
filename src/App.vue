@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch, provide } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { User, Home, BookOpen, UtensilsCrossed, Activity } from 'lucide-vue-next'
+import { User, Home, BookOpen, UtensilsCrossed, Activity, Info } from 'lucide-vue-next'
 import AiCompanion from '@/components/AiCompanion.vue'
 import LoginOverlay from '@/components/LoginOverlay.vue'
 import { useAuth } from '@/composables/useAuth'
@@ -108,7 +108,16 @@ provide('openAiCompanion', openAiCompanion)
             </router-link>
           </div>
 
-          <div class="flex items-center">
+          <div class="flex items-center gap-2 sm:gap-3">
+            <router-link
+              to="/about"
+              class="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-stone-600 hover:text-emerald-800 hover:bg-white/90 text-sm font-medium shrink-0"
+              active-class="text-emerald-800 bg-emerald-50/90"
+            >
+              <Info :size="18" class="shrink-0 md:hidden" />
+              <span class="hidden sm:inline">关于本站</span>
+              <span class="sm:hidden">关于</span>
+            </router-link>
             <button @click="openAuthPanel" class="flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full border border-stone-300 hover:border-emerald-500 hover:text-emerald-700 hover:bg-white transition-all bg-stone-50">
               <User :size="20" />
               <span class="text-[0.9375rem] font-medium">{{ user ? '个人中心' : '登录 / 注册' }}</span>
