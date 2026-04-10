@@ -54,6 +54,24 @@ const isOwner = computed(
 );
 const loading = ref(true);
 const activeTab = ref("plans");
+const PROFILE_TAB_IDS = new Set([
+  "plans",
+  "herbs",
+  "recipes",
+  "works",
+  "my_recipes",
+  "mailbox",
+]);
+
+watch(
+  () => route.query.tab,
+  (tab) => {
+    const t = String(tab || "").trim();
+    if (PROFILE_TAB_IDS.has(t)) activeTab.value = t;
+  },
+  { immediate: true },
+);
+
 const foldedStates = ref({});
 const showAccountMenu = ref(false);
 
@@ -999,6 +1017,15 @@ function goToHerbDetail(herbName) {
   router.push(`/herb/${herbName}`);
 }
 
+function goToAcupointFromCarePlan(ac) {
+  const name = String(ac?.name || "").trim();
+  if (!name) return;
+  router.push({
+    name: "Acupoints",
+    query: { point: name, from: "care_plans" },
+  });
+}
+
 // 从「我的作品」跳转到独立的作业详情页
 function goToHomeworkDetail(work) {
   if (!work) return;
@@ -1613,7 +1640,13 @@ function closeAccountMenu() {
                   <div
                     v-for="(ac, idx) in plan.acupoints"
                     :key="idx"
-                    class="bg-white border border-[#5A7C65]/15 px-3 py-3 rounded-2xl text-base shadow-sm hover:shadow-md transition"
+                    role="button"
+                    tabindex="0"
+                    class="bg-white border border-[#5A7C65]/15 px-3 py-3 rounded-2xl text-base shadow-sm hover:shadow-md transition cursor-pointer hover:border-[#5A7C65]/35 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5A7C65]/40"
+                    :title="`在穴位导航中查看「${ac.name}」`"
+                    @click="goToAcupointFromCarePlan(ac)"
+                    @keydown.enter.prevent="goToAcupointFromCarePlan(ac)"
+                    @keydown.space.prevent="goToAcupointFromCarePlan(ac)"
                   >
                     <div
                       class="font-bold text-gray-800 mb-1 flex items-center gap-2"

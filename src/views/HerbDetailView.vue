@@ -541,11 +541,14 @@ function goBack() {
                   />
                 </button>
               </div>
-              <p v-if="herb?.alias" class="text-xs sm:text-sm text-sandalwood/60">
-                别名：{{ herb.alias }}
+              <p
+                v-if="herbEasy?.identity_tag"
+                class="text-sm text-sandalwood/90 font-medium leading-relaxed text-justify"
+              >
+                {{ herbEasy.identity_tag }}
               </p>
 
-              <!-- 功效与属性标签：紧跟在别名下方 -->
+              <!-- 功效与属性标签：紧跟在副标题下方 -->
               <div v-if="herbTagInfo" class="space-y-1.5 pt-1">
                 <div class="flex flex-wrap gap-1.5 text-[11px] sm:text-xs">
                   <span
@@ -707,19 +710,12 @@ function goBack() {
           </div>
           <template v-else>
             <div class="space-y-4">
-              
-              <div v-if="herbEasy.identity_tag" class="rounded-xl bg-[#FBF5EA] border border-sandalwood/10 p-5 relative overflow-hidden">
-                <div class="absolute top-0 left-0 w-1 h-full bg-amber-400/80"></div>
-                <h2 class="text-amber-800 font-serif font-semibold text-base mb-2">
-                  核心概括
-                </h2>
-                <p class="text-sandalwood/90 text-base font-medium leading-relaxed text-justify">{{ herbEasy.identity_tag }}</p>
-              </div>
 
               <!-- 作用效果：主角卡片 -->
-              <div v-if="herbEasy.friendly_explanation" class="rounded-xl bg-emerald-50/70 border border-emerald-200 p-6">
-                <h2 class="text-emerald-800 font-serif font-bold text-lg mb-3 flex items-center gap-2">
-                  <span class="w-1.5 h-5 bg-emerald-500/80 rounded-full" /> 作用效果
+              <div v-if="herbEasy.friendly_explanation" class="rounded-xl bg-orange-50/80 border border-orange-200/90 p-6 relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-1 h-full bg-orange-400/90" aria-hidden="true" />
+                <h2 class="text-orange-900 font-serif font-bold text-lg mb-3 flex items-center gap-2">
+                  <span class="w-1.5 h-5 bg-orange-500/85 rounded-full shrink-0" /> 作用效果
                 </h2>
                 <p class="text-sandalwood text-base font-medium leading-relaxed text-justify">{{ herbEasy.friendly_explanation }}</p>
               </div>

@@ -202,15 +202,44 @@ export function getMeridianById(id) {
 }
 
 /**
+ * 数据内穴位名不带「穴」后缀；用户/AI 常写「风池穴」等，去掉末尾「穴」便于匹配与搜索。
+ */
+export function normalizeAcupointLookupName(name) {
+  let s = String(name || '').trim()
+  if (!s) return ''
+  while (s.endsWith('穴')) {
+    s = s.slice(0, -1).trim()
+  }
+  return s
+}
+
+/** 按穴位名精确查找所属经脉（十四经与经外穴数据内名称唯一） */
+export function findMeridianForPoint(pointName) {
+  if (!pointName || !String(pointName).trim()) return null
+  const raw = String(pointName).trim()
+  const norm = normalizeAcupointLookupName(raw)
+  const tryNames = [...new Set([raw, norm].filter(Boolean))]
+  for (const name of tryNames) {
+    const m = MERIDIAN_GROUPS.find(m => m.points.includes(name))
+    if (m) return m
+  }
+  return null
+}
+
+/**
  * 搜索穴位名（模糊匹配），返回 [{ meridian, point }]
+ * 支持「风池穴」等与库内「风池」对齐（同时用原词与去「穴」词匹配）
  */
 export function searchAcupoints(keyword) {
   if (!keyword || !keyword.trim()) return []
-  const kw = keyword.trim()
+  const raw = keyword.trim()
+  const norm = normalizeAcupointLookupName(raw)
+  const kws = [...new Set([raw, norm].filter(Boolean))]
   const results = []
   for (const meridian of MERIDIAN_GROUPS) {
     for (const point of meridian.points) {
-      if (point.includes(kw)) {
+      const hit = kws.some((kw) => point === kw || point.includes(kw))
+      if (hit) {
         results.push({ meridianId: meridian.id, meridianName: meridian.name, point })
       }
     }
