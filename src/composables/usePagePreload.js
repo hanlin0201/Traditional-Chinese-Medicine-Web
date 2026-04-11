@@ -133,48 +133,53 @@ export function onInteractionsLoaded(cb) {
 async function warmInteractions() {
   if (interactionsCache.loaded) return
 
-  const [{ data: allComments }, { data: allHomeworks }] = await Promise.all([
-    supabase.from('comments').select('*').order('created_at', { ascending: false }),
-    supabase.from('homeworks').select('*').order('created_at', { ascending: false }),
-  ])
+  try {
+    const [{ data: allComments }, { data: allHomeworks }] = await Promise.all([
+      supabase.from('comments').select('*').order('created_at', { ascending: false }),
+      supabase.from('homeworks').select('*').order('created_at', { ascending: false }),
+    ])
 
-  // 批量拉取所有作业作者的 profile
-  const allHomeworksArr = allHomeworks || []
-  const userIds = [...new Set(allHomeworksArr.map(hw => hw.user_id).filter(Boolean))]
-  let profilesById = {}
-  if (userIds.length) {
-    const { data: profileRows } = await supabase
-      .from('profiles')
-      .select('id, username, avatar_url')
-      .in('id', userIds)
-    profilesById = Object.fromEntries((profileRows || []).map(p => [String(p.id), p]))
-  }
-  interactionsCache.profilesById = profilesById
-
-  // 评论按 recipe_id 分组
-  for (const c of (allComments || [])) {
-    const key = c.recipe_id
-    if (!interactionsCache.comments[key]) interactionsCache.comments[key] = []
-    interactionsCache.comments[key].push(c)
-  }
-
-  // 作业按 recipe_id 分组，同时附上用户展示信息；同时建平铺 id 索引
-  for (const hw of allHomeworksArr) {
-    const profile = hw.user_id ? profilesById[String(hw.user_id)] : null
-    const enriched = {
-      ...hw,
-      user_display_name: profile?.username || hw.user_name || '养生达人',
-      user_display_avatar: profile?.avatar_url || null,
+    // 批量拉取所有作业作者的 profile
+    const allHomeworksArr = allHomeworks || []
+    const userIds = [...new Set(allHomeworksArr.map(hw => hw.user_id).filter(Boolean))]
+    let profilesById = {}
+    if (userIds.length) {
+      const { data: profileRows } = await supabase
+        .from('profiles')
+        .select('id, username, avatar_url')
+        .in('id', userIds)
+      profilesById = Object.fromEntries((profileRows || []).map(p => [String(p.id), p]))
     }
-    const recipeKey = hw.recipe_id
-    if (!interactionsCache.homeworks[recipeKey]) interactionsCache.homeworks[recipeKey] = []
-    interactionsCache.homeworks[recipeKey].push(enriched)
-    interactionsCache.homeworksById[String(hw.id)] = enriched
-  }
+    interactionsCache.profilesById = profilesById
 
-  interactionsCache.loaded = true
-  _interactionsLoadedCallbacks.forEach(cb => cb())
-  _interactionsLoadedCallbacks.length = 0
+    // 评论按 recipe_id 分组
+    for (const c of (allComments || [])) {
+      const key = c.recipe_id
+      if (!interactionsCache.comments[key]) interactionsCache.comments[key] = []
+      interactionsCache.comments[key].push(c)
+    }
+
+    // 作业按 recipe_id 分组，同时附上用户展示信息；同时建平铺 id 索引
+    for (const hw of allHomeworksArr) {
+      const profile = hw.user_id ? profilesById[String(hw.user_id)] : null
+      const enriched = {
+        ...hw,
+        user_display_name: profile?.username || hw.user_name || '养生达人',
+        user_display_avatar: profile?.avatar_url || null,
+      }
+      const recipeKey = hw.recipe_id
+      if (!interactionsCache.homeworks[recipeKey]) interactionsCache.homeworks[recipeKey] = []
+      interactionsCache.homeworks[recipeKey].push(enriched)
+      interactionsCache.homeworksById[String(hw.id)] = enriched
+    }
+
+    interactionsCache.loaded = true
+  } catch (e) {
+    console.warn('warmInteractions failed, will retry on next preload', e)
+  } finally {
+    _interactionsLoadedCallbacks.forEach(cb => cb())
+    _interactionsLoadedCallbacks.length = 0
+  }
 }
 
 async function warmProfile() {
@@ -271,6 +276,7 @@ export async function preloadHomeFeaturePages() {
   if (preloadPromise) return preloadPromise
 
   preloadPromise = (async () => {
+    let failed = false
     // 1) 预热路由懒加载 chunk，减少首次点击导航时的 JS 下载等待
     const warmChunks = Promise.allSettled([
       import('@/views/HomeView.vue'),
@@ -316,7 +322,9 @@ export async function preloadHomeFeaturePages() {
       if (data) data.forEach(item => acupointCache.set(item.name, item))
     })()
 
-    await Promise.allSettled([warmChunks, warmHerbs, warmRecipes, warmProfileData, warmInteractionsData, warmAcupoints])
+    const results = await Promise.allSettled([warmChunks, warmHerbs, warmRecipes, warmProfileData, warmInteractionsData, warmAcupoints])
+    failed = results.some(r => r.status === 'rejected')
+    if (failed) preloadPromise = null
   })()
 
   return preloadPromise

@@ -571,6 +571,7 @@ onMounted(() => {
 
 onActivated(() => {
   applySearchKeywordFromQuery()
+  if (recipes.value.length === 0) fetchRecipes()
   const pendingId = route.query.open_id
   if (pendingId) {
     if (!selectedRecipe.value || selectedRecipe.value.id != pendingId) {
