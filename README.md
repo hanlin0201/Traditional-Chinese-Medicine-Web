@@ -90,3 +90,37 @@ src/
    - 登录后个人中心会显示 **「管理员」** 标签；也可在 `profiles` 中将该用户 `is_admin = true`（可选）。  
    - 登录页底部有低调的 **「管理员登录（测试）」**，可一键填入并登录。
 3. **流程**：个人中心发布菜谱时可勾选 **「发布到食谱广场」** → 状态为 **审核中** → 管理员在 **「信箱」** 中处理 **待审核** → 用户收到 **站内信**；通过后菜谱出现在 **养生膳食广场**，并展示投稿者头像与昵称。
+
+## AI 接口说明
+
+### 调用链路
+
+```
+前端 AiCompanion.vue
+    ↓ fetch（流式 SSE）
+Supabase Edge Function（supabase/functions/tcm-chat/index.ts）
+    ↓ fetch + Authorization: Bearer
+硅基流动 SiliconFlow API（https://api.siliconflow.cn/v1/chat/completions）
+```
+
+### 模型与供应商
+
+| 项目 | 值 |
+|------|-----|
+| 供应商 | 硅基流动 SiliconFlow |
+| 模型 | `Qwen/Qwen2.5-72B-Instruct` |
+| 协议 | OpenAI-compatible Chat Completions API（流式 SSE） |
+
+### 为什么使用代理层（Edge Function）
+
+- **密钥安全**：`SILICONFLOW_API_KEY` 存储在 Supabase 服务端环境变量中，前端代码不暴露任何密钥。
+- **跨域处理**：Edge Function 统一处理 CORS，前端无需额外配置。
+- **灵活切换**：如需更换模型或供应商，只改 Edge Function 一处即可，前端无感知。
+
+### 环境变量配置
+
+在 Supabase 项目的 Edge Function 环境变量中设置：
+
+```
+SILICONFLOW_API_KEY=your_api_key_here
+```

@@ -1,6 +1,7 @@
 // Supabase Edge Function - TCM Chat Proxy
 // 运行环境：Deno（Supabase Edge Runtime）
 // 作用：代理前端请求到硅基流动 API，API Key 安全存储在服务端环境变量中
+// 调用链路：前端（AiCompanion.vue） -> Supabase Edge Function（本文件） -> 硅基流动 SiliconFlow API
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',

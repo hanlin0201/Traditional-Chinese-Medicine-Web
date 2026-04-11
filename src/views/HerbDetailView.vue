@@ -3,11 +3,6 @@ import { ref, onMounted, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 // 1. 引入 Heart 图标
 import { ArrowLeft, Heart } from 'lucide-vue-next'
-// 3D 核心组件与控制器
-import { TresCanvas } from '@tresjs/core'
-import { OrbitControls } from '@tresjs/cientos'
-// 引入你的 3D 模型子组件
-import Herb3DScene from '@/components/Herb3DScene.vue'
 // 引入 Supabase 客户端
 import { supabase } from '@/supabaseClient' 
 import { useAuth } from '@/composables/useAuth'

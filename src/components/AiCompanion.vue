@@ -356,7 +356,7 @@ async function callSiliconFlowStream(onChunk, userInputText = '') {
 
       try {
         const parsed = JSON.parse(jsonStr)
-        // 标准 OpenAI 兼容格式：choices[0].delta.content
+        // SSE 数据按 OpenAI-compatible 字段解析（当前上游为硅基流动 SiliconFlow）：choices[0].delta.content
         const chunk = parsed.choices?.[0]?.delta?.content || ''
         if (chunk) {
           fullText += chunk
