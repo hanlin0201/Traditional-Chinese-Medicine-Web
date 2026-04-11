@@ -79,6 +79,17 @@ export function getHerbDetailCache(name) {
   return herbDetailCache.get(name) ?? null
 }
 
+// 通俗版药材缓存：{ [name]: herbEasyData }（供 HerbDetailView identity_tag 秒显）
+export const herbEasyCache = new Map()
+
+export function getHerbEasyCache(name) {
+  return herbEasyCache.get(name) ?? null
+}
+
+export function setHerbEasyCache(name, data) {
+  if (name && data) herbEasyCache.set(name, data)
+}
+
 // 穴位详情缓存：{ [name]: { name, position, disease } }
 export const acupointCache = new Map()
 
@@ -213,8 +224,11 @@ async function warmProfile() {
   const herbNames = rawHerbs.map(h => h.name).filter(Boolean)
   let identityTagMap = {}
   if (herbNames.length) {
-    const { data: easyData } = await supabase.from('herbseasy').select('name, identity_tag').in('name', herbNames)
-    if (easyData) identityTagMap = Object.fromEntries(easyData.map(e => [e.name, e.identity_tag]))
+    const { data: easyData } = await supabase.from('herbseasy').select('*').in('name', herbNames)
+    if (easyData) {
+      easyData.forEach(e => { if (e.name) herbEasyCache.set(e.name, e) })
+      identityTagMap = Object.fromEntries(easyData.map(e => [e.name, e.identity_tag]))
+    }
   }
   const favoriteHerbs = rawHerbs.map(h => ({ ...h, identity_tag: identityTagMap[h.name] ?? null }))
   // 填充药材详情缓存，供 HerbDetailView 秒开
@@ -286,13 +300,29 @@ export async function preloadHomeFeaturePages() {
 
     // 2) 首页药材列表首屏数据预加载（与 useHerbData 缓存 key 对齐）
     const warmHerbs = (async () => {
-      if (getCache(HERB_CACHE_KEY_PAGE1)) return
-      const { data, error } = await supabase
-        .from('herbs')
-        .select('*')
-        .order('id', { ascending: true })
-        .range(0, 19)
-      if (!error && data) setCache(HERB_CACHE_KEY_PAGE1, data)
+      let herbNames = null
+      const cached = getCache(HERB_CACHE_KEY_PAGE1)
+      if (cached) {
+        herbNames = cached.map(h => h.name).filter(Boolean)
+      } else {
+        const { data, error } = await supabase
+          .from('herbs')
+          .select('*')
+          .order('id', { ascending: true })
+          .range(0, 19)
+        if (!error && data) {
+          setCache(HERB_CACHE_KEY_PAGE1, data)
+          herbNames = data.map(h => h.name).filter(Boolean)
+        }
+      }
+      // 顺带预热首屏药材的通俗版数据，供点击后立刻显示
+      if (herbNames && herbNames.length && herbEasyCache.size === 0) {
+        const { data: easyData } = await supabase
+          .from('herbseasy')
+          .select('*')
+          .in('name', herbNames)
+        if (easyData) easyData.forEach(e => { if (e.name) herbEasyCache.set(e.name, e) })
+      }
     })()
 
     // 3) 食谱列表数据预加载（供 RecipeMarket 首屏秒开）

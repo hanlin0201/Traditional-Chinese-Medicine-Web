@@ -7,7 +7,7 @@ import { ArrowLeft, Heart } from 'lucide-vue-next'
 import { supabase } from '@/supabaseClient' 
 import { useAuth } from '@/composables/useAuth'
 import { getHerbTagDisplayByName } from '@/composables/useHerbTags'
-import { getHerbDetailCache, profileCache } from '@/composables/usePagePreload'
+import { getHerbDetailCache, getHerbEasyCache, setHerbEasyCache, profileCache } from '@/composables/usePagePreload'
 // 入药部位对应的顶部背景图（静态资源见 public/photo/herb-part-categories/）
 const HERB_PART_ART = '/photo/herb-part-categories'
 
@@ -293,7 +293,7 @@ const fetchHerbByName = async () => {
 
   if (preloadData) {
     herb.value = preloadData
-    herbEasy.value = null
+    herbEasy.value = getHerbEasyCache(herbName)
     loading.value = false
     // 后台静默更新完整数据
     try {
@@ -302,7 +302,10 @@ const fetchHerbByName = async () => {
         supabase.from('herbseasy').select('*').eq('name', herbName).maybeSingle(),
       ])
       if (resHerb.data) herb.value = resHerb.data
-      if (resEasy.data) herbEasy.value = resEasy.data
+      if (resEasy.data) {
+        herbEasy.value = resEasy.data
+        setHerbEasyCache(herbName, resEasy.data)
+      }
     } catch (e) {
       console.warn('后台更新数据失败，但不影响展示', e)
     }
@@ -321,7 +324,10 @@ const fetchHerbByName = async () => {
 
     if (resHerb.error) throw resHerb.error
     herb.value = resHerb.data
-    if (resEasy.data) herbEasy.value = resEasy.data
+    if (resEasy.data) {
+      herbEasy.value = resEasy.data
+      setHerbEasyCache(herbName, resEasy.data)
+    }
   } catch (err) {
     console.error('查询药材失败:', err)
     error.value = err
@@ -707,10 +713,10 @@ function goBack() {
             <div class="space-y-4">
 
               <!-- 作用效果：主角卡片 -->
-              <div v-if="herbEasy.friendly_explanation" class="rounded-xl bg-orange-50/80 border border-orange-200/90 p-6 relative overflow-hidden">
-                <div class="absolute top-0 left-0 w-1 h-full bg-orange-400/90" aria-hidden="true" />
-                <h2 class="text-orange-900 font-serif font-bold text-lg mb-3 flex items-center gap-2">
-                  <span class="w-1.5 h-5 bg-orange-500/85 rounded-full shrink-0" /> 作用效果
+              <div v-if="herbEasy.friendly_explanation" class="rounded-xl bg-amber-100/40 border border-amber-200/50 p-6 relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-1 h-full bg-amber-700/40" aria-hidden="true" />
+                <h2 class="text-amber-950 font-serif font-bold text-lg mb-3 flex items-center gap-2">
+                  <span class="w-1.5 h-5 bg-amber-700/45 rounded-full shrink-0" /> 作用效果
                 </h2>
                 <p class="text-sandalwood text-base font-medium leading-relaxed text-justify">{{ herbEasy.friendly_explanation }}</p>
               </div>
