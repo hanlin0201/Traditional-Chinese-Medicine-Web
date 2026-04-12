@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(xargs wc:*)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(npx supabase:*)",
+      "Bash(supabase functions:*)"
     ]
   }
 }

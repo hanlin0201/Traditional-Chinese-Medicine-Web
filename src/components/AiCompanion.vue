@@ -284,30 +284,43 @@ async function callSiliconFlowStream(onChunk, userInputText = '') {
     }
   }
 
-  // 🚀 2. 核心修复：只截取最后一次开方【之后】的新对话
-  // 这样既能忘掉第一轮的“长痘白发”，又不会忘掉第二轮刚说的“胃胀气/头疼”
-  const startIndex = lastPrescriptionIdx >= 0 ? lastPrescriptionIdx + 1 : 0
-  
-  for (let i = startIndex; i < list.length; i++) {
+  // 🚀 2. 包含完整对话历史，让 AI 能参考上下文（如”上次开的头疼方吃了好多了”）
+  // 处方消息序列化为纯文字摘要，避免原始 JSON 暴露给 AI 造成重复输出或乱码
+  for (let i = 0; i < list.length; i++) {
     const m = list[i]
     const role = m.role === 'user' ? 'user' : 'assistant'
     let content = ''
-    if (m.type === 'inquiry') content = m.text || ''
-    else content = m.content || ''
+
+    if (m.type === 'prescription') {
+      // 将处方卡片转为可读摘要，禁止传入原始 JSON
+      const recipeNames = (m.recipes || []).map(r => r.name).filter(Boolean).join('、')
+      const acupointNames = (m.acupoints || [])
+        .filter(a => a && a.name !== '无')
+        .map(a => a.name)
+        .join('、')
+      content = `【已出具处方】\n辨证结果：${m.diagnosis_result || ''}\n方案概要：${m.summary || ''}\n食疗推荐：${recipeNames || '见处方卡'}`
+      if (acupointNames) content += `\n穴位推荐：${acupointNames}`
+    } else if (m.type === 'inquiry') {
+      content = m.text || ''
+    } else {
+      content = m.content || ''
+    }
+
     if (!content) continue
     apiMessages.push({ role, content })
   }
 
-  // 🚀 3. 如果是开方后的新一轮问诊，我们在开头悄悄塞一句话，让 AI 彻底忘掉上一个病人
+  // 🚀 3. 若有历史处方，在开头注入上下文提示，告知 AI 可参考历史（而非忘掉）
   if (lastPrescriptionIdx >= 0 && apiMessages.length > 0) {
-    apiMessages.unshift({ 
-      role: 'assistant', 
-      content: '【系统提示】上一轮问诊已结束并出具了处方。现在用户开始了全新的咨询，请务必忘掉前面的症状，只根据接下来的对话重新进行独立诊断。' 
+    apiMessages.unshift({
+      role: 'assistant',
+      content: '【系统提示】本对话有过往问诊记录。若用户提及上次处方或症状变化，请结合历史信息综合判断，无需重复追问已了解的内容。若用户提出全新问题，则重新独立辨证分析。',
     })
   }
 
-  // 🚀 4. 动态计算这轮新问诊中，用户说了几句话（精准统计轮数）
-  const currentTurnCount = apiMessages.filter(m => m.role === 'user').length
+  // 🚀 4. userTurnCount 仍只统计【当前新轮次】中用户的发言次数，保证追问/开方节奏不受历史影响
+  const currentStartIndex = lastPrescriptionIdx >= 0 ? lastPrescriptionIdx + 1 : 0
+  const currentTurnCount = list.slice(currentStartIndex).filter(m => m.role === 'user').length
 
   // 发送请求给后端
   const response = await fetch(TCM_CHAT_URL, {

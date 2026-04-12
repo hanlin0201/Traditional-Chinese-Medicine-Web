@@ -194,8 +194,11 @@ function normalizeRecipe(item, myFavorites = [], profilesById = {}) {
 }
 
 // --- 1. 获取基础食谱数据 ---
+let _fetchRecipesInFlight = false
 const fetchRecipes = async () => {
   if (recipes.value.length > 0) return
+  if (_fetchRecipesInFlight) return
+  _fetchRecipesInFlight = true
 
   const cached = getRecipeMarketCachedData()
   const hasCachedData = Array.isArray(cached) && cached.length > 0
@@ -234,6 +237,7 @@ const fetchRecipes = async () => {
     console.error('获取食谱失败:', error)
   } finally {
     loading.value = false
+    _fetchRecipesInFlight = false
   }
 }
 

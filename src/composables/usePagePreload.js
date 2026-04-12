@@ -144,6 +144,11 @@ export function onInteractionsLoaded(cb) {
 async function warmInteractions() {
   if (interactionsCache.loaded) return
 
+  // 重试前清空，防止上次部分写入导致数据累加重复
+  interactionsCache.comments = {}
+  interactionsCache.homeworks = {}
+  interactionsCache.homeworksById = {}
+
   try {
     const [{ data: allComments }, { data: allHomeworks }] = await Promise.all([
       supabase.from('comments').select('*').order('created_at', { ascending: false }),
@@ -352,9 +357,14 @@ export async function preloadHomeFeaturePages() {
       if (data) data.forEach(item => acupointCache.set(item.name, item))
     })()
 
-    const results = await Promise.allSettled([warmChunks, warmHerbs, warmRecipes, warmProfileData, warmInteractionsData, warmAcupoints])
-    failed = results.some(r => r.status === 'rejected')
-    if (failed) preloadPromise = null
+    await Promise.allSettled([warmChunks, warmHerbs, warmRecipes, warmProfileData, warmInteractionsData, warmAcupoints])
+    // 子任务内部用 if(!error&&data) 吞掉了异常，永远不会 reject。
+    // 所以改为直接检查关键缓存是否真的写入成功，任一缺失则重置，允许下次重跑。
+    const herbsOk = getCache(HERB_CACHE_KEY_PAGE1) !== null
+    const recipesOk = getCache(RECIPE_CACHE_KEY) !== null
+    const acupointsOk = acupointCache.size > 0
+    const interactionsOk = interactionsCache.loaded
+    if (!herbsOk || !recipesOk || !acupointsOk || !interactionsOk) preloadPromise = null
   })()
 
   return preloadPromise
