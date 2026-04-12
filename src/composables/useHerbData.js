@@ -73,52 +73,64 @@ export function useHerbList() {
   const loadingMore = ref(false)
   let nextOffset = PAGE_SIZE
 
-  const TIMEOUT_MS = 12000
-  const timeout = () => new Promise((_, reject) =>
+  const TIMEOUT_MS = 5000
+  const RETRY_DELAYS = [800, 2000] // 自动重试 2 次，失败间隔递增
+  const makeTimeout = () => new Promise((_, reject) =>
     setTimeout(() => reject(new Error('timeout')), TIMEOUT_MS)
   )
+  const fetchPage1 = () => Promise.race([
+    supabase.from('herbs').select('*').order('id', { ascending: true }).range(0, PAGE_SIZE - 1),
+    makeTimeout(),
+  ])
 
   async function load() {
     const cached = getCache(CACHE_KEY_PAGE1)
     if (cached && Array.isArray(cached)) {
+      // 有缓存：立即展示，后台静默重试刷新
       herbs.value = normalizeHerbs(cached)
       loading.value = false
       nextOffset = PAGE_SIZE
       hasMore.value = cached.length >= PAGE_SIZE
-      // 后台静默 revalidate（加超时保护，失败静默忽略）
-      try {
-        const { data, error: e } = await Promise.race([
-          supabase.from('herbs').select('*').order('id', { ascending: true }).range(0, PAGE_SIZE - 1),
-          timeout(),
-        ])
-        if (!e && data) {
-          const norm = normalizeHerbs(data)
-          herbs.value = norm
-          setCache(CACHE_KEY_PAGE1, norm)
-          hasMore.value = norm.length >= PAGE_SIZE
+      for (let i = 0; i <= RETRY_DELAYS.length; i++) {
+        try {
+          const { data, error: e } = await fetchPage1()
+          if (!e && data) {
+            const norm = normalizeHerbs(data)
+            herbs.value = norm
+            setCache(CACHE_KEY_PAGE1, norm)
+            hasMore.value = norm.length >= PAGE_SIZE
+          }
+          return
+        } catch {
+          if (i < RETRY_DELAYS.length) await new Promise(r => setTimeout(r, RETRY_DELAYS[i]))
         }
-      } catch {}
+      }
       return
     }
+
+    // 无缓存：用户看到转圈，后台自动重试，全失败才报错
     loading.value = true
     error.value = null
-    try {
-      const { data, error: e } = await Promise.race([
-        supabase.from('herbs').select('*').order('id', { ascending: true }).range(0, PAGE_SIZE - 1),
-        timeout(),
-      ])
-      if (e) throw e
-      const norm = normalizeHerbs(data || [])
-      herbs.value = norm
-      setCache(CACHE_KEY_PAGE1, norm)
-      nextOffset = PAGE_SIZE
-      hasMore.value = norm.length >= PAGE_SIZE
-    } catch (e) {
-      error.value = e
-      herbs.value = []
-    } finally {
-      loading.value = false
+    let lastErr = null
+    for (let i = 0; i <= RETRY_DELAYS.length; i++) {
+      try {
+        const { data, error: e } = await fetchPage1()
+        if (e) throw e
+        const norm = normalizeHerbs(data || [])
+        herbs.value = norm
+        setCache(CACHE_KEY_PAGE1, norm)
+        nextOffset = PAGE_SIZE
+        hasMore.value = norm.length >= PAGE_SIZE
+        loading.value = false
+        return
+      } catch (e) {
+        lastErr = e
+        if (i < RETRY_DELAYS.length) await new Promise(r => setTimeout(r, RETRY_DELAYS[i]))
+      }
     }
+    error.value = lastErr
+    herbs.value = []
+    loading.value = false
   }
 
   async function loadMore() {
@@ -127,7 +139,7 @@ export function useHerbList() {
     try {
       const { data, error: e } = await Promise.race([
         supabase.from('herbs').select('*').order('id', { ascending: true }).range(nextOffset, nextOffset + PAGE_SIZE - 1),
-        timeout(),
+        makeTimeout(),
       ])
       if (e) return
       const norm = normalizeHerbs(data || [])
@@ -152,7 +164,7 @@ export function useHerbList() {
     try {
       const { data, error: e } = await Promise.race([
         supabase.from('herbs').select('*').order('id', { ascending: true }),
-        timeout(),
+        makeTimeout(),
       ])
       if (e) return
       herbs.value = normalizeHerbs(data || [])

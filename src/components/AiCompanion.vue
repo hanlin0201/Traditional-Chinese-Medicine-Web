@@ -55,6 +55,9 @@ const SYSTEM_PROMPT = `你是一位经验丰富的中医专家（AI TCM Tutor）
 - **严禁使用有毒药材**：附子、乌头、马钱子、砒霜、生半夏、生南星等一律禁止。食疗方仅使用药食同源、常见食材及温和药材。
 - recipes 三类含义：tea=茶饮（红枣、枸杞、菊花、陈皮等安全食材）；meal=食疗汤粥/家常菜；classic=可在家制作的经典食疗方，**禁止**成药或含毒药材的方剂。
 
+【非问诊输入识别】
+当用户输入的内容与身体症状、健康问题**完全无关**时（如打招呼、闲聊、测试文字、无意义输入、表达情绪等），**禁止**触发问诊流程，**禁止**附带 inquiry 卡片。直接用一两句自然语言友好回应即可，例如"您好！有什么身体不适或中医问题可以告诉我，我来帮您。"。只有当用户明确描述症状、身体不适或主动询问中医健康相关内容时，才进入问诊流程。
+
 【核心规则】
 1. **绝对服从问诊节奏**
   我会通过对话末尾的【系统提示】告诉你当前该”继续追问”还是”出具处方”。请你必须严格遵从提示的指令。如果提示不允许开方，绝对不能输出处方 JSON。
@@ -105,7 +108,10 @@ const WELCOME_MSG = { role: 'assistant', type: 'text', content: '您好，我是
 const messages = ref([{ ...WELCOME_MSG }])
 
 // ── 会话管理 ──────────────────────────────────────────
-const SESSIONS_KEY = 'tcm_chat_sessions'
+// key 按用户 ID 隔离，未登录用 'guest'
+function getSessionsKey() {
+  return `tcm_chat_sessions_${user.value?.id || 'guest'}`
+}
 const sessions = ref([])
 const activeSessionId = ref(null)
 const showSessionList = ref(false)
@@ -118,7 +124,7 @@ function serializeMessages(msgs) {
 }
 
 function persistSessions() {
-  try { localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions.value)) } catch {}
+  try { localStorage.setItem(getSessionsKey(), JSON.stringify(sessions.value)) } catch {}
 }
 
 function saveActiveSession() {
@@ -231,7 +237,7 @@ function formatSessionDate(iso) {
 
 function loadSessions() {
   try {
-    const raw = localStorage.getItem(SESSIONS_KEY)
+    const raw = localStorage.getItem(getSessionsKey())
     if (raw) {
       const parsed = JSON.parse(raw)
       sessions.value = Array.isArray(parsed)
@@ -260,6 +266,13 @@ watch(messages, () => {
   if (messages.value.some(m => m.type === 'streaming')) return
   saveActiveSession()
 }, { deep: true })
+
+// 登录/退出时切换到对应账号的会话记录
+watch(user, () => {
+  sessions.value = []
+  activeSessionId.value = null
+  loadSessions()
+})
 
 /*function isNewConversationAfterPrescription() {
   const list = messages.value.filter(m => m.type !== 'streaming')
@@ -887,10 +900,10 @@ defineExpose({ openPanel })
             </template>
           </div>
           <div class="flex items-center gap-1.5">
-            <button @click="createNewSession" title="新建对话" :disabled="isGenerating" class="p-1.5 rounded-lg hover:bg-sandalwood/10 text-sandalwood/60 hover:text-sandalwood transition disabled:opacity-30 disabled:cursor-not-allowed">
+            <button v-if="user" @click="createNewSession" title="新建对话" :disabled="isGenerating" class="p-1.5 rounded-lg hover:bg-sandalwood/10 text-sandalwood/60 hover:text-sandalwood transition disabled:opacity-30 disabled:cursor-not-allowed">
               <PlusCircle class="w-4 h-4" />
             </button>
-            <button @click="showSessionList = !showSessionList" title="历史对话" class="p-1.5 rounded-lg hover:bg-sandalwood/10 transition" :class="showSessionList ? 'text-sandalwood bg-sandalwood/10' : 'text-sandalwood/60 hover:text-sandalwood'">
+            <button v-if="user" @click="showSessionList = !showSessionList" title="历史对话" class="p-1.5 rounded-lg hover:bg-sandalwood/10 transition" :class="showSessionList ? 'text-sandalwood bg-sandalwood/10' : 'text-sandalwood/60 hover:text-sandalwood'">
               <History class="w-4 h-4" />
             </button>
             <X class="w-5 h-5 cursor-pointer text-sandalwood/70 ml-1" @click="open = false" />
@@ -901,7 +914,7 @@ defineExpose({ openPanel })
         <div v-if="showSessionList" class="absolute left-0 right-0 bottom-0 z-10 bg-[#FDFBF7] flex flex-col border-t border-sandalwood/15 overflow-hidden" style="top: 52px">
           <div class="px-4 py-2.5 border-b border-sandalwood/10 flex items-center justify-between shrink-0">
             <span class="text-xs font-semibold text-sandalwood/70 uppercase tracking-wide">历史对话</span>
-            <button @click="createNewSession" :disabled="isGenerating" class="flex items-center gap-1 text-xs text-sandalwood bg-sandalwood/10 px-2.5 py-1 rounded-lg hover:bg-sandalwood/20 transition disabled:opacity-30 disabled:cursor-not-allowed">
+            <button v-if="user" @click="createNewSession" :disabled="isGenerating" class="flex items-center gap-1 text-xs text-sandalwood bg-sandalwood/10 px-2.5 py-1 rounded-lg hover:bg-sandalwood/20 transition disabled:opacity-30 disabled:cursor-not-allowed">
               <PlusCircle class="w-3.5 h-3.5" /> 新建对话
             </button>
           </div>

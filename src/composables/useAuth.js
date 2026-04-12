@@ -154,11 +154,11 @@ export function useAuth() {
   }
 
   async function handleLogout() {
-    await supabase.auth.signOut()
     user.value = null
     profile.value = null
     isGuest.value = true
     if (typeof localStorage !== 'undefined') localStorage.setItem(GUEST_KEY, '1')
+    supabase.auth.signOut()
   }
 
   function setGuestMode() {

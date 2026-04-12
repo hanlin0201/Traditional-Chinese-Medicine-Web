@@ -24,6 +24,7 @@ const { user: currentUser, profile: currentUserProfile } = useAuth()
 // --- 状态定义 ---
 const recipes = ref([])
 const loading = ref(true)
+const hasError = ref(false)
 const selectedRecipe = ref(null)
 
 // --- 搜索与筛选 ---
@@ -194,11 +195,29 @@ function normalizeRecipe(item, myFavorites = [], profilesById = {}) {
 }
 
 // --- 1. 获取基础食谱数据 ---
+const FETCH_TIMEOUT_MS = 5000
+const FETCH_RETRY_DELAYS = [800, 2000]
+const makeFetchTimeout = () => new Promise((_, reject) =>
+  setTimeout(() => reject(new Error('timeout')), FETCH_TIMEOUT_MS)
+)
+
+async function fetchRecipesOnce(uid) {
+  return Promise.race([
+    Promise.all([
+      supabase.from('recipes').select('*').or('moderation_status.eq.published,moderation_status.is.null').order('id'),
+      uid ? supabase.from('favorite_recipes').select('recipe_id').eq('user_id', uid) : Promise.resolve({ data: [] }),
+      supabase.from('favorite_recipes').select('recipe_id'),
+    ]),
+    makeFetchTimeout(),
+  ])
+}
+
 let _fetchRecipesInFlight = false
 const fetchRecipes = async () => {
   if (recipes.value.length > 0) return
   if (_fetchRecipesInFlight) return
   _fetchRecipesInFlight = true
+  hasError.value = false
 
   const cached = getRecipeMarketCachedData()
   const hasCachedData = Array.isArray(cached) && cached.length > 0
@@ -206,39 +225,45 @@ const fetchRecipes = async () => {
     recipes.value = cached.map(r => ({ ...r, favorites_count: r.favorites_count || 0 }))
     loading.value = false
     syncCookedCounts()
+  } else {
+    loading.value = true
   }
 
-  try {
-    if (!hasCachedData) loading.value = true
-    const uid = currentUser.value?.id
+  const uid = currentUser.value?.id
+  let lastErr = null
 
-    const [recipesRes, myFavsRes, favCountsRes] = await Promise.all([
-      supabase.from('recipes').select('*').or('moderation_status.eq.published,moderation_status.is.null').order('id'),
-      uid ? supabase.from('favorite_recipes').select('recipe_id').eq('user_id', uid) : Promise.resolve({ data: [] }),
-      supabase.from('favorite_recipes').select('recipe_id'),
-    ])
+  for (let i = 0; i <= FETCH_RETRY_DELAYS.length; i++) {
+    try {
+      const [recipesRes, myFavsRes, favCountsRes] = await fetchRecipesOnce(uid)
+      const { data, error } = recipesRes
+      if (error) throw error
 
-    const { data, error } = recipesRes
-    if (error) throw error
+      const myFavorites = (myFavsRes.data || []).map(f => f.recipe_id)
+      const favCountMap = {}
+      ;(favCountsRes.data || []).forEach(f => { favCountMap[f.recipe_id] = (favCountMap[f.recipe_id] || 0) + 1 })
 
-    const myFavorites = (myFavsRes.data || []).map(f => f.recipe_id)
-    const favCountMap = {}
-    ;(favCountsRes.data || []).forEach(f => { favCountMap[f.recipe_id] = (favCountMap[f.recipe_id] || 0) + 1 })
-
-    if (data) {
       const authorIds = data.map(item => item.author_user_id).filter(Boolean)
       const profilesById = await fetchProfilesMap(authorIds)
       const normalized = data.map(item => ({ ...normalizeRecipe(item, myFavorites, profilesById), favorites_count: favCountMap[item.id] || 0 }))
       recipes.value = normalized
       syncCookedCounts()
       setRecipeMarketCachedData([...recipes.value])
+      loading.value = false
+      _fetchRecipesInFlight = false
+      return
+    } catch (err) {
+      lastErr = err
+      if (i < FETCH_RETRY_DELAYS.length) {
+        await new Promise(r => setTimeout(r, FETCH_RETRY_DELAYS[i]))
+      }
     }
-  } catch (error) {
-    console.error('获取食谱失败:', error)
-  } finally {
-    loading.value = false
-    _fetchRecipesInFlight = false
   }
+
+  // 所有重试耗尽
+  console.error('获取食谱失败:', lastErr)
+  if (!hasCachedData) hasError.value = true
+  loading.value = false
+  _fetchRecipesInFlight = false
 }
 
 const syncCookedCounts = () => {
@@ -707,6 +732,10 @@ onDeactivated(() => {
     </Transition>
 
     <div v-if="loading" class="text-center py-20 text-stone-500">⏳ 正在获取食谱...</div>
+    <div v-else-if="hasError" class="flex flex-col items-center justify-center py-20 gap-3 text-stone-500">
+      <span class="text-sm">加载出错了，请检查网络后重试</span>
+      <button @click="fetchRecipes" class="text-xs px-5 py-2 rounded-full border border-stone-300 hover:bg-stone-100 transition-colors">点击重试</button>
+    </div>
     <template v-else>
       <div v-if="filteredRecipes.length === 0" class="text-center py-16 px-4">
         <p class="text-stone-500 mb-4">未找到符合条件的食谱</p>
