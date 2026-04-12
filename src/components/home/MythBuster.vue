@@ -11,12 +11,14 @@ import {
 } from "lucide-vue-next";
 import { supabase } from "@/supabaseClient";
 import { FEATURE_COPY } from "@/constants/branding";
+import { mythsCache } from "@/composables/usePagePreload";
 
 const bgImage = "/images/myth-bg-2.jpg?v=2";
 
 const fullMyths = ref([]);
 const displayedMyths = ref([]);
 const loading = ref(false);
+const hasError = ref(false);
 const expandedId = ref(null);
 const mythSearch = ref("");
 const activeHitIndex = ref(0);
@@ -117,10 +119,7 @@ const BATCH_SIZE = 3;
 
 const isMythSearching = computed(() => mythSearch.value.trim().length > 0);
 
-const mythSourceList = computed(() => {
-  const list = fullMyths.value;
-  return list && list.length && hasValidItems(list) ? list : FALLBACK;
-});
+const mythSourceList = computed(() => fullMyths.value);
 
 function rowMatchesQuery(item, q) {
   const hay = [item.question, item.answer, stripHtml(item.detail)]
@@ -189,30 +188,44 @@ function pickRandomBatch() {
   displayedMyths.value = copy.slice(0, BATCH_SIZE);
 }
 
+let _loadInFlight = false;
 async function loadMyths() {
+  if (_loadInFlight) return;
+  hasError.value = false;
+
+  // 命中预加载缓存：直接同步显示，无需 loading
+  if (mythsCache.length > 0) {
+    const mapped = mythsCache.map((r, i) => normalize(r, i));
+    fullMyths.value = hasValidItems(mapped) ? mapped : [];
+    pickRandomBatch();
+    return;
+  }
+
+  _loadInFlight = true;
   loading.value = true;
   fullMyths.value = [];
   displayedMyths.value = [];
   mythSearch.value = "";
   expandedId.value = null;
   try {
-    const { data, error } = await supabase.from("myths").select("*");
-    if (error) {
-      console.warn("[养生避雷针] Supabase error:", error.message);
-      fullMyths.value = [...FALLBACK];
-      pickRandomBatch();
-      return;
-    }
+    const { data, error } = await Promise.race([
+      supabase.from("myths").select("*"),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("timeout")), 8000)
+      ),
+    ]);
+    if (error) throw error;
     const raw = Array.isArray(data) ? data : [];
+    if (raw.length) mythsCache.push(...raw);
     const mapped = raw.map((r, i) => normalize(r, i));
-    fullMyths.value = hasValidItems(mapped) ? mapped : [...FALLBACK];
+    fullMyths.value = hasValidItems(mapped) ? mapped : [];
     pickRandomBatch();
   } catch (e) {
     console.warn("[养生避雷针] load failed:", e);
-    fullMyths.value = [...FALLBACK];
-    pickRandomBatch();
+    hasError.value = true;
   } finally {
     loading.value = false;
+    _loadInFlight = false;
   }
 }
 
@@ -315,6 +328,10 @@ onMounted(() => {
         <div v-if="loading" class="loading-state">
           <Loader2 class="w-8 h-8 animate-spin text-brown-600" />
           <p>正在搜罗养生秘籍...</p>
+        </div>
+        <div v-else-if="hasError" class="error-state">
+          <p class="error-text">数据加载失败，请检查网络后重试</p>
+          <button class="retry-btn" @click="loadMyths">点击重试</button>
         </div>
         <template v-else>
           <div
@@ -594,6 +611,31 @@ onMounted(() => {
   height: 200px;
   color: #8b5e3c;
   gap: 10px;
+}
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  gap: 16px;
+}
+.error-text {
+  color: #7d5a4a;
+  font-size: 1rem;
+}
+.retry-btn {
+  padding: 10px 28px;
+  border-radius: 24px;
+  background: #c44d36;
+  color: #fff;
+  font-size: 0.95rem;
+  cursor: pointer;
+  border: none;
+  transition: background 0.2s;
+}
+.retry-btn:hover {
+  background: #a83929;
 }
 
 .myth-item {

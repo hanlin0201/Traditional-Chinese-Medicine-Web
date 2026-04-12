@@ -281,9 +281,9 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div v-else-if="error" class="flex flex-col items-center justify-center py-20 text-cinnabar/80">
-        <Loader2 class="w-8 h-8 animate-spin mb-2" />
-        <span class="text-sm font-serif">加载出错了，请刷新重试</span>
+      <div v-else-if="error" class="flex flex-col items-center justify-center py-20 text-cinnabar/80 gap-3">
+        <span class="text-sm font-serif">加载出错了，请检查网络后重试</span>
+        <button @click="load()" class="text-xs px-5 py-2 rounded-full border border-cinnabar/40 hover:bg-cinnabar/10 transition-colors">点击重试</button>
       </div>
 
       <!-- 药柜网格：v-memo 仅在被点击项动画时重渲染，减少整表重绘 -->

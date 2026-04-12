@@ -4,12 +4,14 @@ import { useRouter } from "vue-router";
 import { Link, AlertTriangle, Compass, Search, X } from "lucide-vue-next";
 import { supabase } from "@/supabaseClient";
 import { FEATURE_COPY } from "@/constants/branding";
+import { herbalPairingsCache } from "@/composables/usePagePreload";
 
 const router = useRouter();
 const fullPairings = ref([]);
 const browsePairs = ref([]);
 const herbQuery = ref("");
 const loading = ref(false);
+const hasError = ref(false);
 /**
  * 搜索结果必须用 ref（深度响应），不能用 shallowRef：
  * 点击翻转只改 item.isOpen，shallowRef 不会跟踪深层属性，界面不更新。
@@ -83,178 +85,40 @@ function shuffleBrowseBatch() {
 }
 
 // --- 1. 加载全量配伍 + 随机浏览 ---
+let _fetchInFlight = false;
 const fetchRandomPairings = async () => {
+  if (_fetchInFlight) return;
+  hasError.value = false;
+
+  // 命中预加载缓存：直接同步显示，无需 loading
+  if (herbalPairingsCache.length > 0) {
+    fullPairings.value = herbalPairingsCache.map(mapPairingRow);
+    pickRandomBrowse();
+    return;
+  }
+
+  _fetchInFlight = true;
   loading.value = true;
   try {
-    const { data, error } = await supabase
-      .from("herbal_pairings")
-      .select("*")
-      .limit(2000);
+    const { data, error } = await Promise.race([
+      supabase.from("herbal_pairings").select("*").limit(2000),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("timeout")), 8000)
+      ),
+    ]);
 
     if (error) throw error;
 
     const rows = Array.isArray(data) ? data : [];
+    if (rows.length) herbalPairingsCache.push(...rows);
     fullPairings.value = rows.map(mapPairingRow);
     pickRandomBrowse();
   } catch (e) {
-    console.error("获取失败:", e);
-    // 演示数据
-    const demo = [
-      {
-        id: 1,
-        type: "good",
-        left_herb: "枸杞",
-        right_herb: "菊花",
-        effect: "清肝明目",
-        description:
-          "枸杞滋补肝肾，菊花清热解毒。二者搭配，补而不腻，常用于目赤肿痛或视力减退。",
-        isOpen: false,
-      },
-      {
-        id: 2,
-        type: "bad",
-        left_herb: "甘草",
-        right_herb: "甘遂",
-        effect: "十八反",
-        description: "药性相反，同用产生剧烈毒性，损伤元气，属于十八反禁忌。",
-        isOpen: false,
-      },
-      {
-        id: 3,
-        type: "good",
-        left_herb: "黄芪",
-        right_herb: "当归",
-        effect: "气血双补",
-        description:
-          "当归补血活血，黄芪补气生血。气旺则血生，是补血汤的经典配伍。",
-        isOpen: false,
-      },
-      {
-        id: 4,
-        type: "good",
-        left_herb: "陈皮",
-        right_herb: "半夏",
-        effect: "燥湿化痰",
-        description: "陈皮理气，半夏化痰。二药相须为用，大大增强化痰功效。",
-        isOpen: false,
-      },
-      {
-        id: 5,
-        type: "good",
-        left_herb: "人参",
-        right_herb: "莱菔子",
-        effect: "补气消食",
-        description:
-          "虽有人参恶莱菔子之说，但临床上二者同用可防补气太过导致的腹胀。",
-        isOpen: false,
-      },
-      {
-        id: 6,
-        type: "good",
-        left_herb: "麦冬",
-        right_herb: "五味子",
-        effect: "敛肺生津",
-        description:
-          "麦冬养阴，五味子敛肺，合用适于气阴两虚之咳喘口干。",
-        isOpen: false,
-      },
-      {
-        id: 7,
-        type: "good",
-        left_herb: "白芍",
-        right_herb: "甘草",
-        effect: "缓急止痛",
-        description: "芍药甘草汤意，酸甘化阴，舒筋缓急。",
-        isOpen: false,
-      },
-      {
-        id: 8,
-        type: "good",
-        left_herb: "茯苓",
-        right_herb: "白术",
-        effect: "健脾利湿",
-        description: "健脾与渗湿相配，适于脾虚湿困。",
-        isOpen: false,
-      },
-      {
-        id: 9,
-        type: "good",
-        left_herb: "桂枝",
-        right_herb: "白芍",
-        effect: "调和营卫",
-        description: "一散一收，调和营卫，为桂枝汤核心配伍。",
-        isOpen: false,
-      },
-      {
-        id: 10,
-        type: "good",
-        left_herb: "川芎",
-        right_herb: "白芷",
-        effect: "祛风止痛",
-        description: "上行头目，祛风止痛，多用于风寒头痛。",
-        isOpen: false,
-      },
-      {
-        id: 11,
-        type: "good",
-        left_herb: "地黄",
-        right_herb: "山茱萸",
-        effect: "补益肝肾",
-        description: "滋阴固精，常用于肾虚腰酸、遗精等。",
-        isOpen: false,
-      },
-      {
-        id: 12,
-        type: "good",
-        left_herb: "知母",
-        right_herb: "黄柏",
-        effect: "滋阴降火",
-        description: "知母清热滋阴，黄柏泻火，相须用于阴虚火旺。",
-        isOpen: false,
-      },
-      {
-        id: 13,
-        type: "good",
-        left_herb: "柴胡",
-        right_herb: "黄芩",
-        effect: "和解少阳",
-        description: "表里兼顾，和解少阳，小柴胡汤要药。",
-        isOpen: false,
-      },
-      {
-        id: 14,
-        type: "good",
-        left_herb: "桔梗",
-        right_herb: "枳壳",
-        effect: "升降气机",
-        description: "一升一降，宣肺宽中，气机调畅。",
-        isOpen: false,
-      },
-      {
-        id: 15,
-        type: "good",
-        left_herb: "石膏",
-        right_herb: "知母",
-        effect: "清气分热",
-        description: "清热泻火力强，适用于气分大热。",
-        isOpen: false,
-      },
-      {
-        id: 16,
-        type: "good",
-        left_herb: "玄参",
-        right_herb: "麦冬",
-        effect: "养阴润燥",
-        description: "增液润燥，多用于热病伤阴、咽干口燥。",
-        isOpen: false,
-      },
-    ];
-    fullPairings.value = demo.map(mapPairingRow);
-    pickRandomBrowse();
+    console.error("获取配伍失败:", e);
+    hasError.value = true;
   } finally {
-    setTimeout(() => {
-      loading.value = false;
-    }, 800);
+    loading.value = false;
+    _fetchInFlight = false;
   }
 };
 
@@ -331,8 +195,16 @@ onMounted(() => {
         <template v-else> 未找到包含「{{ herbQuery.trim() }}」的配伍记录 </template>
       </p>
 
-      <div class="cabinet-container">
-        <div class="cabinet-inner">
+      <div v-if="hasError" class="error-state">
+        <p class="error-text">配伍数据加载失败，请检查网络后重试</p>
+        <button class="retry-btn" @click="fetchRandomPairings">点击重试</button>
+      </div>
+
+      <div v-else class="cabinet-container">
+        <div v-if="loading" class="cabinet-loading">
+          <span>正在加载配伍数据…</span>
+        </div>
+        <div v-else class="cabinet-inner">
           <div
             v-for="(item, idx) in displayedPairs"
             :key="pairRowKey(item, idx)"
@@ -570,6 +442,44 @@ onMounted(() => {
   .search-field {
     min-width: 0;
   }
+}
+
+.error-state {
+  max-width: 1000px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 60px 20px;
+}
+.error-text {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 1rem;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+.retry-btn {
+  padding: 10px 28px;
+  border: none;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 0.95rem;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  transition: background 0.2s;
+}
+.retry-btn:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+.cabinet-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: #d7ccc8;
+  font-size: 0.95rem;
 }
 
 .cabinet-container {
