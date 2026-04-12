@@ -52,6 +52,13 @@ const viewedUserId = computed(() =>
 const isOwner = computed(
   () => !!user.value?.id && viewedUserId.value === user.value.id,
 );
+/** 当前资料卡对应用户是否为管理员（与「当前登录者是否管理员」区分） */
+const profileOwnerIsAdmin = computed(() => {
+  if (!profile.value) return false;
+  if (profile.value.is_admin) return true;
+  if (isOwner.value && user.value?.email === ADMIN_LOGIN_EMAIL) return true;
+  return false;
+});
 const loading = ref(true);
 const activeTab = ref("plans");
 const PROFILE_TAB_IDS = new Set([
@@ -67,7 +74,12 @@ watch(
   () => route.query.tab,
   (tab) => {
     const t = String(tab || "").trim();
-    if (PROFILE_TAB_IDS.has(t)) activeTab.value = t;
+    if (!PROFILE_TAB_IDS.has(t)) return;
+    if (t === "mailbox" && (!isOwner.value || !isAdmin.value)) {
+      activeTab.value = "plans";
+      return;
+    }
+    activeTab.value = t;
   },
   { immediate: true },
 );
@@ -145,6 +157,52 @@ const mergedMyRecipes = computed(() => {
   );
 });
 
+/** 他人查看且对方将调理方案设为「仅自己可见」时不展示内容与条数 */
+const visitorCannotViewCarePlans = computed(
+  () => !isOwner.value && !!privacySettings.value.plans,
+);
+
+const headerCarePlanCountText = computed(() => {
+  if (visitorCannotViewCarePlans.value) return "—";
+  return String(carePlans.value.length);
+});
+
+const visitorCannotViewHerbs = computed(
+  () => !isOwner.value && !!privacySettings.value.herbs,
+);
+
+const visitorCannotViewSavedRecipes = computed(
+  () => !isOwner.value && !!privacySettings.value.recipes,
+);
+
+/** 访客视角下「收藏」只统计对其可见的药材 + 食谱；二者皆不可见时显示 — */
+const headerFavoritesCountText = computed(() => {
+  if (isOwner.value) {
+    return String(savedRecipes.value.length + favoriteHerbs.value.length);
+  }
+  if (visitorCannotViewHerbs.value && visitorCannotViewSavedRecipes.value) {
+    return "—";
+  }
+  let n = 0;
+  if (!visitorCannotViewHerbs.value) n += favoriteHerbs.value.length;
+  if (!visitorCannotViewSavedRecipes.value) n += savedRecipes.value.length;
+  return String(n);
+});
+
+const profileNavTabs = computed(() => {
+  const tabs = [
+    { id: "plans", icon: FileText, label: "调理方案" },
+    { id: "herbs", icon: Leaf, label: "药材私库" },
+    { id: "recipes", icon: ChefHat, label: "收藏食谱" },
+    { id: "works", icon: ImageIcon, label: "我的作品" },
+    { id: "my_recipes", icon: BookOpen, label: "我的菜谱" },
+  ];
+  if (isOwner.value && isAdmin.value) {
+    tabs.push({ id: "mailbox", icon: Mail, label: "信箱" });
+  }
+  return tabs;
+});
+
 function getMyRecipeStatusLabel(r) {
   if (r._rowSource === "legacy") return "个人菜谱";
   const s = r.moderation_status;
@@ -202,6 +260,7 @@ async function deleteMyRecipeEntry(r) {
     alert("请先登录后再操作");
     return;
   }
+  if (!isOwner.value) return;
   if (!canDeleteMyRecipeEntry(r)) {
     alert("该食谱正在审核中，请等待审核结束后再删除");
     return;
@@ -358,6 +417,7 @@ function openNewRecipeModal(prefill = null) {
     alert("请先登录后再发布菜谱");
     return;
   }
+  if (!isOwner.value) return;
   resetNewRecipeForm();
   if (prefill) {
     newRecipeName.value = String(prefill.name || "").trim();
@@ -405,6 +465,7 @@ async function handlePublishRecipe() {
     alert("请先登录后再发布菜谱");
     return;
   }
+  if (!isOwner.value) return;
   if (!newRecipeName.value.trim()) {
     alert("请填写菜谱名称");
     return;
@@ -493,7 +554,7 @@ async function handlePublishRecipe() {
 
     if (publishToSquare.value) {
       alert(
-        "已提交审核！请在「我的菜谱」查看「审核中」状态，审核结果将在「信箱」通知。",
+        "已提交审核！请在「我的菜谱」查看「审核中」状态，审核通过或驳回后状态会相应更新。",
       );
     } else {
       alert("菜谱已保存为「个人菜谱」（未发布到食谱广场）。");
@@ -553,6 +614,15 @@ async function getProfile() {
   const isRevalidate = loading.value === false && _profileCache.userId === uid;
   if (!isRevalidate) loading.value = true;
   try {
+    const inboxQuery =
+      isOwner.value && isAdmin.value
+        ? supabase
+            .from("inbox_messages")
+            .select("*")
+            .eq("user_id", uid)
+            .order("created_at", { ascending: false })
+        : null;
+
     const [
       { data: profileData },
       { data: herbsData },
@@ -582,11 +652,9 @@ async function getProfile() {
         .select("*")
         .eq("author_user_id", uid)
         .order("created_at", { ascending: false }),
-      supabase
-        .from("inbox_messages")
-        .select("*")
-        .eq("user_id", uid)
-        .order("created_at", { ascending: false }),
+      inboxQuery
+        ? inboxQuery
+        : Promise.resolve({ data: [], error: null }),
     ]);
 
     if (favRecipesErr) console.warn("加载广场收藏失败", favRecipesErr);
@@ -712,9 +780,7 @@ async function getProfile() {
         ? profileData.my_recipes
         : [];
 
-    const userIsAdmin =
-      user.value?.email === ADMIN_LOGIN_EMAIL || !!profileData?.is_admin;
-    if (userIsAdmin) {
+    if (isAdmin.value) {
       const { data: pend, error: pendErr } = await supabase
         .from("recipes")
         .select("*")
@@ -828,6 +894,7 @@ function inferBodyTypeFromAi(recipe) {
 }
 
 function openPublishPrefillFromAi(recipe) {
+  if (!isOwner.value) return;
   const tags = (Array.isArray(recipe?.tags) ? recipe.tags : [])
     .map((x) => String(x || "").trim())
     .filter(Boolean);
@@ -903,6 +970,7 @@ function handleFavoriteHerbImageError(event, herb) {
 
 // --- 删除逻辑 ---
 async function deletePlan(planId) {
+  if (!isOwner.value || !user.value) return;
   if (!confirm("确定删除这条调理记录吗?")) return;
   const newPlans = carePlans.value.filter((p) => p.id !== planId);
   await supabase
@@ -914,6 +982,7 @@ async function deletePlan(planId) {
 
 // 🌟 修复：智能删除 (区分 AI 和 广场)
 async function deleteRecipe(recipe) {
+  if (!isOwner.value || !user.value) return;
   if (!confirm("确定取消收藏该食谱?")) return;
 
   try {
@@ -957,6 +1026,7 @@ async function deleteRecipe(recipe) {
 }
 
 async function deleteHerb(favoriteId) {
+  if (!isOwner.value) return;
   if (!confirm("确定将该药材移出私库吗?")) return;
   const { error } = await supabase
     .from("favorite_herbs")
@@ -974,6 +1044,7 @@ async function deleteWork(workId) {
     alert("请先登录后再操作");
     return;
   }
+  if (!isOwner.value) return;
   if (!confirm("确定要删除这条作业吗？")) return;
 
   try {
@@ -1202,10 +1273,14 @@ onMounted(() => {
   } else {
     getProfile();
   }
-  const returnTab = sessionStorage.getItem('profileReturnTab');
-  if (returnTab) {
-    activeTab.value = returnTab;
-    sessionStorage.removeItem('profileReturnTab');
+  const returnTab = sessionStorage.getItem("profileReturnTab");
+    if (returnTab) {
+    if (returnTab === "mailbox" && (!isOwner.value || !isAdmin.value)) {
+      activeTab.value = "plans";
+    } else if (PROFILE_TAB_IDS.has(returnTab)) {
+      activeTab.value = returnTab;
+    }
+    sessionStorage.removeItem("profileReturnTab");
   }
   window.addEventListener("profile-updated", getProfile);
 });
@@ -1213,6 +1288,20 @@ watch(viewedUserId, (next, prev) => {
   if (!next || next === prev) return;
   getProfile();
 });
+watch(
+  () => [isOwner.value, isAdmin.value],
+  ([own, adm]) => {
+    if (activeTab.value === "mailbox" && (!own || !adm)) {
+      activeTab.value = "plans";
+    }
+    if (!own) {
+      showNewRecipeModal.value = false;
+      isEditingName.value = false;
+      isEditingBio.value = false;
+      selectedMyRecipe.value = null;
+    }
+  },
+);
 onUnmounted(() => {
   window.removeEventListener("profile-updated", getProfile);
 });
@@ -1312,14 +1401,15 @@ function closeAccountMenu() {
               <h1
                 class="text-2xl font-serif font-bold text-white tracking-wide truncate group-hover:opacity-80"
               >
-                {{ username || "点击设置昵称" }}
+                {{ username || (isOwner ? "点击设置昵称" : "未设置昵称") }}
               </h1>
               <span
-                v-if="isAdmin"
+                v-if="profileOwnerIsAdmin"
                 class="text-[10px] px-2 py-0.5 rounded-full bg-white/20 border border-white/30 text-white/95 shrink-0"
                 >管理员</span
               >
               <Edit2
+                v-if="isOwner"
                 class="w-4 h-4 text-white/50 group-hover:text-white transition-colors opacity-0 group-hover:opacity-100"
               />
             </div>
@@ -1352,8 +1442,14 @@ function closeAccountMenu() {
               class="group min-h-[1.5em] flex items-center justify-center sm:justify-start gap-2"
               :class="isOwner ? 'cursor-pointer' : 'cursor-default'"
             >
-              <span>{{ bio || "写一句简介，记录你的养生心得..." }}</span>
+              <span>{{
+                bio ||
+                (isOwner
+                  ? "写一句简介，记录你的养生心得..."
+                  : "暂无简介")
+              }}</span>
               <Edit2
+                v-if="isOwner"
                 class="w-3 h-3 text-white/40 group-hover:text-white/80 opacity-0 group-hover:opacity-100 transition-opacity"
               />
             </div>
@@ -1373,13 +1469,13 @@ function closeAccountMenu() {
           >
             <div>
               <span class="text-white text-lg font-bold block">{{
-                carePlans.length
+                headerCarePlanCountText
               }}</span
               >调理
             </div>
             <div>
               <span class="text-white text-lg font-bold block">{{
-                savedRecipes.length + favoriteHerbs.length
+                headerFavoritesCountText
               }}</span
               >收藏
             </div>
@@ -1399,14 +1495,7 @@ function closeAccountMenu() {
         class="bg-white rounded-xl shadow-sm p-1.5 flex overflow-x-auto gap-2 border border-sandalwood/10 scrollbar-hide"
       >
         <button
-          v-for="tab in [
-            { id: 'plans', icon: FileText, label: '调理方案' },
-            { id: 'herbs', icon: Leaf, label: '药材私库' },
-            { id: 'recipes', icon: ChefHat, label: '收藏食谱' },
-            { id: 'works', icon: ImageIcon, label: '我的作品' },
-            { id: 'my_recipes', icon: BookOpen, label: '我的菜谱' },
-            { id: 'mailbox', icon: Mail, label: '信箱' },
-          ]"
+          v-for="tab in profileNavTabs"
           :key="tab.id"
           @click="activeTab = tab.id"
           class="flex-shrink-0 px-4 py-3 text-sm font-bold font-serif rounded-lg transition-all flex items-center justify-center gap-2 whitespace-nowrap"
@@ -1428,6 +1517,7 @@ function closeAccountMenu() {
           <div class="flex justify-between items-center mb-4 px-2">
             <h3 class="font-bold font-serif text-gray-700">我的调理记录</h3>
             <button
+              v-if="isOwner"
               @click="togglePrivacy('plans')"
               class="text-xs flex items-center gap-1 px-3 py-1.5 rounded-full border transition-all"
               :class="
@@ -1442,8 +1532,33 @@ function closeAccountMenu() {
               />
               {{ privacySettings.plans ? "仅自己可见" : "公开可见" }}
             </button>
+            <span
+              v-else
+              class="text-xs flex items-center gap-1 px-3 py-1.5 rounded-full border border-gray-200 bg-gray-50 text-gray-500"
+            >
+              <component
+                :is="privacySettings.plans ? Lock : Unlock"
+                class="w-3 h-3"
+              />
+              {{ privacySettings.plans ? "仅自己可见" : "公开可见" }}
+            </span>
           </div>
 
+          <div
+            v-if="visitorCannotViewCarePlans"
+            class="text-center py-20 px-4 text-gray-500 bg-white rounded-xl border border-dashed border-sandalwood/10"
+          >
+            <Lock
+              class="w-10 h-10 mx-auto mb-3 text-gray-300"
+              aria-hidden="true"
+            />
+            <p class="font-medium text-gray-600">调理记录已设为私密</p>
+            <p class="text-xs mt-2 text-gray-400">
+              该用户仅自己可见此内容，访客无法查看
+            </p>
+          </div>
+
+          <template v-else>
           <div
             v-if="!carePlans.length"
             class="text-center py-20 text-gray-400 bg-white rounded-xl border border-dashed border-sandalwood/10"
@@ -1458,6 +1573,7 @@ function closeAccountMenu() {
             class="bg-white rounded-xl p-4 shadow-card border border-sandalwood/10 relative group mb-4 font-['KaiTi',cursive]"
           >
             <button
+              v-if="isOwner"
               @click="deletePlan(plan.id)"
               class="absolute top-4 right-4 text-gray-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all p-2 hover:bg-red-50 rounded-full"
             >
@@ -1671,6 +1787,7 @@ function closeAccountMenu() {
               </div>
             </div>
           </div>
+          </template>
         </div>
 
         <div
@@ -1680,6 +1797,7 @@ function closeAccountMenu() {
           <div class="flex justify-between items-center mb-4 px-2">
             <h3 class="font-bold font-serif text-gray-700">收藏的药材</h3>
             <button
+              v-if="isOwner"
               @click="togglePrivacy('herbs')"
               class="text-xs flex items-center gap-1 px-3 py-1.5 rounded-full border transition-all"
               :class="
@@ -1694,9 +1812,33 @@ function closeAccountMenu() {
               />
               {{ privacySettings.herbs ? "仅自己可见" : "公开可见" }}
             </button>
+            <span
+              v-else
+              class="text-xs flex items-center gap-1 px-3 py-1.5 rounded-full border border-gray-200 bg-gray-50 text-gray-500"
+            >
+              <component
+                :is="privacySettings.herbs ? Lock : Unlock"
+                class="w-3 h-3"
+              />
+              {{ privacySettings.herbs ? "仅自己可见" : "公开可见" }}
+            </span>
           </div>
 
-          <div class="grid grid-cols-1 gap-4">
+          <div
+            v-if="visitorCannotViewHerbs"
+            class="text-center py-20 px-4 text-gray-500 bg-white rounded-xl border border-dashed border-sandalwood/10"
+          >
+            <Lock
+              class="w-10 h-10 mx-auto mb-3 text-gray-300"
+              aria-hidden="true"
+            />
+            <p class="font-medium text-gray-600">药材私库已设为私密</p>
+            <p class="text-xs mt-2 text-gray-400">
+              该用户仅自己可见此内容，访客无法查看
+            </p>
+          </div>
+
+          <div v-else class="grid grid-cols-1 gap-4">
             <div
               v-if="!favoriteHerbs.length"
               class="text-center py-20 text-gray-400 bg-white rounded-xl border border-dashed border-sandalwood/10"
@@ -1710,6 +1852,7 @@ function closeAccountMenu() {
               @click="goToHerbDetail(herb.name)"
             >
               <button
+                v-if="isOwner"
                 @click.stop="deleteHerb(herb.favorite_id)"
                 class="absolute top-3 right-3 text-gray-300 hover:text-red-400 p-2 hover:bg-red-50 rounded-full transition-colors opacity-0 group-hover:opacity-100 z-10"
               >
@@ -1772,6 +1915,7 @@ function closeAccountMenu() {
               </button>
             </div>
             <button
+              v-if="isOwner"
               @click="togglePrivacy('recipes')"
               class="text-xs flex items-center gap-1 px-3 py-1.5 rounded-full border transition-all"
               :class="
@@ -1786,8 +1930,33 @@ function closeAccountMenu() {
               />
               {{ privacySettings.recipes ? "仅自己可见" : "公开可见" }}
             </button>
+            <span
+              v-else
+              class="text-xs flex items-center gap-1 px-3 py-1.5 rounded-full border border-gray-200 bg-gray-50 text-gray-500"
+            >
+              <component
+                :is="privacySettings.recipes ? Lock : Unlock"
+                class="w-3 h-3"
+              />
+              {{ privacySettings.recipes ? "仅自己可见" : "公开可见" }}
+            </span>
           </div>
 
+          <div
+            v-if="visitorCannotViewSavedRecipes"
+            class="text-center py-20 px-4 text-gray-500 bg-white rounded-xl border border-dashed border-sandalwood/10"
+          >
+            <Lock
+              class="w-10 h-10 mx-auto mb-3 text-gray-300"
+              aria-hidden="true"
+            />
+            <p class="font-medium text-gray-600">收藏食谱已设为私密</p>
+            <p class="text-xs mt-2 text-gray-400">
+              该用户仅自己可见此内容，访客无法查看
+            </p>
+          </div>
+
+          <template v-else>
           <!-- 广场收藏 子Tab：3列大图卡片 -->
           <div v-if="recipeSubTab === 'market'">
             <div
@@ -1816,6 +1985,7 @@ function closeAccountMenu() {
                     🥣
                   </div>
                   <button
+                    v-if="isOwner"
                     @click.stop="deleteRecipe(recipe)"
                     class="absolute top-1 right-1 bg-black/40 text-white/90 rounded-full p-1 opacity-0 group-hover:opacity-100 transition"
                   >
@@ -1861,6 +2031,7 @@ function closeAccountMenu() {
               class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 relative group transition-all hover:-translate-y-0.5 hover:shadow-lg font-['KaiTi',cursive]"
             >
               <button
+                v-if="isOwner"
                 @click="deleteRecipe(recipe)"
                 class="absolute top-3 right-3 text-gray-300 hover:text-red-400 p-1.5 hover:bg-red-50 rounded-full transition opacity-0 group-hover:opacity-100"
               >
@@ -1929,6 +2100,7 @@ function closeAccountMenu() {
               <!-- 操作按钮 -->
               <div class="flex gap-2">
                 <button
+                  v-if="isOwner"
                   @click="openPublishPrefillFromAi(recipe)"
                   class="flex-1 text-sm py-2 rounded-lg bg-sandalwood/10 text-sandalwood font-medium hover:bg-sandalwood/20 transition flex items-center justify-center gap-1"
                 >
@@ -1943,6 +2115,7 @@ function closeAccountMenu() {
               </div>
             </div>
           </div>
+          </template>
         </div>
 
         <div
@@ -1975,6 +2148,7 @@ function closeAccountMenu() {
               @click="goToHomeworkDetail(work)"
             >
               <button
+                v-if="isOwner"
                 type="button"
                 class="absolute top-2 right-2 z-10 bg-black/40 text-white/80 rounded-full p-1.5 shadow-sm opacity-0 group-hover:opacity-100 transition"
                 @click.stop="deleteWork(work.id)"
@@ -2006,6 +2180,7 @@ function closeAccountMenu() {
           <div class="flex justify-between items-center mb-4 px-2">
             <h3 class="font-bold font-serif text-gray-700">我发布的食谱</h3>
             <button
+              v-if="isOwner"
               type="button"
               class="text-xs bg-sandalwood text-white px-3 py-1.5 rounded-full shadow-sm hover:bg-sandalwood/90 flex items-center gap-1"
               @click="openNewRecipeModal"
@@ -2031,6 +2206,7 @@ function closeAccountMenu() {
               @click="openMyRecipe(recipe)"
             >
               <button
+                v-if="isOwner"
                 type="button"
                 class="absolute top-2 right-2 z-10 rounded-full p-1.5 shadow-sm transition"
                 :class="
@@ -2110,7 +2286,7 @@ function closeAccountMenu() {
         </div>
 
         <div
-          v-else-if="activeTab === 'mailbox'"
+          v-else-if="activeTab === 'mailbox' && isOwner && isAdmin"
           class="animate-in slide-in-from-bottom-4 duration-500"
         >
           <div class="flex justify-between items-center mb-4 px-2">
