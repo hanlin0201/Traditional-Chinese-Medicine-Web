@@ -1014,7 +1014,11 @@ onUnmounted(() => {
   width: 100%;
 }
 .seasonal-mini-head--bento .seasonal-mini-titles {
+  display: flex;
+  flex-direction: column;
   align-items: center;
+  text-align: center;
+  width: 100%;
 }
 .seasonal-mini-main--bento {
   gap: 4px;
@@ -1178,7 +1182,7 @@ onUnmounted(() => {
   overflow: hidden;
   max-width: 100%;
 }
-.seasonal-mini-head {
+.seasonal-mini-head:not(.seasonal-mini-head--bento) {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
