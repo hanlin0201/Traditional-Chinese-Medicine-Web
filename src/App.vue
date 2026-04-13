@@ -129,7 +129,7 @@ provide('openAiCompanion', openAiCompanion)
 
     <main class="relative z-0" :class="mainNavPadClass">
       <RouterView v-slot="{ Component }">
-        <KeepAlive include="RecipeMarket,HomeView">
+        <KeepAlive include="RecipeMarket,HomeView,ProfileView">
           <component :is="Component" />
         </KeepAlive>
       </RouterView>

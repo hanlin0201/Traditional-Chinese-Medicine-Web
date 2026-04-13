@@ -49,12 +49,19 @@ export function setRecipeMarketCachedData(data) {
 }
 
 /** 食谱广场数据有更新（审核/删除）时调用，避免读到旧缓存 */
+export let recipesNeedsRefresh = false
+
 export function clearRecipeMarketCache() {
   try {
     localStorage.removeItem(RECIPE_CACHE_KEY)
+    recipesNeedsRefresh = true
   } catch (e) {
     console.warn('clearRecipeMarketCache failed', e)
   }
+}
+
+export function clearRecipesNeedsRefresh() {
+  recipesNeedsRefresh = false
 }
 
 // 个人中心会话级缓存，供 ProfileView 和预加载共享
@@ -147,10 +154,20 @@ export function onInteractionsLoaded(cb) {
   _interactionsLoadedCallbacks.push(cb)
 }
 
-async function warmInteractions() {
-  if (interactionsCache.loaded) return
+// in-flight 锁：多处并发调用时只发起一次请求，避免数据翻倍
+let _warmInteractionsPromise = null
 
-  // 重试前清空，防止上次部分写入导致数据累加重复
+export function warmInteractions() {
+  if (interactionsCache.loaded) return Promise.resolve()
+  if (_warmInteractionsPromise) return _warmInteractionsPromise
+  _warmInteractionsPromise = _doWarmInteractions().finally(() => {
+    _warmInteractionsPromise = null
+  })
+  return _warmInteractionsPromise
+}
+
+async function _doWarmInteractions() {
+  // 清空，防止上次部分写入导致数据累加重复
   interactionsCache.comments = {}
   interactionsCache.homeworks = {}
   interactionsCache.homeworksById = {}
@@ -204,6 +221,21 @@ async function warmInteractions() {
   }
 }
 
+// 模块级 Promise，供 ProfileView 在 onMounted 中 await 等待预热完成
+let _warmProfilePromise = null
+
+/** 在 main.js 中 initAuth 后调用，提前预热个人中心缓存，不阻塞渲染 */
+export function kickoffWarmProfile() {
+  if (_warmProfilePromise) return _warmProfilePromise
+  _warmProfilePromise = warmProfile().finally(() => { _warmProfilePromise = null })
+  return _warmProfilePromise
+}
+
+/** ProfileView 在 onMounted 中调用，等待已启动的预热完成 */
+export function getWarmProfilePromise() {
+  return _warmProfilePromise
+}
+
 async function warmProfile() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return
@@ -226,20 +258,33 @@ async function warmProfile() {
 
   if (!profileData) return
 
-  // 收藏药材（同时并行拉 identity_tag，避免 ProfileView 初始显示回退文字）
+  // 收藏药材
   const rawHerbs = (herbsData || []).map((item) => ({
     ...item.herb,
     favorite_id: item.id,
     saved_at: item.created_at,
   }))
   const herbNames = rawHerbs.map(h => h.name).filter(Boolean)
+  const recipeIds = (favRecsLinkData || []).map(f => f.recipe_id)
+
+  // 次级查询全部并行：herbseasy identity_tag + 收藏食谱详情
+  const [
+    { data: easyData },
+    { data: recipeDetails },
+  ] = await Promise.all([
+    herbNames.length
+      ? supabase.from('herbseasy').select('*').in('name', herbNames)
+      : Promise.resolve({ data: null }),
+    recipeIds.length
+      ? supabase.from('recipes').select('*').in('id', recipeIds)
+      : Promise.resolve({ data: null }),
+  ])
+
+  // 填充 herbEasyCache 和 identity_tag
   let identityTagMap = {}
-  if (herbNames.length) {
-    const { data: easyData } = await supabase.from('herbseasy').select('*').in('name', herbNames)
-    if (easyData) {
-      easyData.forEach(e => { if (e.name) herbEasyCache.set(e.name, e) })
-      identityTagMap = Object.fromEntries(easyData.map(e => [e.name, e.identity_tag]))
-    }
+  if (easyData) {
+    easyData.forEach(e => { if (e.name) herbEasyCache.set(e.name, { ...e }) })
+    identityTagMap = Object.fromEntries(easyData.map(e => [e.name, e.identity_tag]))
   }
   const favoriteHerbs = rawHerbs.map(h => ({ ...h, identity_tag: identityTagMap[h.name] ?? null }))
   // 填充药材详情缓存，供 HerbDetailView 秒开
@@ -247,21 +292,17 @@ async function warmProfile() {
 
   // 广场收藏食谱
   let marketRecipes = []
-  if (favRecsLinkData && favRecsLinkData.length > 0) {
-    const recipeIds = favRecsLinkData.map((f) => f.recipe_id)
-    const { data: recipeDetails } = await supabase.from('recipes').select('*').in('id', recipeIds)
-    if (recipeDetails) {
-      const recipeMap = Object.fromEntries(recipeDetails.map((r) => [r.id, r]))
-      marketRecipes = favRecsLinkData
-        .filter((f) => recipeMap[f.recipe_id])
-        .map((f) => ({
-          ...recipeMap[f.recipe_id],
-          favorite_id: f.id,
-          saved_at: f.created_at,
-          is_ai: false,
-          tags: recipeMap[f.recipe_id].tags || ['广场精选'],
-        }))
-    }
+  if (recipeDetails && favRecsLinkData && favRecsLinkData.length > 0) {
+    const recipeMap = Object.fromEntries(recipeDetails.map((r) => [r.id, r]))
+    marketRecipes = favRecsLinkData
+      .filter((f) => recipeMap[f.recipe_id])
+      .map((f) => ({
+        ...recipeMap[f.recipe_id],
+        favorite_id: f.id,
+        saved_at: f.created_at,
+        is_ai: false,
+        tags: recipeMap[f.recipe_id].tags || ['广场精选'],
+      }))
   }
 
   // AI 保存食谱

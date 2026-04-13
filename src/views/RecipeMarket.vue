@@ -13,7 +13,7 @@ import { supabase } from '@/supabaseClient'
 import { useAuth } from '@/composables/useAuth'
 import { SOLAR_TERMS_LOOKUP } from '@/constants/solarTerms'
 import { BODY_TYPES, EFFICACY_OPTIONS, TIME_RANGES, parseTimeToMinutes } from '@/constants/recipeFilters'
-import { getRecipeMarketCachedData, setRecipeMarketCachedData, interactionsCache, onInteractionsLoaded } from '@/composables/usePagePreload'
+import { getRecipeMarketCachedData, setRecipeMarketCachedData, interactionsCache, onInteractionsLoaded, warmInteractions, recipesNeedsRefresh, clearRecipesNeedsRefresh } from '@/composables/usePagePreload'
 import { getUserDisplayInfo, DEFAULT_USER_DISPLAY_NAME } from '@/utils/userDisplay'
 import { FEATURE_COPY } from '@/constants/branding'
 
@@ -431,20 +431,34 @@ const submitHomework = async () => {
     if (dbError) throw dbError
 
     alert('作业发布成功！')
-    
-    // 手动 +1（本地 + 数据库）
-    selectedRecipe.value.cooked_count = (selectedRecipe.value.cooked_count || 0) + 1
-    await supabase
-      .from('recipes')
-      .update({ cooked_count: selectedRecipe.value.cooked_count })
-      .eq('id', selectedRecipe.value.id)
-    
     closeUploadModal()
-    // 优先把新作业插入到本地列表顶部，避免等待网络
+
     if (inserted) {
-      homeworks.value = [inserted, ...homeworks.value]
+      // 构建带展示信息的作业对象（与 warmInteractions 中的 enriched 结构一致）
+      const enriched = {
+        ...inserted,
+        user_display_name: getCurrentUserDisplayName(),
+        user_display_avatar: currentUserProfile.value?.avatar_url || null,
+      }
+
+      // 同步写入互动缓存，保证后续 applyInteractions 不会把这条新作业覆盖掉
+      const rid = inserted.recipe_id
+      if (!interactionsCache.homeworks[rid]) interactionsCache.homeworks[rid] = []
+      interactionsCache.homeworks[rid] = [enriched, ...interactionsCache.homeworks[rid]]
+      interactionsCache.homeworksById[String(inserted.id)] = enriched
+
+      // 立即更新当前显示列表
+      homeworks.value = [enriched, ...homeworks.value]
+
+      // 同步更新食谱列表和详情里的「几人做过」计数
+      const newCount = homeworks.value.length
+      if (selectedRecipe.value) selectedRecipe.value.cooked_count = newCount
+      const recipeInList = recipes.value.find(r => r.id === rid)
+      if (recipeInList) recipeInList.cooked_count = newCount
+
+      // 异步持久化计数到数据库（不阻塞 UI）
+      supabase.from('recipes').update({ cooked_count: newCount }).eq('id', rid)
     }
-    fetchInteractions(selectedRecipe.value.id)
     
   } catch (e) {
     alert(`发布失败: ${e.message}`)
@@ -596,10 +610,18 @@ const handleHerbClick = (item) => {
 onMounted(() => {
   applySearchKeywordFromQuery()
   fetchRecipes()
+  // 若直接刷新 RecipeMarket（未经首页预加载），也触发互动数据加载
+  // 保证「几人做过」能从 homeworks 正确计算，不依赖 DB 上可能过期的计数器
+  warmInteractions()
 })
 
 onActivated(() => {
   applySearchKeywordFromQuery()
+  // 若上游（审核通过/删除食谱）清空了缓存，强制重新拉取列表
+  if (recipesNeedsRefresh) {
+    recipes.value = []
+    clearRecipesNeedsRefresh()
+  }
   if (recipes.value.length === 0) fetchRecipes()
   const pendingId = route.query.open_id
   if (pendingId) {

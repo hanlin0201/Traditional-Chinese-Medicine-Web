@@ -1,6 +1,7 @@
 
 <script setup>
-import { onMounted, onUnmounted, ref, computed, watch } from "vue";
+import { onMounted, onUnmounted, onActivated, ref, computed, watch } from "vue";
+defineOptions({ name: 'ProfileView' })
 import { useRouter, useRoute } from "vue-router";
 import { supabase } from "@/supabaseClient";
 import { useAuth } from "@/composables/useAuth";
@@ -8,7 +9,7 @@ import RecipeMarketDetailModal from "@/components/RecipeMarketDetailModal.vue";
 import { SOLAR_TERMS_LOOKUP } from "@/constants/solarTerms";
 import { BODY_TYPES } from "@/constants/recipeFilters";
 import { ADMIN_LOGIN_EMAIL } from "@/utils/loginEmail";
-import { clearRecipeMarketCache, profileCache as _profileCache, prefetchHomeworkDetail } from "@/composables/usePagePreload";
+import { clearRecipeMarketCache, profileCache as _profileCache, prefetchHomeworkDetail, getWarmProfilePromise, herbDetailCache, setHerbEasyCache } from "@/composables/usePagePreload";
 import {
   Trash2,
   ChevronDown,
@@ -60,6 +61,12 @@ const profileOwnerIsAdmin = computed(() => {
   return false;
 });
 const loading = ref(true);
+// 防回写：记录每次 getProfile 的请求序号，以及各本地数组的修改版本
+let _lastReqId = 0
+let _plansVer = 0
+let _herbsVer = 0
+let _recipesVer = 0
+let _worksVer = 0
 const activeTab = ref("plans");
 const PROFILE_TAB_IDS = new Set([
   "plans",
@@ -613,6 +620,12 @@ async function getProfile() {
   if (!uid) return;
   const isRevalidate = loading.value === false && _profileCache.userId === uid;
   if (!isRevalidate) loading.value = true;
+  // 请求序号 + 各数组本地版本快照（用于防旧请求回写覆盖本地删除）
+  const reqId = ++_lastReqId
+  const plansVerSnap = _plansVer
+  const herbsVerSnap = _herbsVer
+  const recipesVerSnap = _recipesVer
+  const worksVerSnap = _worksVer
   try {
     const inboxQuery =
       isOwner.value && isAdmin.value
@@ -679,9 +692,11 @@ async function getProfile() {
         recipes: profileData.is_saved_private ?? false,
         herbs: profileData.is_herbs_private ?? false,
       };
-      carePlans.value = (profileData.care_plans || []).sort(
-        (a, b) => new Date(b.saved_at) - new Date(a.saved_at),
-      );
+      if (reqId === _lastReqId && plansVerSnap === _plansVer) {
+        carePlans.value = (profileData.care_plans || []).sort(
+          (a, b) => new Date(b.saved_at) - new Date(a.saved_at),
+        );
+      }
       if (
         profileData.saved_recipes &&
         Array.isArray(profileData.saved_recipes)
@@ -698,7 +713,7 @@ async function getProfile() {
       }
     }
 
-    if (herbsData) {
+    if (herbsData && reqId === _lastReqId && herbsVerSnap === _herbsVer) {
       // 保留已有的 identity_tag，避免后台刷新时短暂显示回退文字
       const existingTagMap = Object.fromEntries(
         favoriteHerbs.value.filter((h) => h.identity_tag).map((h) => [h.name, h.identity_tag])
@@ -709,16 +724,21 @@ async function getProfile() {
         saved_at: item.created_at,
         identity_tag: existingTagMap[item.herb?.name] ?? undefined,
       }));
-      // 只补充缺少 identity_tag 的药材
+      // 写入 herbDetailCache：让点击收藏药材后详情页秒开，无需等待
+      favoriteHerbs.value.forEach((h) => {
+        if (h?.name) herbDetailCache.set(h.name, h);
+      });
+      // 补充缺少 identity_tag 的药材，同时写入完整 herbEasyCache 供详情页简单模式使用
       const herbNames = favoriteHerbs.value.filter((h) => !h.identity_tag).map((h) => h.name).filter(Boolean);
       if (herbNames.length) {
         supabase
           .from("herbseasy")
-          .select("name, identity_tag")
+          .select("*")
           .in("name", herbNames)
           .then(({ data: easyData }) => {
             if (easyData) {
               const easyMap = Object.fromEntries(easyData.map((e) => [e.name, e.identity_tag]));
+              easyData.forEach((e) => { if (e?.name) setHerbEasyCache(e.name, e); });
               favoriteHerbs.value = favoriteHerbs.value.map((h) => ({
                 ...h,
                 identity_tag: h.identity_tag ?? easyMap[h.name] ?? null,
@@ -732,16 +752,26 @@ async function getProfile() {
     let marketRecipes = [];
     if (favRecsLinkData && favRecsLinkData.length > 0) {
       const recipeIds = favRecsLinkData.map((f) => f.recipe_id);
-      const { data: recipeDetails, error: recipeDetailsErr } = await supabase
-        .from("recipes")
-        .select("*")
-        .in("id", recipeIds);
+      // 食谱详情与作业计数并行查询，消除串行等待
+      const [
+        { data: recipeDetails, error: recipeDetailsErr },
+        { data: hwData },
+      ] = await Promise.all([
+        supabase.from("recipes").select("*").in("id", recipeIds),
+        supabase.from("homeworks").select("recipe_id").in("recipe_id", recipeIds),
+      ]);
       if (recipeDetailsErr)
         console.warn("加载广场收藏详情失败", recipeDetailsErr);
       if (recipeDetails) {
         const recipeMap = Object.fromEntries(
           recipeDetails.map((r) => [r.id, r]),
         );
+        const hwCount = {};
+        if (hwData) {
+          hwData.forEach((h) => {
+            hwCount[h.recipe_id] = (hwCount[h.recipe_id] || 0) + 1;
+          });
+        }
         marketRecipes = favRecsLinkData
           .filter((f) => recipeMap[f.recipe_id])
           .map((f) => ({
@@ -749,31 +779,20 @@ async function getProfile() {
             favorite_id: f.id,
             saved_at: f.created_at,
             is_ai: false,
+            cooked_count: hwCount[f.recipe_id] || 0,
             tags: recipeMap[f.recipe_id].tags || ["广场精选"],
           }));
-
-        // 用 homeworks 表的真实数量覆盖 cooked_count
-        const { data: hwData } = await supabase
-          .from("homeworks")
-          .select("recipe_id")
-          .in("recipe_id", recipeIds);
-        if (hwData) {
-          const hwCount = {};
-          hwData.forEach((h) => {
-            hwCount[h.recipe_id] = (hwCount[h.recipe_id] || 0) + 1;
-          });
-          marketRecipes = marketRecipes.map((r) => ({
-            ...r,
-            cooked_count: hwCount[r.id] || 0,
-          }));
-        }
       }
     }
-    savedRecipes.value = [...marketRecipes, ...aiRecipes].sort(
-      (a, b) => new Date(b.saved_at) - new Date(a.saved_at),
-    );
+    if (reqId === _lastReqId && recipesVerSnap === _recipesVer) {
+      savedRecipes.value = [...marketRecipes, ...aiRecipes].sort(
+        (a, b) => new Date(b.saved_at) - new Date(a.saved_at),
+      );
+    }
 
-    if (worksData) myWorks.value = worksData;
+    if (worksData && reqId === _lastReqId && worksVerSnap === _worksVer) {
+      myWorks.value = worksData;
+    }
     // 旧版 JSON：profiles.my_recipes
     myRecipes.value =
       profileData?.my_recipes && Array.isArray(profileData.my_recipes)
@@ -977,6 +996,7 @@ async function deletePlan(planId) {
     .from("profiles")
     .update({ care_plans: newPlans })
     .eq("id", user.value.id);
+  _plansVer++
   carePlans.value = newPlans;
 }
 
@@ -1003,6 +1023,7 @@ async function deleteRecipe(recipe) {
         .eq("id", user.value.id);
 
       // 更新前端
+      _recipesVer++
       savedRecipes.value = savedRecipes.value.filter(
         (r) => !(r.id === recipe.id && !!r.is_ai === !!recipe.is_ai),
       );
@@ -1015,6 +1036,7 @@ async function deleteRecipe(recipe) {
       if (error) throw error;
 
       // 更新前端
+      _recipesVer++
       savedRecipes.value = savedRecipes.value.filter(
         (r) => !(r.id === recipe.id && !!r.is_ai === !!recipe.is_ai),
       );
@@ -1032,10 +1054,12 @@ async function deleteHerb(favoriteId) {
     .from("favorite_herbs")
     .delete()
     .eq("id", favoriteId);
-  if (!error)
+  if (!error) {
+    _herbsVer++
     favoriteHerbs.value = favoriteHerbs.value.filter(
       (h) => h.favorite_id !== favoriteId,
     );
+  }
 }
 
 // 删除跟做作业
@@ -1056,6 +1080,7 @@ async function deleteWork(workId) {
 
     if (error) throw error;
 
+    _worksVer++
     myWorks.value = myWorks.value.filter((w) => w.id !== workId);
     saveProfilePayload();
   } catch (e) {
@@ -1260,21 +1285,39 @@ function formatDate(isoString) {
   });
 }
 
-onMounted(() => {
-  if (
-    isOwner.value &&
-    user.value &&
-    _profileCache.userId === user.value.id &&
-    _profileCache.payload
-  ) {
-    applyProfilePayload(_profileCache.payload);
-    loading.value = false;
-    getProfile(); // 后台刷新，不阻塞界面
+// 所有 ref 和函数都已声明：同步应用缓存，避免首帧 loading 闪烁
+if (
+  isOwner.value && user.value &&
+  _profileCache.userId === user.value.id && _profileCache.payload
+) {
+  applyProfilePayload(_profileCache.payload)
+  loading.value = false
+}
+
+onMounted(async () => {
+  if (loading.value === false) {
+    // 缓存已在 setup 阶段同步应用，直接后台静默刷新
+    getProfile();
+  } else if (isOwner.value && user.value) {
+    // 无缓存：等待 main.js 预热完成后再次检查（刷新直接进个人主页时有效）
+    const warmPromise = getWarmProfilePromise();
+    if (warmPromise) {
+      await warmPromise;
+      if (_profileCache.userId === user.value.id && _profileCache.payload) {
+        applyProfilePayload(_profileCache.payload);
+        loading.value = false;
+        getProfile(); // 后台静默刷新
+      } else {
+        getProfile();
+      }
+    } else {
+      getProfile();
+    }
   } else {
     getProfile();
   }
   const returnTab = sessionStorage.getItem("profileReturnTab");
-    if (returnTab) {
+  if (returnTab) {
     if (returnTab === "mailbox" && (!isOwner.value || !isAdmin.value)) {
       activeTab.value = "plans";
     } else if (PROFILE_TAB_IDS.has(returnTab)) {
@@ -1283,6 +1326,18 @@ onMounted(() => {
     sessionStorage.removeItem("profileReturnTab");
   }
   window.addEventListener("profile-updated", getProfile);
+});
+
+// KeepAlive 激活（从 WorkDetail 等子页返回）：后台静默刷新，不显示 loading
+let _isFirstActivation = true;
+onActivated(() => {
+  if (_isFirstActivation) {
+    _isFirstActivation = false;
+    return; // 首次激活由 onMounted 处理
+  }
+  if (user.value) {
+    getProfile(); // isRevalidate 检查确保 loading 保持 false
+  }
 });
 watch(viewedUserId, (next, prev) => {
   if (!next || next === prev) return;
