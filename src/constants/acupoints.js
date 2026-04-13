@@ -1,6 +1,5 @@
 /**
- * 十四经穴 + 经外穴 穴位数据
- * 按经脉分组，每组包含所有穴位名称
+ * 十四经穴数据（按经脉分组，每组包含所有穴位名称）
  */
 
 export const MERIDIAN_GROUPS = [
@@ -171,22 +170,6 @@ export const MERIDIAN_GROUPS = [
       '璇玑','天突','廉泉','承浆',
     ],
   },
-
-  // ========== 经外穴 ==========
-  {
-    category: '经外穴',
-    id: 'jing-wai-xue',
-    name: '经外穴',
-    color: '#5D4037',
-    points: [
-      '四神聪','当阳','印堂','鱼腰','太阳','耳尖','球后','上迎香','内迎香',
-      '聚泉','海泉','金津','玉液','翳明','颈百劳','子宫','定喘','夹脊',
-      '胃脘下俞','痞根','下极俞','腰宜','腰眼','十七椎','腰奇','肘尖',
-      '二白','中泉','中魁','大骨空','小骨空','腰痛点','外劳宫','八邪',
-      '四缝','十宣','髋骨','鹤顶','百虫窝','内膝眼','膝眼','胆囊',
-      '阑尾','内踝尖','外踝尖','八风','独阴','气端',
-    ],
-  },
 ]
 
 /**
@@ -213,7 +196,7 @@ export function normalizeAcupointLookupName(name) {
   return s
 }
 
-/** 按穴位名精确查找所属经脉（十四经与经外穴数据内名称唯一） */
+/** 按穴位名精确查找所属经脉（十四经数据内名称唯一） */
 export function findMeridianForPoint(pointName) {
   if (!pointName || !String(pointName).trim()) return null
   const raw = String(pointName).trim()
