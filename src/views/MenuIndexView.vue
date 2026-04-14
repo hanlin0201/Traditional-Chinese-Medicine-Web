@@ -1683,10 +1683,10 @@ onUnmounted(() => {
   font-size: clamp(1.12rem, 2.6vw, 1.48rem);
 }
 .tcm-home-hero .seasonal-mini-card--left-tall .term-name-mini--bento {
-  font-size: clamp(1.34rem, 3.0vw, 1.74rem);
+  font-size: clamp(1.46rem, 3.2vw, 1.86rem);
 }
 .tcm-home-hero .term-count-mini {
-  font-size: 0.88rem;
+  font-size: 0.96rem;
   color: #0a0a0a;
 }
 .tcm-home-hero .term-principle-mini {
@@ -1697,13 +1697,13 @@ onUnmounted(() => {
   font-size: 0.74rem;
 }
 .tcm-home-hero .seasonal-mini-card--left-tall .term-principle-mini--bento {
-  font-size: 0.86rem;
+  font-size: 0.94rem;
 }
 .tcm-home-hero .advice-inline--bento {
   font-size: 0.7rem;
 }
 .tcm-home-hero .seasonal-mini-card--left-tall .advice-inline--bento {
-  font-size: 0.81rem;
+  font-size: 0.89rem;
 }
 .tcm-home-hero .advice-inline-good,
 .tcm-home-hero .advice-inline-bad {
