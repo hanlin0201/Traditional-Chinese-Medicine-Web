@@ -1007,6 +1007,14 @@ onUnmounted(() => {
 }
 .seasonal-mini-main--bento {
   gap: 4px;
+  align-items: center;
+  text-align: center;
+}
+.seasonal-mini-card--bento .seasonal-mini-term-row {
+  justify-content: center;
+}
+.seasonal-mini-card--bento .term-count-mini {
+  font-family: "Ma Shan Zheng", serif;
 }
 .term-name-mini--bento {
   font-size: clamp(1.05rem, 2.4vw, 1.35rem);
@@ -1018,10 +1026,14 @@ onUnmounted(() => {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  font-family: "Ma Shan Zheng", serif;
+  text-align: center;
 }
 .advice-inline--bento {
   font-size: 0.62rem;
   gap: 6px 10px;
+  font-family: "Ma Shan Zheng", serif;
+  justify-content: center;
 }
 .seasonal-mini-recipes--bento {
   margin-top: 0.35rem;
@@ -1029,9 +1041,11 @@ onUnmounted(() => {
 }
 .seasonal-mini-recipes--bento .seasonal-mini-recipes-head {
   margin-bottom: 6px;
+  justify-content: center;
 }
 .mini-recipe-chips--bento {
   gap: 6px;
+  justify-content: center;
 }
 .mini-recipe-chip--bento {
   width: 44px;
@@ -1669,10 +1683,10 @@ onUnmounted(() => {
   font-size: clamp(1.12rem, 2.6vw, 1.48rem);
 }
 .tcm-home-hero .seasonal-mini-card--left-tall .term-name-mini--bento {
-  font-size: clamp(1.22rem, 2.8vw, 1.62rem);
+  font-size: clamp(1.34rem, 3.0vw, 1.74rem);
 }
 .tcm-home-hero .term-count-mini {
-  font-size: 0.8rem;
+  font-size: 0.88rem;
   color: #0a0a0a;
 }
 .tcm-home-hero .term-principle-mini {
@@ -1683,13 +1697,13 @@ onUnmounted(() => {
   font-size: 0.74rem;
 }
 .tcm-home-hero .seasonal-mini-card--left-tall .term-principle-mini--bento {
-  font-size: 0.78rem;
+  font-size: 0.86rem;
 }
 .tcm-home-hero .advice-inline--bento {
   font-size: 0.7rem;
 }
 .tcm-home-hero .seasonal-mini-card--left-tall .advice-inline--bento {
-  font-size: 0.73rem;
+  font-size: 0.81rem;
 }
 .tcm-home-hero .advice-inline-good,
 .tcm-home-hero .advice-inline-bad {
