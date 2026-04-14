@@ -68,37 +68,45 @@ Deno.serve(async (req: Request) => {
       if (userSaysAllFine) {
         hint = "用户表示一切良好，请停止追问，简短祝福即可。严禁输出 JSON。";
       } else if (isGeneralQuestion) {
-        hint = "用户在问知识类问题，请直接回答，不要追问症状。严禁输出 JSON。";
+        hint = "用户在问知识类问题或日常闲聊，请直接回答，不要追问症状。严禁输出 JSON。";
       } else if (userJustConfirmed) {
         hint = `用户已确认没有其他症状或要求直接开方，请立即结束问诊，输出详细的处方 JSON 卡片（type: "prescription"）。\n${SAFETY_PROMPT}\n格式要求：${FORMAT_PROMPT}`;
       } else {
         const needMoreRounds = isVagueSymptom
           ? userTurnCount < 5
           : userTurnCount < 4;
-        if (needMoreRounds) {
-          // 判断对话中是否已经问过舌苔
-          const tongueAsked = messages.some(
-            (m: { role: string; content: string }) =>
-              m.role === "assistant" && (m.content || "").includes("舌苔"),
-          );
-          const tongueHint = tongueAsked
-            ? "（舌苔已询问过，本轮请从其他角度追问，不要重复已问过的问题）"
-            : "【本轮必须询问舌苔情况】（舌色是红/淡/暗？苔是白/黄/厚/薄/腻？）";
 
+        // 判断对话中是否已经问过舌苔
+        const tongueAsked = messages.some(
+          (m: { role: string; content: string }) =>
+            m.role === "assistant" && (m.content || "").includes("舌苔"),
+        );
+        const tongueHint = tongueAsked
+          ? "（舌苔已询问过，本轮请从其他角度追问，不要重复已问过的问题）"
+          : "【本轮必须询问舌苔情况】（舌色是红/淡/暗？苔是白/黄/厚/薄/腻？）";
+
+        let inquiryHint = "";
+        if (needMoreRounds) {
           if (isVagueSymptom) {
-            hint = `【重要】用户描述较模糊，必须多维度追问，当前仅第 ${userTurnCount} 轮，【绝对不要】急于开方！${tongueHint}\n${INQUIRY_PROMPT}`;
+            inquiryHint = `用户描述较模糊，必须多维度追问，当前仅第 ${userTurnCount} 轮，【绝对不要】急于开方！${tongueHint}\n${INQUIRY_PROMPT}`;
           } else if (userNeedsPlanCard) {
-            hint = `【重要】用户想要调理方案，但当前第 ${userTurnCount} 轮信息尚不充分，【绝对不要】输出 prescription！${tongueHint}\n${INQUIRY_PROMPT}`;
+            inquiryHint = `用户想要调理方案，但当前第 ${userTurnCount} 轮信息尚不充分，【绝对不要】输出 prescription！${tongueHint}\n${INQUIRY_PROMPT}`;
           } else {
-            hint = `【重要】当前问诊第 ${userTurnCount} 轮，除非用户明确说"直接开方"，否则【绝对不要】输出 prescription！${tongueHint}\n${INQUIRY_PROMPT}`;
+            inquiryHint = `当前问诊第 ${userTurnCount} 轮，除非用户明确说"直接开方"，否则【绝对不要】输出 prescription！${tongueHint}\n${INQUIRY_PROMPT}`;
           }
         } else {
           if (userNeedsPlanCard) {
-            hint = `【进度提示】问诊已进行 ${userTurnCount} 轮，用户明确请求方案，请立即输出处方。\n${SAFETY_PROMPT}\n格式要求：${FORMAT_PROMPT}`;
+            inquiryHint = `问诊已进行 ${userTurnCount} 轮，用户明确请求方案，请立即输出处方。\n${SAFETY_PROMPT}\n格式要求：${FORMAT_PROMPT}`;
           } else {
-            hint = `【进度提示】问诊已进行 ${userTurnCount} 轮。如果核心症状、舌象等信息已足够，请直接输出处方；否则继续追问。\n${SAFETY_PROMPT}\n格式要求：${FORMAT_PROMPT}\n如继续追问：${INQUIRY_PROMPT}`;
+            inquiryHint = `问诊已进行 ${userTurnCount} 轮。如果核心症状、舌象等信息已足够，请直接输出处方；否则继续追问。\n${SAFETY_PROMPT}\n格式要求：${FORMAT_PROMPT}\n如继续追问：${INQUIRY_PROMPT}`;
           }
         }
+
+        hint = `【意图判断——此项优先级最高，凌驾于下方所有指令】
+请先判断用户本轮输入是否属于"描述自身症状或寻求健康调理"：
+- 若【否】（包括：询问历史人物、中医常识、养生知识、闲聊、发表情符号等）→ 直接用自然语言回答，回答后立即停止，忽略下方全部问诊指令，严禁输出任何 JSON。
+- 若【是】（用户描述了身体不适、病症或明确请求调理方案）→ 执行下方问诊指令：
+${inquiryHint}`;
       }
 
       //  如果是有过历史处方的复诊，提醒 AI 可参考历史上下文（而非忘掉）
