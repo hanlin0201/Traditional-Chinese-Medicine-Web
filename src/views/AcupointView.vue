@@ -516,7 +516,7 @@ watch(() => route.query.point, () => applyAcupointRouteQuery(), { immediate: tru
               {{ activeMeridian.name }}
             </div>
           </div>
-          <!-- 未选择经脉 / 无示意图 -->
+          <!-- 未选择经脉 / 经外穴无图片 -->
           <div v-else class="placeholder-body">
             <div class="placeholder-text">
               <span class="placeholder-icon">🧘</span>
