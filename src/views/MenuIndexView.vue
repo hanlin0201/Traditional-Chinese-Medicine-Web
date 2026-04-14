@@ -333,17 +333,20 @@ onUnmounted(() => {
                   class="bento-tile bento-tile--seasonal seasonal-mini-card seasonal-mini-card--bento seasonal-mini-card--left-tall seasonal-card-enter"
                 >
                   <div class="seasonal-mini-head seasonal-mini-head--bento">
-                    <div class="seasonal-mini-titles">
-                      <span class="seasonal-mini-eyebrow">{{
-                        FEATURE_COPY.seasonal.title
-                      }}</span>
-                      <span class="seasonal-mini-motto">{{
-                        FEATURE_COPY.seasonal.motto
+                    <div class="seasonal-mini-head-bento-top">
+                      <div class="seasonal-mini-head-bento-left">
+                        <span class="seasonal-mini-eyebrow">{{
+                          FEATURE_COPY.seasonal.title
+                        }}</span>
+                        <span
+                          class="seasonal-mini-motto seasonal-mini-motto--bento"
+                          >{{ FEATURE_COPY.seasonal.motto }}</span
+                        >
+                      </div>
+                      <span class="today-pill today-pill--mini">{{
+                        todayLabel
                       }}</span>
                     </div>
-                    <span class="today-pill today-pill--mini">{{
-                      todayLabel
-                    }}</span>
                   </div>
                   <div class="seasonal-mini-main seasonal-mini-main--bento">
                     <div class="seasonal-mini-term-row">
@@ -1006,19 +1009,34 @@ onUnmounted(() => {
 }
 .seasonal-mini-head--bento {
   margin-bottom: 0.35rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 0.45rem;
   width: 100%;
 }
-.seasonal-mini-head--bento .seasonal-mini-titles {
+.seasonal-mini-head-bento-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  width: 100%;
+  gap: 0.5rem;
+}
+.seasonal-mini-head-bento-left {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  text-align: center;
-  width: 100%;
+  align-items: flex-start;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 1;
+  text-align: left;
+}
+.seasonal-mini-head-bento-left .seasonal-mini-eyebrow {
+  text-align: left;
+}
+.seasonal-mini-head-bento-top .today-pill--mini {
+  flex-shrink: 0;
+}
+.seasonal-mini-motto--bento {
+  display: block;
+  text-align: left;
+  max-width: 100%;
 }
 .seasonal-mini-main--bento {
   gap: 4px;
@@ -1030,10 +1048,10 @@ onUnmounted(() => {
   justify-content: center;
 }
 .term-name-mini--bento {
-  font-size: clamp(1.05rem, 2.4vw, 1.35rem);
+  font-size: clamp(1.38rem, 3.24vw, 1.82rem);
 }
 .term-principle-mini--bento {
-  font-size: 0.68rem;
+  font-size: 0.91rem;
   line-height: 1.45;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -1043,7 +1061,7 @@ onUnmounted(() => {
   max-width: 100%;
 }
 .advice-inline--bento {
-  font-size: 0.62rem;
+  font-size: 0.84rem;
   gap: 6px 10px;
   justify-content: center;
 }
@@ -1078,14 +1096,14 @@ onUnmounted(() => {
   margin-bottom: 0.5rem;
 }
 .seasonal-mini-card--left-tall .term-name-mini--bento {
-  font-size: clamp(1.15rem, 2.6vw, 1.52rem);
+  font-size: clamp(1.54rem, 3.48vw, 2.02rem);
 }
 .seasonal-mini-card--left-tall .term-principle-mini--bento {
-  font-size: 0.72rem;
+  font-size: 0.96rem;
   -webkit-line-clamp: 4;
 }
 .seasonal-mini-card--left-tall .advice-inline--bento {
-  font-size: 0.65rem;
+  font-size: 0.89rem;
 }
 .seasonal-mini-card--left-tall .mini-recipe-chip--bento {
   width: 50px;
@@ -1692,18 +1710,18 @@ onUnmounted(() => {
   font-weight: 700;
 }
 
-/* 首页首屏：节气卡与入口方格内文字统一近黑；主入口标题加粗；除「四时之序」眉题外整体略放大 */
-.tcm-home-hero .seasonal-mini-eyebrow {
+/* 首页首屏：眉题+副标题左上叠放、日期右上；节气正文与甄选较此前再大 1.2 倍且居中 */
+.tcm-home-hero .seasonal-mini-card--bento .seasonal-mini-eyebrow {
   font-family: "Ma Shan Zheng", cursive;
-  font-size: 1.02rem;
+  font-size: 1.12rem;
   color: #0a0a0a;
-  text-align: center;
+  text-align: left;
 }
-.tcm-home-hero .seasonal-mini-motto {
+.tcm-home-hero .seasonal-mini-card--bento .seasonal-mini-motto--bento {
   font-family: "Ma Shan Zheng", cursive;
-  font-size: 0.74rem;
+  font-size: 0.9rem;
   color: #0a0a0a;
-  text-align: center;
+  text-align: left;
 }
 .tcm-home-hero .term-name-mini {
   font-family: "Ma Shan Zheng", cursive;
@@ -1712,36 +1730,36 @@ onUnmounted(() => {
 }
 .tcm-home-hero .term-name-mini--bento {
   font-family: "Ma Shan Zheng", cursive;
-  font-size: clamp(1.12rem, 2.6vw, 1.48rem);
+  font-size: clamp(1.49rem, 3.42vw, 1.94rem);
 }
 .tcm-home-hero .seasonal-mini-card--left-tall .term-name-mini--bento {
-  font-size: clamp(1.22rem, 2.8vw, 1.62rem);
+  font-size: clamp(1.61rem, 3.66vw, 2.14rem);
 }
 .tcm-home-hero .seasonal-mini-card--bento .term-count-mini {
   font-family: "Ma Shan Zheng", cursive;
-  font-size: 0.8rem;
+  font-size: 1.08rem;
   color: #0a0a0a;
   text-align: center;
 }
 .tcm-home-hero .seasonal-mini-card--bento .term-principle-mini {
   font-family: "Ma Shan Zheng", cursive;
-  font-size: 0.82rem;
+  font-size: 1.1rem;
   color: #0a0a0a;
   text-align: center;
 }
 .tcm-home-hero .seasonal-mini-card--bento .term-principle-mini--bento {
   font-family: "Ma Shan Zheng", cursive;
-  font-size: 0.74rem;
+  font-size: 1.01rem;
 }
 .tcm-home-hero .seasonal-mini-card--bento.seasonal-mini-card--left-tall .term-principle-mini--bento {
-  font-size: 0.78rem;
+  font-size: 1.06rem;
 }
 .tcm-home-hero .seasonal-mini-card--bento .advice-inline--bento {
   font-family: "Ma Shan Zheng", cursive;
-  font-size: 0.7rem;
+  font-size: 0.96rem;
 }
 .tcm-home-hero .seasonal-mini-card--bento.seasonal-mini-card--left-tall .advice-inline--bento {
-  font-size: 0.73rem;
+  font-size: 1.01rem;
 }
 .tcm-home-hero .seasonal-mini-card--bento .advice-inline-good,
 .tcm-home-hero .seasonal-mini-card--bento .advice-inline-bad {
@@ -1751,21 +1769,23 @@ onUnmounted(() => {
 }
 .tcm-home-hero .seasonal-mini-card--bento .seasonal-mini-recipes-label {
   font-family: "Ma Shan Zheng", cursive;
-  font-size: 0.82rem;
+  font-size: 1.15rem;
   font-weight: 700;
   color: #0a0a0a;
 }
 .tcm-home-hero .seasonal-mini-card--bento .seasonal-mini-recipes-hint {
   font-family: "Ma Shan Zheng", cursive;
-  font-size: 0.7rem;
+  font-size: 0.84rem;
   color: #0a0a0a;
 }
 .tcm-home-hero .seasonal-mini-card--bento .seasonal-mini-soup-icon {
   color: #0a0a0a;
+  width: 17px;
+  height: 17px;
 }
 .tcm-home-hero .seasonal-mini-card--bento .today-pill--mini {
   font-family: "Ma Shan Zheng", cursive;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   color: #0a0a0a;
   text-align: center;
 }
