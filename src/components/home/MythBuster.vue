@@ -216,7 +216,6 @@ async function loadMyths() {
     ]);
     if (error) throw error;
     const raw = Array.isArray(data) ? data : [];
-    if (raw.length) mythsCache.push(...raw);
     const mapped = raw.map((r, i) => normalize(r, i));
     fullMyths.value = hasValidItems(mapped) ? mapped : [];
     pickRandomBatch();
@@ -336,7 +335,7 @@ onMounted(() => {
         <template v-else>
           <div
             v-for="(item, idx) in visibleMyths"
-            :key="item.id + '-' + idx"
+            :key="item.id"
             class="myth-item"
             :class="{
               'is-expanded': expandedId === item.id,

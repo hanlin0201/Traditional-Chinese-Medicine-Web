@@ -35,7 +35,7 @@ watch(
       .filter(
         (p) =>
           (p.left_herb && String(p.left_herb).includes(q)) ||
-          (p.right_herb && String(p.right_herb).includes(q))
+          (p.right_herb && String(p.right_herb).includes(q)),
       )
       .slice(0, SEARCH_RESULT_CAP)
       .map((p, i) => ({
@@ -43,7 +43,7 @@ watch(
         _key: `s-${p.id ?? i}-${i}`,
       }));
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 const displayedPairs = computed(() => {
@@ -52,7 +52,9 @@ const displayedPairs = computed(() => {
 });
 
 const pairRowKey = (item, index) =>
-  isSearching.value ? item._key ?? `s-${item.id}-${index}` : item.id ?? index;
+  isSearching.value
+    ? (item._key ?? `s-${item.id}-${index}`)
+    : (item.id ?? index);
 
 // --- 背景图设置 ---
 const bgImage =
@@ -103,14 +105,13 @@ const fetchRandomPairings = async () => {
     const { data, error } = await Promise.race([
       supabase.from("herbal_pairings").select("*").limit(2000),
       new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("timeout")), 8000)
+        setTimeout(() => reject(new Error("timeout")), 8000),
       ),
     ]);
 
     if (error) throw error;
 
     const rows = Array.isArray(data) ? data : [];
-    if (rows.length) herbalPairingsCache.push(...rows);
     fullPairings.value = rows.map(mapPairingRow);
     pickRandomBrowse();
   } catch (e) {
@@ -192,7 +193,9 @@ onMounted(() => {
             （至多展示 {{ SEARCH_RESULT_CAP }} 条）
           </span>
         </template>
-        <template v-else> 未找到包含「{{ herbQuery.trim() }}」的配伍记录 </template>
+        <template v-else>
+          未找到包含「{{ herbQuery.trim() }}」的配伍记录
+        </template>
       </p>
 
       <div v-if="hasError" class="error-state">
@@ -550,8 +553,8 @@ onMounted(() => {
 }
 .card-front.bad {
   background: #fff5f5;
-  border-color: #ef9a9a;
-  border-bottom-color: #e57373;
+  border-color: #ee1212;
+  border-bottom-color: #f43c3c;
 }
 
 .brass-ring {
@@ -621,7 +624,7 @@ onMounted(() => {
   border-top: 3px solid #66bb6a;
 }
 .card-back.bad {
-  border-top: 3px solid #ef5350;
+  border-top: 3px solid #db2b28;
 }
 
 .back-header {
@@ -643,7 +646,7 @@ onMounted(() => {
   background: #66bb6a;
 }
 .back-tag.bad {
-  background: #ef5350;
+  background: #cf2522;
 }
 .back-effect {
   font-size: 0.9rem;

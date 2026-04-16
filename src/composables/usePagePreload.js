@@ -100,8 +100,56 @@ export function setHerbEasyCache(name, data) {
 // 配伍数据预加载缓存
 export const herbalPairingsCache = []
 
+let _warmPairingsPromise = null
+function _doWarmHerbalPairings() {
+  if (herbalPairingsCache.length > 0) return Promise.resolve()
+  if (_warmPairingsPromise) return _warmPairingsPromise
+  _warmPairingsPromise = (async () => {
+    try {
+      const { data } = await Promise.race([
+        supabase.from('herbal_pairings').select('*').limit(2000),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
+      ])
+      if (data && data.length) {
+        const seen = new Set(herbalPairingsCache.map(r => r.id))
+        for (const row of data) {
+          if (!seen.has(row.id)) {
+            herbalPairingsCache.push(row)
+            seen.add(row.id)
+          }
+        }
+      }
+    } catch {}
+  })().finally(() => { _warmPairingsPromise = null })
+  return _warmPairingsPromise
+}
+
 // 养生避雷针预加载缓存
 export const mythsCache = []
+
+let _warmMythsPromise = null
+function _doWarmMyths() {
+  if (mythsCache.length > 0) return Promise.resolve()
+  if (_warmMythsPromise) return _warmMythsPromise
+  _warmMythsPromise = (async () => {
+    try {
+      const { data } = await Promise.race([
+        supabase.from('myths').select('*'),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
+      ])
+      if (data && data.length) {
+        const seen = new Set(mythsCache.map(r => r.id))
+        for (const row of data) {
+          if (!seen.has(row.id)) {
+            mythsCache.push(row)
+            seen.add(row.id)
+          }
+        }
+      }
+    } catch {}
+  })().finally(() => { _warmMythsPromise = null })
+  return _warmMythsPromise
+}
 
 // 穴位详情缓存：{ [name]: { name, position, disease } }
 export const acupointCache = new Map()
@@ -405,28 +453,10 @@ export async function preloadHomeFeaturePages() {
     })()
 
     // 7) 配伍数据预加载（供百子柜秒显）
-    const warmHerbalPairings = (async () => {
-      if (herbalPairingsCache.length > 0) return
-      try {
-        const { data } = await Promise.race([
-          supabase.from('herbal_pairings').select('*').limit(2000),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
-        ])
-        if (data && data.length) herbalPairingsCache.push(...data)
-      } catch {}
-    })()
+    const warmHerbalPairings = _doWarmHerbalPairings()
 
     // 8) 养生避雷针数据预加载（供 MythBuster 秒显）
-    const warmMyths = (async () => {
-      if (mythsCache.length > 0) return
-      try {
-        const { data } = await Promise.race([
-          supabase.from('myths').select('*'),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
-        ])
-        if (data && data.length) mythsCache.push(...data)
-      } catch {}
-    })()
+    const warmMyths = _doWarmMyths()
 
     await Promise.allSettled([warmChunks, warmHerbs, warmRecipes, warmProfileData, warmInteractionsData, warmAcupoints, warmHerbalPairings, warmMyths])
     // 子任务内部用 if(!error&&data) 吞掉了异常，永远不会 reject。
