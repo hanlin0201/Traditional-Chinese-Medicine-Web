@@ -231,17 +231,51 @@ const calculateSeasonalState = () => {
   return activeTerm.name;
 };
 
+/** 已发布（或旧数据无审核字段）的食谱筛选，与食谱广场一致 */
+const RECIPES_PUBLISHED_OR =
+  "moderation_status.eq.published,moderation_status.is.null";
+
+/**
+ * 优先取当前节气标签的食谱；库里若未标注该节气（常见），退回任意已发布食谱，避免「当季甄选」空白
+ */
+const fetchSeasonalRecipes = async (termName) => {
+  const { data: matched } = await supabase
+    .from("recipes")
+    .select("id, name, image")
+    .eq("solar_term", termName)
+    .or(RECIPES_PUBLISHED_OR)
+    .limit(3);
+  if (matched?.length) return matched;
+
+  const { data: anyPublished } = await supabase
+    .from("recipes")
+    .select("id, name, image")
+    .or(RECIPES_PUBLISHED_OR)
+    .limit(3);
+  return anyPublished || [];
+};
+
 // --- 数据获取：Supabase ---
 const fetchSeasonalData = async () => {
   // 同步计算节气名与倒计时，立即渲染
   const termName = calculateSeasonalState();
   currentTermName.value = termName;
 
-  // 有缓存直接用，不再请求
+  // 已缓存节气文案时直接复用；食谱列表若为空则补拉（兼容旧会话只缓存了节气、或库里无当前节气）
   if (_seasonalCache.info) {
     termInfo.value = _seasonalCache.info;
-    seasonalRecipes.value = _seasonalCache.recipes;
+    seasonalRecipes.value = Array.isArray(_seasonalCache.recipes)
+      ? _seasonalCache.recipes
+      : [];
     loading.value = false;
+    if (seasonalRecipes.value.length) return;
+    try {
+      const list = await fetchSeasonalRecipes(termName);
+      seasonalRecipes.value = list;
+      _seasonalCache.recipes = list;
+    } catch {
+      /* 网络失败时节气名与倒计时仍正常显示 */
+    }
     return;
   }
 
@@ -249,23 +283,16 @@ const fetchSeasonalData = async () => {
   loading.value = false;
 
   try {
-    const [{ data: info }, { data: recipes }] = await Promise.all([
-      supabase.from("solar_terms").select("*").eq("name", termName).single(),
-      supabase
-        .from("recipes")
-        .select("id, name, image")
-        .eq("solar_term", termName)
-        .or("moderation_status.eq.published,moderation_status.is.null")
-        .limit(3),
+    const [{ data: info }, recipes] = await Promise.all([
+      supabase.from("solar_terms").select("*").eq("name", termName).maybeSingle(),
+      fetchSeasonalRecipes(termName),
     ]);
     if (info) {
       termInfo.value = info;
       _seasonalCache.info = info;
     }
-    if (recipes && recipes.length) {
-      seasonalRecipes.value = recipes;
-      _seasonalCache.recipes = recipes;
-    }
+    seasonalRecipes.value = recipes;
+    _seasonalCache.recipes = recipes;
   } catch (e) {
     // 网络失败时节气名与倒计时仍正常显示
   }

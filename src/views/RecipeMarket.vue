@@ -592,8 +592,10 @@ const handleHerbClick = (item) => {
   const fromRecipeId = selectedRecipe.value?.id
   const fromRecipeName = selectedRecipe.value?.name
 
-  // 先关闭弹层，避免 Teleport 悬浮层残留到下一页
-  closeRecipe()
+  // 只更新本地状态关闭 Teleport 弹层；不要先 router.replace 再 push（两次导航会卡主线程）
+  selectedRecipe.value = null
+  comments.value = []
+  homeworks.value = []
 
   router.push({
     name: 'HerbDetail',
